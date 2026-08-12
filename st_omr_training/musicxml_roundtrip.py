@@ -112,7 +112,7 @@ def project_score_semantics(score: object) -> SemanticScoreProjection:
                     elif isinstance(event, ChordEvent):
                         event_type = "chord"
                         pitches = tuple(_project_pitch(note) for note in event.notes)
-                    else:
+                    else:  # validate_score() makes this unreachable for V1.
                         raise SupportedV1RoundTripError("unsupported canonical event type")
 
                     projected_events.append(
@@ -161,7 +161,7 @@ def _required_int(element: ET.Element, child_name: str) -> int:
         raise SupportedV1RoundTripError(f"validated V1 element is missing {child_name}")
     try:
         return int(child.text)
-    except ValueError as exc:
+    except ValueError as exc:  # Stage 2-C should make this unreachable.
         raise SupportedV1RoundTripError(f"validated V1 integer is invalid: {child_name}") from exc
 
 
@@ -226,7 +226,7 @@ def parse_supported_v1_musicxml_projection(data: object) -> SemanticScoreProject
 
     try:
         root = ET.fromstring(data)
-    except ET.ParseError as exc:
+    except ET.ParseError as exc:  # Stage 2-C should make this unreachable.
         raise SupportedV1RoundTripError("validated MusicXML could not be parsed") from exc
 
     part = root.find("part")
@@ -327,10 +327,15 @@ def parse_supported_v1_musicxml_projection(data: object) -> SemanticScoreProject
     )
 
 
-def compare_semantic_projections(expected: object, actual: object) -> ValidationResult:
+def compare_semantic_projections(
+    expected: object,
+    actual: object,
+) -> ValidationResult:
     """Compare every field frozen by the Stage-2-D round-trip contract."""
 
-    if not isinstance(expected, SemanticScoreProjection) or not isinstance(actual, SemanticScoreProjection):
+    if not isinstance(expected, SemanticScoreProjection) or not isinstance(
+        actual, SemanticScoreProjection
+    ):
         return ValidationResult(
             (_issue("roundtrip.projection_type", "$", "both values must be SemanticScoreProjection"),)
         )
@@ -345,27 +350,77 @@ def compare_semantic_projections(expected: object, actual: object) -> Validation
     for part_index, (left_part, right_part) in enumerate(zip(expected.parts, actual.parts)):
         part_path = f"$.parts[{part_index}]"
         check("roundtrip.part_id", f"{part_path}.part_id", left_part.part_id, right_part.part_id, "part id")
-        check("roundtrip.staff_count", f"{part_path}.staff_count", left_part.staff_count, right_part.staff_count, "staff count")
-        check("roundtrip.measure_count", f"{part_path}.measures", len(left_part.measures), len(right_part.measures), "measure count")
-        for measure_index, (left_measure, right_measure) in enumerate(zip(left_part.measures, right_part.measures)):
+        check(
+            "roundtrip.staff_count",
+            f"{part_path}.staff_count",
+            left_part.staff_count,
+            right_part.staff_count,
+            "staff count",
+        )
+        check(
+            "roundtrip.measure_count",
+            f"{part_path}.measures",
+            len(left_part.measures),
+            len(right_part.measures),
+            "measure count",
+        )
+        for measure_index, (left_measure, right_measure) in enumerate(
+            zip(left_part.measures, right_part.measures)
+        ):
             measure_path = f"{part_path}.measures[{measure_index}]"
             check("roundtrip.measure_number", f"{measure_path}.number", left_measure.number, right_measure.number, "measure number")
-            check("roundtrip.time_signature", f"{measure_path}.time_signature", left_measure.time_signature, right_measure.time_signature, "time signature")
-            check("roundtrip.key_signature", f"{measure_path}.key_signature", left_measure.key_signature, right_measure.key_signature, "key signature")
+            check(
+                "roundtrip.time_signature",
+                f"{measure_path}.time_signature",
+                left_measure.time_signature,
+                right_measure.time_signature,
+                "time signature",
+            )
+            check(
+                "roundtrip.key_signature",
+                f"{measure_path}.key_signature",
+                left_measure.key_signature,
+                right_measure.key_signature,
+                "key signature",
+            )
             check("roundtrip.clef", f"{measure_path}.clef", left_measure.clef, right_measure.clef, "clef")
-            check("roundtrip.voice_count", f"{measure_path}.voices", len(left_measure.voices), len(right_measure.voices), "voice count")
-            for voice_index, (left_voice, right_voice) in enumerate(zip(left_measure.voices, right_measure.voices)):
+            check(
+                "roundtrip.voice_count",
+                f"{measure_path}.voices",
+                len(left_measure.voices),
+                len(right_measure.voices),
+                "voice count",
+            )
+            for voice_index, (left_voice, right_voice) in enumerate(
+                zip(left_measure.voices, right_measure.voices)
+            ):
                 voice_path = f"{measure_path}.voices[{voice_index}]"
                 check("roundtrip.voice_id", f"{voice_path}.voice_id", left_voice.voice_id, right_voice.voice_id, "voice id")
-                check("roundtrip.event_count", f"{voice_path}.events", len(left_voice.events), len(right_voice.events), "event count")
-                for event_index, (left_event, right_event) in enumerate(zip(left_voice.events, right_voice.events)):
+                check(
+                    "roundtrip.event_count",
+                    f"{voice_path}.events",
+                    len(left_voice.events),
+                    len(right_voice.events),
+                    "event count",
+                )
+                for event_index, (left_event, right_event) in enumerate(
+                    zip(left_voice.events, right_voice.events)
+                ):
                     event_path = f"{voice_path}.events[{event_index}]"
                     check("roundtrip.event_type", f"{event_path}.event_type", left_event.event_type, right_event.event_type, "event type")
                     check("roundtrip.onset", f"{event_path}.onset", left_event.onset, right_event.onset, "onset")
                     check("roundtrip.duration", f"{event_path}.duration", left_event.duration, right_event.duration, "duration")
                     check("roundtrip.staff", f"{event_path}.staff", left_event.staff, right_event.staff, "staff")
-                    check("roundtrip.pitch_count", f"{event_path}.pitches", len(left_event.pitches), len(right_event.pitches), "pitch/member count")
-                    for pitch_index, (left_pitch, right_pitch) in enumerate(zip(left_event.pitches, right_event.pitches)):
+                    check(
+                        "roundtrip.pitch_count",
+                        f"{event_path}.pitches",
+                        len(left_event.pitches),
+                        len(right_event.pitches),
+                        "pitch/member count",
+                    )
+                    for pitch_index, (left_pitch, right_pitch) in enumerate(
+                        zip(left_event.pitches, right_event.pitches)
+                    ):
                         pitch_path = f"{event_path}.pitches[{pitch_index}]"
                         check("roundtrip.pitch_step", f"{pitch_path}.step", left_pitch.step, right_pitch.step, "pitch step")
                         check("roundtrip.pitch_alter", f"{pitch_path}.alter", left_pitch.alter, right_pitch.alter, "pitch alter")
