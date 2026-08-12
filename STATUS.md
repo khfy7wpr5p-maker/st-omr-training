@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. No ST Music Generator implementation, dataset generation, model training, or ScoreMosaic integration has started.
+Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1-A is the active package and introduces only the immutable canonical core model primitives for the ST Music Generator. No MusicXML writer, renderer, dataset generation, model training, or ScoreMosaic integration has started.
 
 ## Stage status
 
@@ -18,7 +18,8 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 0-F | Architecture consistency audit | ✅ Complete |
 | 0-G | Baseline documentation | ✅ Complete |
 | 0 | Safety and architecture baseline | ✅ Closed with CI deferred |
-| 1 | ST Music Generator | 🔒 Not started |
+| 1 | ST Music Generator | 🔄 In progress |
+| 1-A | Canonical core model | 🔄 PR package in progress |
 | 2 | Canonical / MusicXML validation | 🔒 Not started |
 | 3 | Renderer integration | 🔒 Not started |
 | 4 | Controlled degradation | 🔒 Not started |
@@ -31,32 +32,38 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 
 ## Current branch package
 
-Branch: `stage-0-closure-status`
+Branch: `stage-1a-canonical-core-model`
 
 Scope:
 
-- update `STATUS.md` only
-- record the successful completion of Stage 0-G
-- close Stage 0 while preserving the explicit CI-deferred status
-- keep Stage 1 locked and not started
+- immutable `RationalDuration`
+- structured `Pitch`
+- `DisplayAccidental` and `NotationIntent`
+- immutable `NoteEvent`
+- immutable `RestEvent`
+- immutable `ChordEvent`
+- Stage 1-A unit, negative, immutability, exact-rational, equality, and hash-behavior tests
+- update this status file to reflect the active package
 
-Out of scope for this package:
+Explicitly out of scope:
 
-- application code
-- generator code
-- dependencies
-- workflows or CI
-- datasets
-- model files
-- ScoreMosaic changes
+- Score / Measure generation
+- random or procedural music generation
+- MusicXML writer or parser
+- Verovio or any renderer
+- image augmentation
+- datasets or model files
+- AI/model training
+- ScoreMosaic integration
 - Guitar TAB work
+- dependencies or GitHub Actions
 
 ## Verification status
 
-This is a documentation-only closure package. Its required verification is a branch diff confirming that only the approved `STATUS.md` state correction is present.
+The Stage 1-A implementation has been exercised locally with the standard-library unittest suite: 33 tests passed. Python compile validation also passed. GitHub CI is currently unavailable, so this evidence must be reported as `LOCAL VERIFIED — CI NOT AVAILABLE`, never as CI evidence.
 
-GitHub CI is currently unavailable. Local verification evidence, when later produced, must not be reported as GitHub CI evidence.
+The final package still requires branch diff review and PR review before merge.
 
 ## Next gate
 
-The next planned work is Stage 1-A: define and implement the smallest canonical core model package for the ST Music Generator. Stage 1 must begin only as a separate approved package and must not include MusicXML rendering, datasets, model training, or ScoreMosaic integration.
+After Stage 1-A is reviewed and explicitly accepted for merge, the next package is Stage 1-B: independent validation of canonical core objects and higher-level invariants. MusicXML rendering, datasets, model training, and ScoreMosaic integration remain out of scope.
