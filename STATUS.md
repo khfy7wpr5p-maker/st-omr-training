@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1-A canonical core model is merged. Stage 1-B is the active package and adds an independent V1 validator for the canonical core objects. No MusicXML writer, renderer, dataset generation, model training, or ScoreMosaic integration has started.
+Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1-A canonical core model and Stage 1-B independent V1 validator are merged. Stage 1-C is the active package and adds the immutable Score → Part → Measure → Voice structure plus independent V1 structure validation. No procedural generator, MusicXML writer, renderer, dataset generation, model training, or ScoreMosaic integration has started.
 
 ## Stage status
 
@@ -20,7 +20,8 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 0 | Safety and architecture baseline | ✅ Closed with CI deferred |
 | 1 | ST Music Generator | 🔄 In progress |
 | 1-A | Canonical core model | ✅ Complete |
-| 1-B | Independent V1 validator | 🔄 PR package in progress |
+| 1-B | Independent V1 validator | ✅ Complete |
+| 1-C | Score structure model and validator | 🔄 PR package in progress |
 | 2 | Canonical / MusicXML validation | 🔒 Not started |
 | 3 | Renderer integration | 🔒 Not started |
 | 4 | Controlled degradation | 🔒 Not started |
@@ -33,28 +34,30 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 
 ## Current branch package
 
-Branch: `stage-1b-independent-validator`
+Branch: `stage-1c-score-structure`
 
 Scope:
 
-- immutable `ValidationIssue`
-- immutable `ValidationResult`
-- independent validation for `NoteEvent`
-- independent validation for `RestEvent`
-- independent validation for `ChordEvent`
-- generic `validate_v1_event()` dispatch
-- V1 voice/staff policy enforcement
-- exact/canonical duration and onset checks
-- V1 pitch checks
-- chord size, duplicate-pitch, and member consistency checks
-- visible accidental / pitch-alter coherence checks
-- negative tests that deliberately corrupt otherwise immutable core objects to prove the validator does not trust constructor success
+- immutable `TimeSignature` with V1 2/4, 3/4, and 4/4 capacities
+- immutable `Voice`, `Measure`, `Part`, and `Score`
+- explicit V1 treble clef, key signature 0, one voice, one staff, and one part policy
+- exact rational `expected_duration`
+- independent score-structure validation
+- event ordering, overlap, gap, measure underflow, and measure overflow checks
+- V1 note/chord/rest duration-set checks
+- explicit-rest requirement for silence inside a complete measure
+- sequential measure-number validation
+- score reproduction metadata fields for later deterministic generation
+- Stage 1-C positive, negative, immutability, timing, chord-timeline, and deterministic issue-order tests
 
 Explicitly out of scope:
 
-- Score / Part / Measure / Voice generation
 - random or procedural music generation
-- measure-level accidental-state interpretation
+- pickup/anacrusis measures
+- full-measure-rest notation semantics
+- multiple voices or staffs
+- non-zero key signatures
+- clefs other than treble
 - MusicXML writer or parser
 - Verovio or any renderer
 - image augmentation
@@ -66,10 +69,10 @@ Explicitly out of scope:
 
 ## Verification status
 
-The exact Stage 1-B code and tests were mirrored locally and exercised with the standard-library unittest suite: 62 tests passed in total, including the existing Stage 1-A regression suite. Python compile validation also passed. GitHub CI remains unavailable, so this evidence is `LOCAL VERIFIED — CI NOT AVAILABLE`, not CI evidence.
+The Stage 1-C candidate was exercised locally with the standard-library unittest suite together with the existing Stage 1-A and Stage 1-B regression coverage: 101 tests passed. Python compile validation also passed. GitHub CI remains unavailable, so this evidence is `LOCAL VERIFIED — CI NOT AVAILABLE`, not CI evidence.
 
 The final package still requires branch diff review and PR review before merge.
 
 ## Next gate
 
-After Stage 1-B is reviewed and explicitly accepted for merge, the next Stage 1 package will be scoped separately. MusicXML rendering, datasets, model training, and ScoreMosaic integration must not begin implicitly.
+After Stage 1-C is reviewed and explicitly accepted for merge, the next planned package is Stage 1-D: deterministic ST Music Generator v1. MusicXML rendering, datasets, model training, and ScoreMosaic integration must not begin implicitly.
