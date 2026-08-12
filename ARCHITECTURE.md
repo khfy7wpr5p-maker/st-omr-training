@@ -99,7 +99,9 @@ MusicXML is a derived deterministic serialization. For the same canonical `Score
 
 Stage 3 pins Verovio 6.2.1, renderer configuration, Leipzig font selection, adapter version, and deterministic XML-ID behavior. In the verified Linux/Python environment, repeated rendering of identical supported MusicXML produced byte-identical SVG output and identical page hashes.
 
-Cross-platform SVG byte identity is not assumed automatically. A different operating system, architecture, renderer resource bundle, or runtime must be separately verified before artifacts from different environments are mixed.
+Stage 4 derives its complete public degradation configuration from explicit integer parameters and, for sampled profiles, an explicit seed without mutable global RNG state. The clean raster, exact degradation configuration, source hashes, dependency/runtime provenance, and final PNG hash are recorded for replay and audit.
+
+Cross-platform SVG or raster byte identity is not assumed automatically. A different operating system, architecture, renderer resource bundle, Cairo runtime, or relevant image runtime must be separately verified before artifacts from different environments are mixed.
 
 ## MusicXML serialization boundary
 
@@ -149,23 +151,44 @@ Validated self-contained SVG page(s)
 Per-page SHA-256 + renderer provenance
 ```
 
-The renderer adapter validates MusicXML before invoking Verovio, uses explicit MusicXML input mode, limits page count, records runtime/configuration provenance, and rejects unsafe SVG surfaces such as scripts or external references. Rasterization is intentionally deferred to Stage 4 so the clean vector render remains independently auditable.
+The renderer adapter validates MusicXML before invoking Verovio, uses explicit MusicXML input mode, limits page count, records runtime/configuration provenance, and rejects unsafe SVG surfaces such as scripts or external references. Rasterization remains outside the renderer so the clean vector render stays independently auditable.
 
 ## Controlled degradation boundary
 
-Stage 4 is the next development stage. It may transform clean rendered output into visually degraded derivatives for training, but it must preserve the symbolic target and source-family identity.
+Stage 4 is governed by [DEGRADATION_CONTRACT.md](DEGRADATION_CONTRACT.md).
 
-Stage 4 must remain separate from the renderer and dataset builder. It must define deterministic/replayable augmentation parameters, provenance for every derivative, explicit safety bounds, and rejection rules for transformations that remove or destroy required score content.
+The bounded V1 path is:
 
-No Stage 4 implementation is part of the completed Stage 3 architecture.
+```text
+Validated self-contained Stage 3 SVG page
+        + lineage / family_id
+        ↓
+Independent Stage 4 SVG/hash/resource preflight
+        ↓
+Pinned CairoSVG 2.8.2 clean rasterization
+        ↓
+Canonical grayscale PNG + clean hash
+        ↓
+Bounded deterministic transform pipeline
+        ↓
+Final grayscale PNG
+        ↓
+Exact replay config + source/clean/final hashes + runtime provenance
+```
+
+Stage 4 is separate from both the renderer and the dataset builder. It revalidates Stage 3 SVG/hash lineage, uses a bounded raster width/pixel budget, and performs only conservative V1 transformations: expanded-canvas rotation, Gaussian blur, brightness, contrast, deterministic noise, and optional JPEG round-trip compression. The final artifact remains PNG.
+
+Arbitrary crop, perspective warp, shear, elastic deformation, synthetic occlusion/shadow, staff deletion, symbol deletion, and content-aware erasing are deliberately deferred. Those transforms require stronger score-region/content-preservation evidence before they can become training-data operations.
+
+The original canonical symbolic score remains the musical target. Stage 4 creates derived appearance artifacts only and preserves `family_id` across all derivatives.
 
 ## Verification boundary
 
-GitHub Actions CI is active for the public repository. The current baseline uses GitHub-hosted Ubuntu with Python 3.13, pinned runtime dependencies, the complete unittest suite including real Verovio runtime tests, and Python compile validation.
+GitHub Actions CI is active for the public repository. The baseline uses GitHub-hosted Ubuntu with Python 3.13, pinned runtime dependencies, complete unittest discovery including real-runtime integration tests, and Python compile validation.
 
-The exact `main` commit `5abbc9859a4a69bf9a17936bc41e722256f87472` passed the post-merge CI run after PR #12. The current integrated implementation through Stage 3 is therefore CI verified.
+The exact pre-Stage-4 `main` commit `23739ddfab618a0406836e94bb0ced1a124f8886` passed post-merge CI run `31648164533`. The integrated implementation through Stage 3 is therefore CI verified.
 
-Future implementation packages must still pass their own focused tests, full regression, relevant real-runtime/integration evidence, pull-request CI, and post-merge main CI before a stage is closed.
+Stage 4 is not complete merely because its implementation exists on a feature branch. It must pass its focused and real-pipeline tests, full regression, exact final PR-head GitHub-hosted CI, separate merge approval, and post-merge CI on the exact resulting `main` commit before Stage 5 may begin.
 
 ## Stage roadmap
 
@@ -177,7 +200,7 @@ Stage 2-B Deterministic MusicXML 4.0 writer            ✅
 Stage 2-C Offline XSD + independent validator          ✅
 Stage 2-D Supported-V1 semantic round-trip verifier    ✅
 Stage 3   Renderer integration                          ✅
-Stage 4   Controlled degradation                        ⏭ next
+Stage 4   Controlled degradation                        🔄 active package
 Stage 5   Dataset validation                            🔒
 Stage 6   Synthetic Dataset v1                          🔒
 Stage 7   Baseline ST-OMR training                      🔒
