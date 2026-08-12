@@ -200,22 +200,21 @@ A future `real_verified` class, if introduced, must remain distinct from synthet
 
 All rendered or degraded derivatives of the same symbolic source must share one `family_id`.
 
-Example:
+Stage 4 V1 example:
 
 ```text
 family: score-1842
-├── clean-svg
-├── raster-clean-01
-├── blur-01
-├── shadow-01
-└── skew-01
+├── clean-svg-page-1
+├── raster-clean-page-1
+├── light-seed-17-page-1
+└── medium-seed-42-page-1
 ```
 
 Dataset splitting must operate on source families, not individual images, so derivatives of one symbolic score cannot leak across train, validation, and test partitions.
 
 ## Derived artifact provenance
 
-Stage 3 clean renderer output and Stage 4 degraded derivatives remain derived artifacts; they do not become symbolic ground truth.
+Stage 3 clean renderer output and Stage 4 raster/degraded derivatives remain derived artifacts; they do not become symbolic ground truth.
 
 A derived artifact record should preserve, as applicable:
 
@@ -232,7 +231,9 @@ DerivedArtifact
 └── transformation_metadata
 ```
 
-For Stage 3, the producer identity includes the pinned renderer/runtime and renderer configuration. For Stage 4, degradation provenance must identify the clean source artifact and the exact transformation parameters needed for audit or replay.
+For Stage 3, producer identity includes the pinned renderer/runtime and renderer configuration.
+
+Stage 4 V1 additionally preserves the original MusicXML hash, renderer configuration fingerprint, source SVG hash, clean raster hash, exact `DegradationConfig`, degradation configuration fingerprint, final PNG hash, Stage 4 version, direct image-library versions, Cairo runtime version, Python version, and platform system/machine. The exact implemented representation is defined in [DEGRADATION_CONTRACT.md](DEGRADATION_CONTRACT.md).
 
 ## Hash lineage
 
@@ -245,7 +246,9 @@ MusicXML
     ↓ hash
 Clean rendered SVG page
     ↓ hash
-Rasterized/degraded derivative
+Clean grayscale raster
+    ↓ hash
+Controlled degradation derivative
     ↓ hash
 Dataset sample manifest entry
 ```
