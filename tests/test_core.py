@@ -21,6 +21,13 @@ class RationalDurationTests(unittest.TestCase):
         self.assertEqual(RationalDuration(2, 8), Q)
         self.assertEqual(hash(RationalDuration(2, 8)), hash(Q))
 
+    def test_addition_is_exact(self):
+        self.assertEqual(Q + Q, RationalDuration(1, 2))
+        self.assertEqual(
+            RationalDuration(1, 3) + RationalDuration(1, 6),
+            RationalDuration(1, 2),
+        )
+
     def test_normalizes_negative_denominator(self):
         self.assertEqual(RationalDuration(-1, -4), Q)
 
@@ -76,7 +83,9 @@ class NotationIntentTests(unittest.TestCase):
     def test_pitch_and_display_intent_are_separate(self):
         pitch = Pitch("F", 1, 4)
         hidden = NoteEvent(0, Q, pitch)
-        shown = NoteEvent(0, Q, pitch, NotationIntent(DisplayAccidental.SHARP))
+        shown = NoteEvent(
+            0, Q, pitch, NotationIntent(DisplayAccidental.SHARP)
+        )
         self.assertNotEqual(hidden, shown)
 
     def test_raw_string_rejected(self):
@@ -120,23 +129,35 @@ class ChordEventTests(unittest.TestCase):
         self.b = Pitch("B", 0, 4)
         self.d = Pitch("D", 0, 5)
 
+    def note(self, pitch, *, onset=0, duration=Q, voice=1, staff=1, intent=None):
+        return NoteEvent(
+            onset,
+            duration,
+            pitch,
+            intent or NotationIntent(),
+            voice=voice,
+            staff=staff,
+        )
+
     def test_two_through_four_note_chords_allowed(self):
-        for notes in (
+        for pitches in (
             (self.c, self.e),
             (self.c, self.e, self.g),
             (self.c, self.e, self.g, self.b),
         ):
+            notes = tuple(self.note(pitch) for pitch in pitches)
             with self.subTest(size=len(notes)):
                 chord = ChordEvent(0, Q, notes)
                 self.assertEqual(chord.notes, notes)
 
     def test_one_note_chord_rejected(self):
         with self.assertRaises(ValueError):
-            ChordEvent(0, Q, (self.c,))
+            ChordEvent(0, Q, (self.note(self.c),))
 
     def test_five_note_chord_rejected(self):
+        notes = tuple(self.note(p) for p in (self.c, self.e, self.g, self.b, self.d))
         with self.assertRaises(ValueError):
-            ChordEvent(0, Q, (self.c, self.e, self.g, self.b, self.d))
+            ChordEvent(0, Q, notes)
 
     def test_empty_chord_rejected(self):
         with self.assertRaises(ValueError):
@@ -144,17 +165,58 @@ class ChordEventTests(unittest.TestCase):
 
     def test_duplicate_pitch_rejected(self):
         with self.assertRaises(ValueError):
-            ChordEvent(0, Q, (self.c, self.e, self.c))
+            ChordEvent(
+                0,
+                Q,
+                (self.note(self.c), self.note(self.e), self.note(self.c)),
+            )
 
     def test_mutable_note_container_rejected(self):
         with self.assertRaises(TypeError):
-            ChordEvent(0, Q, [self.c, self.e])
+            ChordEvent(0, Q, [self.note(self.c), self.note(self.e)])
 
-    def test_chord_hash_and_equality_are_stable(self):
-        first = ChordEvent(0, Q, (self.c, self.e, self.g))
-        second = ChordEvent(
-            Fraction(0, 8), RationalDuration(2, 8), (self.c, self.e, self.g)
+    def test_member_onset_must_match(self):
+        with self.assertRaises(ValueError):
+            ChordEvent(
+                0,
+                Q,
+                (self.note(self.c), self.note(self.e, onset=Fraction(1, 8))),
+            )
+
+    def test_member_duration_must_match(self):
+        with self.assertRaises(ValueError):
+            ChordEvent(
+                0,
+                Q,
+                (self.note(self.c), self.note(self.e, duration=RationalDuration(1, 8))),
+            )
+
+    def test_member_voice_and_staff_must_match(self):
+        with self.assertRaises(ValueError):
+            ChordEvent(0, Q, (self.note(self.c), self.note(self.e, voice=2)))
+        with self.assertRaises(ValueError):
+            ChordEvent(0, Q, (self.note(self.c), self.note(self.e, staff=2)))
+
+    def test_member_notation_intent_is_preserved(self):
+        sharp_intent = NotationIntent(DisplayAccidental.SHARP)
+        chord = ChordEvent(
+            0,
+            Q,
+            (self.note(Pitch("C", 1, 4), intent=sharp_intent), self.note(self.e)),
         )
+        self.assertEqual(
+            chord.notes[0].notation_intent.display_accidental,
+            DisplayAccidental.SHARP,
+        )
+
+    def test_chord_hash_and_equality_are_stable_for_equal_objects(self):
+        first_notes = tuple(self.note(p) for p in (self.c, self.e, self.g))
+        second_notes = tuple(
+            NoteEvent(Fraction(0, 8), RationalDuration(2, 8), p)
+            for p in (self.c, self.e, self.g)
+        )
+        first = ChordEvent(0, Q, first_notes)
+        second = ChordEvent(Fraction(0, 8), RationalDuration(2, 8), second_notes)
         self.assertEqual(first, second)
         self.assertEqual(hash(first), hash(second))
 
