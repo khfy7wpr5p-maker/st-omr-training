@@ -8,7 +8,7 @@ The repository is public. Stage 0 safety/architecture baseline, Stage 1 ST Music
 
 The exact pre-Stage-4 `main` commit `23739ddfab618a0406836e94bb0ced1a124f8886` completed GitHub-hosted CI successfully in run `31648164533`. The integrated state through Stage 3 is therefore `CI VERIFIED`.
 
-Stage 4 Controlled Degradation is the active bounded implementation package on branch `stage-4-controlled-degradation`. Stage 5 Dataset Validation has not started and remains locked.
+Stage 4 Controlled Degradation is the active bounded implementation package on branch `stage-4-controlled-degradation`. PR #14 is open. Stage 5 Dataset Validation has not started and remains locked.
 
 ## Stage status
 
@@ -33,7 +33,7 @@ Stage 4 Controlled Degradation is the active bounded implementation package on b
 | 2-D | Supported-V1 semantic round-trip verifier | ✅ Complete |
 | 2 | MusicXML pipeline | ✅ Closed — integrated main CI verified |
 | 3 | Renderer integration | ✅ Closed — integrated main CI verified |
-| 4 | Controlled degradation | 🔄 PR open — final-head CI gate pending |
+| 4 | Controlled degradation | ✅ PR package ready — final-head CI required for merge |
 | 5 | Dataset validation | 🔒 Not started |
 | 6 | Synthetic Dataset v1 | 🔒 Not started |
 | 7 | Baseline ST-OMR training | 🔒 Not started |
@@ -50,7 +50,7 @@ Stage 4 Controlled Degradation is the active bounded implementation package on b
 - CI baseline merged through PR #12 at main commit `5abbc9859a4a69bf9a17936bc41e722256f87472` and post-merge run `31647615123` succeeded.
 - Current-state documentation synchronized through PR #13 at main commit `23739ddfab618a0406836e94bb0ced1a124f8886` and post-merge run `31648164533` succeeded.
 
-The `CI VERIFIED` statement applies to the exact integrated `main` content GitHub-hosted CI exercised. Stage 4 requires its own new evidence.
+The `CI VERIFIED` statement applies to the exact integrated `main` content GitHub-hosted CI exercised. Stage 4 requires its own PR-head and later post-merge evidence.
 
 ## Stage 4 package
 
@@ -98,9 +98,9 @@ Local focused/prototype evidence before hosted verification:
 
 A complete local repository regression is not claimed for this package.
 
-GitHub-hosted PR run `31649588268` succeeded on implementation head `84c76efbc13d6ebb4ad90e33e5af0b9fdfa4bbfe`. The fresh Ubuntu 24.04 / Python 3.13.14 environment installed and verified `lxml==6.1.1`, `verovio==6.2.1`, `CairoSVG==2.8.2`, and `Pillow==12.3.0`; `pip check` reported no broken requirements; the complete suite passed **264/264 tests** including the real Verovio → CairoSVG/Pillow Stage 4 path; and Python compile validation passed.
+GitHub-hosted PR run `31649588268` succeeded on implementation head `84c76efbc13d6ebb4ad90e33e5af0b9fdfa4bbfe`. A subsequent hosted run `31649679729` also succeeded after the evidence/status update. In the fresh Ubuntu 24.04 / Python 3.13 environment, exact `lxml==6.1.1`, `verovio==6.2.1`, `CairoSVG==2.8.2`, and `Pillow==12.3.0` checks passed; `pip check` reported no broken requirements; the complete suite passed **264/264 tests** including the real Verovio → CairoSVG/Pillow Stage 4 path; and Python compile validation passed.
 
-This STATUS update creates a new PR head commit. Therefore the package is not labeled `CI VERIFIED — PR HEAD` until the automatically triggered GitHub-hosted run for this exact final head also succeeds.
+The merge gate always uses the GitHub-hosted run associated with the **exact current PR head**. A successful run on an earlier head is evidence, but never substitutes for final-head verification.
 
 ## CI baseline
 
@@ -110,4 +110,4 @@ The Stage 4 branch extends the pinned runtime check to CairoSVG 2.8.2 and Pillow
 
 ## Next gate
 
-Require GitHub-hosted CI to pass on the exact final PR #14 head after this evidence update. If green, Stage 4 is `CI VERIFIED — PR HEAD` and merge requires separate explicit approval. After merge, the exact resulting `main` commit must also pass GitHub-hosted CI before Stage 4 closes and Stage 5 may begin.
+Verify GitHub-hosted CI on the exact current PR #14 head. If green, Stage 4 is `CI VERIFIED — PR HEAD` and merge requires separate explicit approval. After merge, the exact resulting `main` commit must also pass GitHub-hosted CI before Stage 4 closes and Stage 5 may begin.
