@@ -33,6 +33,16 @@ from .generator import (
     config_fingerprint,
     generate_score,
 )
+from .musicxml_writer import (
+    MUSICXML_PART_ID,
+    MUSICXML_PART_NAME,
+    MUSICXML_VERSION,
+    MUSICXML_WRITER_VERSION,
+    MusicXMLWriteError,
+    compute_musicxml_divisions,
+    musicxml_sha256,
+    write_musicxml,
+)
 
 __all__ = [
     "ChordEvent",
@@ -65,4 +75,12 @@ __all__ = [
     "GeneratorConfig",
     "config_fingerprint",
     "generate_score",
+    "MUSICXML_PART_ID",
+    "MUSICXML_PART_NAME",
+    "MUSICXML_VERSION",
+    "MUSICXML_WRITER_VERSION",
+    "MusicXMLWriteError",
+    "compute_musicxml_divisions",
+    "musicxml_sha256",
+    "write_musicxml",
 ]
