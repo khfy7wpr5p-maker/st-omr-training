@@ -53,6 +53,19 @@ from .musicxml_validator import (
     validate_musicxml_xsd,
     verify_musicxml_schema_assets,
 )
+from .musicxml_roundtrip import (
+    SemanticEventProjection,
+    SemanticMeasureProjection,
+    SemanticPartProjection,
+    SemanticPitchProjection,
+    SemanticScoreProjection,
+    SemanticVoiceProjection,
+    SupportedV1RoundTripError,
+    compare_semantic_projections,
+    parse_supported_v1_musicxml_projection,
+    project_score_semantics,
+    verify_supported_v1_round_trip,
+)
 
 __all__ = [
     "ChordEvent",
@@ -101,4 +114,15 @@ __all__ = [
     "validate_musicxml_semantics",
     "validate_musicxml_xsd",
     "verify_musicxml_schema_assets",
+    "SemanticEventProjection",
+    "SemanticMeasureProjection",
+    "SemanticPartProjection",
+    "SemanticPitchProjection",
+    "SemanticScoreProjection",
+    "SemanticVoiceProjection",
+    "SupportedV1RoundTripError",
+    "compare_semantic_projections",
+    "parse_supported_v1_musicxml_projection",
+    "project_score_semantics",
+    "verify_supported_v1_round_trip",
 ]
