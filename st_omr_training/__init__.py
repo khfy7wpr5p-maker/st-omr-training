@@ -25,6 +25,14 @@ from .structure_validator import (
     validate_time_signature,
     validate_voice,
 )
+from .generator import (
+    DEFAULT_GENERATOR_VERSION,
+    DEFAULT_SCHEMA_VERSION,
+    GenerationValidationError,
+    GeneratorConfig,
+    config_fingerprint,
+    generate_score,
+)
 
 __all__ = [
     "ChordEvent",
@@ -51,4 +59,10 @@ __all__ = [
     "validate_score",
     "validate_time_signature",
     "validate_voice",
+    "DEFAULT_GENERATOR_VERSION",
+    "DEFAULT_SCHEMA_VERSION",
+    "GenerationValidationError",
+    "GeneratorConfig",
+    "config_fingerprint",
+    "generate_score",
 ]
