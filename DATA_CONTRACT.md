@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the Stage 0 conceptual data contract shared by the ST Music Generator, independent validator, MusicXML writer, and later dataset pipeline.
+This document defines the conceptual data contract shared by the ST Music Generator, independent validator, MusicXML writer, renderer boundary, and later degradation/dataset pipeline.
 
 The implementation may evolve, but it must preserve these semantic boundaries unless the contract is explicitly revised.
 
@@ -170,7 +170,7 @@ notation_intent
 └── display_accidental = none | sharp | flat | natural
 ```
 
-The exact implementation representation is deferred, but the semantic distinction is mandatory.
+The implementation representation may evolve, but the semantic distinction is mandatory.
 
 ## Provenance
 
@@ -204,7 +204,8 @@ Example:
 
 ```text
 family: score-1842
-├── clean
+├── clean-svg
+├── raster-clean-01
 ├── blur-01
 ├── shadow-01
 └── skew-01
@@ -212,24 +213,49 @@ family: score-1842
 
 Dataset splitting must operate on source families, not individual images, so derivatives of one symbolic score cannot leak across train, validation, and test partitions.
 
+## Derived artifact provenance
+
+Stage 3 clean renderer output and Stage 4 degraded derivatives remain derived artifacts; they do not become symbolic ground truth.
+
+A derived artifact record should preserve, as applicable:
+
+```text
+DerivedArtifact
+├── family_id
+├── source_artifact_sha256
+├── artifact_sha256
+├── artifact_type
+├── producer_name
+├── producer_version
+├── config_fingerprint
+├── seed_or_replay_parameters
+└── transformation_metadata
+```
+
+For Stage 3, the producer identity includes the pinned renderer/runtime and renderer configuration. For Stage 4, degradation provenance must identify the clean source artifact and the exact transformation parameters needed for audit or replay.
+
 ## Hash lineage
 
-Later pipeline stages must preserve a traceable hash chain where applicable:
+Pipeline stages must preserve a traceable hash chain where applicable:
 
 ```text
 Canonical model
     ↓ hash
 MusicXML
     ↓ hash
-Rendered image
+Clean rendered SVG page
     ↓ hash
-Derived image
+Rasterized/degraded derivative
+    ↓ hash
+Dataset sample manifest entry
 ```
 
-Hashes support traceability; they do not replace semantic validation.
+Hashes support traceability; they do not replace semantic, renderer-safety, degradation-safety, or dataset validation.
 
 ## Canonicalization constraints
 
 Canonicalization may normalize ordering or serialization choices that do not alter musical or visual notation meaning.
 
 It must not silently collapse notation-distinct forms such as different enharmonic spellings or explicit accidental-display intent.
+
+Visual degradation is never canonicalization. A degraded image is a derivative of the same symbolic source and must retain lineage back to that source.
