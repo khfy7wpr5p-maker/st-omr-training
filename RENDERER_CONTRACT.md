@@ -4,7 +4,11 @@
 
 This document freezes the Stage 3 renderer boundary for ST-OMR Training Lab.
 
-Stage 2 is complete: the canonical score is deterministically serialized to MusicXML 4.0, independently XSD/semantic validated, and verified through the supported-V1 semantic round-trip gate. Stage 3 may therefore consume only MusicXML that passes the existing Stage 2-C validation boundary.
+Stage 2 is complete: the canonical score is deterministically serialized to MusicXML 4.0, independently XSD/semantic validated, and verified through the supported-V1 semantic round-trip gate. Stage 3 consumes only MusicXML that passes the existing Stage 2-C validation boundary.
+
+Stage 3 implementation is complete and merged through PR #11. Its exact renderer runtime was locally verified with Verovio 6.2.1, and the current integrated main state containing Stage 3 passed GitHub-hosted CI after PR #12. Runtime evidence remains recorded in [VEROVIO_RUNTIME_EVIDENCE.md](VEROVIO_RUNTIME_EVIDENCE.md).
+
+Changing this renderer contract requires an explicit compatibility/architecture decision and regression review.
 
 ## 1. Renderer backend
 
@@ -90,7 +94,7 @@ The V1 font is fixed to Leipzig. Adding another music font is a later explicit c
 
 `xmlIdChecksum=true` is required so generated Verovio XML/SVG identifiers are derived from input content rather than a time-based random seed.
 
-For identical MusicXML bytes, pinned Verovio package/runtime, renderer configuration, platform/resource bundle, and adapter version, repeated rendering must produce identical SVG bytes in local verification.
+For identical MusicXML bytes, pinned Verovio package/runtime, renderer configuration, platform/resource bundle, and adapter version, repeated rendering must produce identical SVG bytes in the verified environment.
 
 Cross-platform byte identity is not assumed merely because the Verovio version is pinned. If later dataset production spans multiple operating systems/architectures, renderer-platform evidence must be recorded and compared before artifacts are mixed.
 
@@ -129,7 +133,7 @@ V1 uses a fail-closed upper guard of 64 pages per render call. A page count outs
 
 Stage 3 cannot close on mocked adapter tests alone.
 
-Required evidence before merge:
+Required evidence:
 
 1. focused adapter tests pass;
 2. full existing regression suite passes;
@@ -139,7 +143,9 @@ Required evidence before merge:
 6. generated ST-OMR scores pass MusicXML validation and real rendering across a bounded stress sample;
 7. unsafe/invalid renderer inputs and unsafe SVG surfaces fail closed.
 
-If the real Verovio runtime is unavailable, Stage 3 remains incomplete even when mock-backed adapter tests pass.
+These gates were satisfied before PR #11 merged. The current integrated main state containing the renderer is additionally exercised by GitHub-hosted CI.
+
+If the exact required renderer runtime is unavailable or mismatched in a future environment, rendering must fail closed rather than silently use a different backend/version.
 
 ## 10. Explicitly out of scope
 
@@ -152,6 +158,6 @@ Stage 3 does not add:
 - real-score/user-file ingestion;
 - ScoreMosaic runtime integration;
 - Guitar TAB;
-- automatic GitHub deployment or CI.
+- deployment/release automation.
 
-The next stage after a merged and verified Stage 3 is Stage 4 Controlled Degradation.
+Stage 4 Controlled Degradation is the next separate development package.
