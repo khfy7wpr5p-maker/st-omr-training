@@ -9,6 +9,14 @@ from .core import (
     RationalDuration,
     RestEvent,
 )
+from .validator import (
+    ValidationIssue,
+    ValidationResult,
+    validate_chord_event,
+    validate_note_event,
+    validate_rest_event,
+    validate_v1_event,
+)
 
 __all__ = [
     "ChordEvent",
@@ -18,4 +26,10 @@ __all__ = [
     "Pitch",
     "RationalDuration",
     "RestEvent",
+    "ValidationIssue",
+    "ValidationResult",
+    "validate_chord_event",
+    "validate_note_event",
+    "validate_rest_event",
+    "validate_v1_event",
 ]
