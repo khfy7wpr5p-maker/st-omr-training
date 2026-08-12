@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-Stage 0 safety/architecture baseline is closed. The repository is now public and the previously deferred GitHub CI capability is being added as a bounded follow-up package before Stage 4 starts. Stage 1 ST Music Generator, Stage 2 MusicXML Pipeline, and Stage 3 Renderer Integration are merged. Stage 4 Controlled Degradation has not started.
+Stage 0 safety/architecture baseline is closed. The repository is public and the previously deferred GitHub CI capability is now implemented on a bounded follow-up PR. Stage 1 ST Music Generator, Stage 2 MusicXML Pipeline, and Stage 3 Renderer Integration are merged. Stage 4 Controlled Degradation has not started.
 
 ## Stage status
 
@@ -14,21 +14,21 @@ Stage 0 safety/architecture baseline is closed. The repository is now public and
 | 0-B | Architecture and data boundaries | ✅ Complete |
 | 0-C | Canonical data contract | ✅ Complete |
 | 0-D | Local verification strategy | ✅ Complete |
-| 0-E | GitHub CI | 🔄 Baseline PR in progress |
+| 0-E | GitHub CI | ✅ PR CI green — merge pending |
 | 0-F | Architecture consistency audit | ✅ Complete |
 | 0-G | Baseline documentation | ✅ Complete |
-| 0 | Safety and architecture baseline | ✅ Closed — CI follow-up active |
+| 0 | Safety and architecture baseline | ✅ Closed — CI follow-up merge pending |
 | 1-A | Canonical core model | ✅ Complete |
 | 1-B | Independent V1 validator | ✅ Complete |
 | 1-C | Score structure model and validator | ✅ Complete |
 | 1-D | Deterministic ST Music Generator v1 | ✅ Complete |
-| 1 | ST Music Generator | ✅ Closed — local verification evidence |
+| 1 | ST Music Generator | ✅ Closed — exercised by PR CI |
 | 2-A | MusicXML contract freeze | ✅ Complete |
 | 2-B | Deterministic MusicXML 4.0 writer | ✅ Complete |
 | 2-C | Offline XSD + independent MusicXML validator | ✅ Complete |
 | 2-D | Supported-V1 semantic round-trip verifier | ✅ Complete |
-| 2 | MusicXML pipeline | ✅ Closed — local verification evidence |
-| 3 | Renderer integration | ✅ Merged — local verification evidence |
+| 2 | MusicXML pipeline | ✅ Closed — exercised by PR CI |
+| 3 | Renderer integration | ✅ Merged — exercised by PR CI |
 | 4 | Controlled degradation | 🔒 Not started |
 | 5 | Dataset validation | 🔒 Not started |
 | 6 | Synthetic Dataset v1 | 🔒 Not started |
@@ -47,7 +47,7 @@ Stage 2-D merged through PR #10 at main commit `4f36da277540d5a1b7a074215f2def96
 
 Stage 3 merged through PR #11 at main commit `3b1e94cea8ac3a26a5df1e2038acc4331a24d371`. Pre-merge local evidence included 29 focused adapter/real-runtime tests, 236 full regression tests, all six Stage 2 goldens rendered with pinned Verovio 6.2.1, 120 generated real-render stress cases, 20/20 deterministic repeats, and Python compile validation.
 
-Historical Stage 1–3 evidence remains local evidence unless the same commit/content is exercised by GitHub-hosted CI. CI verification is never inferred retroactively from local tests.
+The first GitHub-hosted CI run on PR #12 completed successfully on the repository content derived from main `3b1e94cea8ac3a26a5df1e2038acc4331a24d371`. It verified pinned dependency installation, `lxml==6.1.1`, `verovio==6.2.1`, `pip check`, the full unittest suite including real Verovio runtime tests, and Python compile validation. This establishes CI evidence for the PR candidate; exact merged-main CI evidence still requires the post-merge push run.
 
 ## Current branch package
 
@@ -75,8 +75,8 @@ Explicitly out of scope:
 
 ## Verification status
 
-The CI workflow package is not complete until a GitHub-hosted pull-request run succeeds. Until that evidence exists, the new CI package is `UNVERIFIED` and prior Stage 1–3 evidence remains `LOCAL VERIFIED` only.
+PR #12 has GitHub-hosted CI evidence. The workflow run completed successfully with every job step green. Because this STATUS update creates a new PR head commit, the final merge gate still requires the automatically triggered CI run for this exact head to succeed.
 
 ## Next gate
 
-Open the bounded CI baseline PR and require a successful GitHub-hosted workflow run. Merge requires separate explicit approval. Stage 4 remains locked until the CI baseline package is merged and post-merge `main` CI is verified.
+Require the GitHub-hosted CI run for the final PR head to pass. Merge then requires separate explicit approval. After merge, verify the automatic `push` run on exact `main`. Stage 4 remains locked until that post-merge main CI is green.
