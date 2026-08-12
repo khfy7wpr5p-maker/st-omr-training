@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1 ST Music Generator is closed with local verification only. Stage 2-A MusicXML contract freeze and Stage 2-B deterministic MusicXML 4.0 writer are merged. Stage 2-C is the active implementation package: pinned offline official MusicXML 4.0 XSD assets plus an independent fail-closed ST-OMR V1 semantic validator. Stage 2-D round-trip parsing, rendering, dataset generation, model training, and ScoreMosaic integration have not started.
+Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1 ST Music Generator is closed with local verification only. Stage 2-A MusicXML contract freeze, Stage 2-B deterministic MusicXML 4.0 writer, and Stage 2-C offline XSD plus independent semantic validation are merged. Stage 2-D is the active package: a supported-V1 semantic round-trip verifier. Rendering, dataset generation, model training, and ScoreMosaic integration have not started.
 
 ## Stage status
 
@@ -25,8 +25,8 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 1 | ST Music Generator | ✅ Closed — local verification only |
 | 2-A | MusicXML contract freeze | ✅ Complete |
 | 2-B | Deterministic MusicXML 4.0 writer | ✅ Complete |
-| 2-C | Offline XSD + independent MusicXML validator | 🔄 PR package in progress |
-| 2-D | Supported-V1 semantic round-trip verifier | 🔒 Not started |
+| 2-C | Offline XSD + independent MusicXML validator | ✅ Complete |
+| 2-D | Supported-V1 semantic round-trip verifier | 🔄 PR package in progress |
 | 3 | Renderer integration | 🔒 Not started |
 | 4 | Controlled degradation | 🔒 Not started |
 | 5 | Dataset validation | 🔒 Not started |
@@ -40,30 +40,35 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 
 Stage 1-D merged through PR #6 at main commit `4d10aac736ddb41191f1ed55a868932ea479fd9d` with recorded local verification only.
 
-Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`. Its pre-merge evidence was 24 focused writer tests, 146 full available regression tests, Python compile validation, and 1,000 deterministic serialization stress cases. That Stage 2-B evidence was not XSD validation.
+Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`. Its pre-merge evidence was 24 focused writer tests, 146 full available regression tests, Python compile validation, and 1,000 deterministic serialization stress cases.
+
+Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8b8f4ee5cbd50960a7a75049f0`. Its pre-merge evidence was 40 focused validation tests, 186 full available regression tests, Python compile validation, 300 real official-XSD plus semantic stress cases, and 7 fail-closed security-negative cases. The official MusicXML 4.0 schema assets are pinned and integrity-checked offline.
 
 GitHub CI remains unavailable. No stage in this repository may be reported as CI-verified unless GitHub-hosted evidence actually exists.
 
 ## Current branch package
 
-Branch: `stage-2c-musicxml-validation`
+Branch: `stage-2d-semantic-roundtrip`
 
 Scope:
 
-- official MusicXML 4.0 `musicxml.xsd`, `xlink.xsd`, `xml.xsd`, and `catalog.xml` vendored from the pinned W3C MusicXML source commit;
-- explicit SHA-256 integrity manifest and runtime integrity gate for the exact schema bytes;
-- exact `lxml==6.1.1` dependency pin;
-- fail-closed XML parser configuration with entity resolution, DTD loading/validation, network access, recovery mode, and huge-tree mode disabled;
-- offline XSD compilation with an allowlisted resolver restricted to the two required MusicXML schema imports;
-- independent ST-OMR V1 semantic validation for root/version, P1 identity, measure numbering, attributes, time/key/clef rules, durations/types, voice/staff, pitch/accidental coherence, chord rules, supported elements, and exact measure fill;
-- explicit rejection of DOCTYPE/XXE surfaces, malformed/oversized input, schema tampering, unknown external schema imports, unsupported namespaces/elements, and non-V1 musical structure;
-- real-schema integration checks against all six Stage 2-B golden fixtures and deterministic generated writer output.
+- immutable semantic projection types for the frozen supported-V1 comparison surface;
+- canonical `Score` semantic projection that excludes generator-only provenance such as score ID, seed, generator version, and config/source metadata;
+- limited MusicXML parser that accepts only documents which already pass the independent Stage 2-C XSD and semantic gates;
+- exact whole-note `Fraction` reconstruction from MusicXML divisions and duration values;
+- effective per-measure time-signature projection, including time changes;
+- note, rest, and chord reconstruction with chord-member order preserved and chord continuations not advancing musical position;
+- pitch step/alter/octave and visible sharp/flat/natural intent projection;
+- independent field-by-field semantic comparator for part, measure, voice, staff, event timing/type, chord membership, pitch, and accidental intent;
+- end-to-end verifier: canonical Score → Stage 2-B writer → Stage 2-C validation → limited parser → semantic comparison;
+- fail-closed rejection of unsupported/noncanonical MusicXML rather than silent normalization.
 
 Explicitly out of scope:
 
-- general MusicXML import or normalization;
-- Stage 2-D semantic round-trip verification;
+- general-purpose MusicXML import;
+- reconstruction of generator-only provenance or score identity;
 - `.mxl` packaging;
+- MusicXML rewriting or normalization;
 - Verovio or renderer integration;
 - image augmentation;
 - dataset creation or storage;
@@ -75,18 +80,15 @@ Explicitly out of scope:
 
 ## Verification status
 
-The final Stage 2-C validator source, committed focused validator test file, real-schema integration test file, and the four vendored schema assets were mirrored locally. Their Git blob identities were checked against the GitHub branch; the four schema blobs also match the pinned official W3C MusicXML source blobs.
+Local Stage 2-D verification results:
 
-Local verification results:
-
-- focused Stage 2-C validator suites: 40 tests passed;
-- full available unit/regression suite: 186 tests passed;
+- focused Stage 2-D round-trip suite: 21 tests passed;
+- full available unit/regression suite: 207 tests passed;
 - Python compile validation passed;
-- real official XSD + semantic stress: 300 generated scores across mixed, note-only, rest-only, chord-only, fixed 2/4, and accidentals-disabled configurations passed all gates;
-- supplemental security-negative harness: 7 attack/fail-closed cases passed, including DOCTYPE/XXE rejection, malformed/oversized input, wrong namespace/root, unknown external schema import refusal, and schema tamper detection.
+- supplemental semantic round-trip stress: 600 generated scores across mixed, note-only, rest-only, chord-only, fixed 2/4, and accidentals-disabled configurations passed writer determinism, Stage 2-C validation, limited parsing, and exact semantic projection comparison.
 
 This is `LOCAL VERIFIED — CI NOT AVAILABLE`.
 
 ## Next gate
 
-Stage 2-C must be reviewed as one bounded PR package. Merge requires separate explicit approval. Stage 2-D remains locked until Stage 2-C is merged and post-merge state is verified.
+Stage 2-D must be reviewed as one bounded PR package. Merge requires separate explicit approval. Stage 3 renderer integration remains locked until Stage 2-D is merged and post-merge state is verified.
