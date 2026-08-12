@@ -68,6 +68,12 @@ class RationalDuration:
     def fraction(self) -> Fraction:
         return Fraction(self.numerator, self.denominator)
 
+    def __add__(self, other: object) -> "RationalDuration":
+        if not isinstance(other, RationalDuration):
+            return NotImplemented
+        total = self.fraction + other.fraction
+        return RationalDuration(total.numerator, total.denominator)
+
 
 @dataclass(frozen=True, slots=True)
 class Pitch:
@@ -146,11 +152,11 @@ class RestEvent:
 
 @dataclass(frozen=True, slots=True)
 class ChordEvent:
-    """A V1 chord is one event with one shared onset/duration/voice/staff."""
+    """A V1 chord whose member notes must share event timing and placement."""
 
     onset: Fraction | int
     duration: RationalDuration
-    notes: tuple[Pitch, ...]
+    notes: tuple[NoteEvent, ...]
     voice: int = 1
     staff: int = 1
 
@@ -158,13 +164,24 @@ class ChordEvent:
         object.__setattr__(self, "onset", _normalize_onset(self.onset))
         if not isinstance(self.duration, RationalDuration):
             raise TypeError("duration must be RationalDuration")
-        if not isinstance(self.notes, tuple):
-            raise TypeError("notes must be an immutable tuple of Pitch values")
-        if not 2 <= len(self.notes) <= 4:
-            raise ValueError("V1 chords must contain 2 through 4 pitches")
-        if any(not isinstance(note, Pitch) for note in self.notes):
-            raise TypeError("every chord note must be Pitch")
-        if len(set(self.notes)) != len(self.notes):
-            raise ValueError("duplicate pitches are not allowed in a chord")
         object.__setattr__(self, "voice", _require_positive_index("voice", self.voice))
         object.__setattr__(self, "staff", _require_positive_index("staff", self.staff))
+
+        if not isinstance(self.notes, tuple):
+            raise TypeError("notes must be an immutable tuple of NoteEvent values")
+        if not 2 <= len(self.notes) <= 4:
+            raise ValueError("V1 chords must contain 2 through 4 notes")
+        if any(not isinstance(note, NoteEvent) for note in self.notes):
+            raise TypeError("every chord member must be NoteEvent")
+        if len({note.pitch for note in self.notes}) != len(self.notes):
+            raise ValueError("duplicate pitches are not allowed in a chord")
+
+        for note in self.notes:
+            if note.onset != self.onset:
+                raise ValueError("every chord note must share the chord onset")
+            if note.duration != self.duration:
+                raise ValueError("every chord note must share the chord duration")
+            if note.voice != self.voice:
+                raise ValueError("every chord note must share the chord voice")
+            if note.staff != self.staff:
+                raise ValueError("every chord note must share the chord staff")
