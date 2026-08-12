@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1 ST Music Generator is closed with local verification only. Stage 2-A MusicXML contract freeze, Stage 2-B deterministic MusicXML 4.0 writer, and Stage 2-C offline XSD plus independent semantic validation are merged. Stage 2-D is the active package: a supported-V1 semantic round-trip verifier. Rendering, dataset generation, model training, and ScoreMosaic integration have not started.
+Stage 0 safety/architecture baseline is closed with GitHub CI deferred. Stage 1 ST Music Generator is closed. Stage 2-A through Stage 2-D are merged, so the bounded MusicXML pipeline is closed. Stage 3 Renderer Integration is implemented and locally verified with the exact pinned Verovio runtime. Stage 4 Controlled Degradation has not started.
 
 ## Stage status
 
@@ -26,8 +26,9 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 2-A | MusicXML contract freeze | ✅ Complete |
 | 2-B | Deterministic MusicXML 4.0 writer | ✅ Complete |
 | 2-C | Offline XSD + independent MusicXML validator | ✅ Complete |
-| 2-D | Supported-V1 semantic round-trip verifier | 🔄 PR package in progress |
-| 3 | Renderer integration | 🔒 Not started |
+| 2-D | Supported-V1 semantic round-trip verifier | ✅ Complete |
+| 2 | MusicXML pipeline | ✅ Closed — local verification only |
+| 3 | Renderer integration | ✅ PR package ready — local verification only |
 | 4 | Controlled degradation | 🔒 Not started |
 | 5 | Dataset validation | 🔒 Not started |
 | 6 | Synthetic Dataset v1 | 🔒 Not started |
@@ -36,59 +37,67 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 9 | Benchmark and candidate decision | 🔒 Not started |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
 
-## Completed evidence
+## Completed Stage 2 evidence
 
-Stage 1-D merged through PR #6 at main commit `4d10aac736ddb41191f1ed55a868932ea479fd9d` with recorded local verification only.
+Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`.
 
-Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`. Its pre-merge evidence was 24 focused writer tests, 146 full available regression tests, Python compile validation, and 1,000 deterministic serialization stress cases.
+Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8f4ee5cbd50960a7a75049f0`.
 
-Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8b8f4ee5cbd50960a7a75049f0`. Its pre-merge evidence was 40 focused validation tests, 186 full available regression tests, Python compile validation, 300 real official-XSD plus semantic stress cases, and 7 fail-closed security-negative cases. The official MusicXML 4.0 schema assets are pinned and integrity-checked offline.
+Stage 2-D merged through PR #10 at main commit `4f36da277540d5a1b7a074215f2def968db73739`.
 
-GitHub CI remains unavailable. No stage in this repository may be reported as CI-verified unless GitHub-hosted evidence actually exists.
+Stage 2 remains `LOCAL VERIFIED — CI NOT AVAILABLE`.
 
 ## Current branch package
 
-Branch: `stage-2d-semantic-roundtrip`
+Branch: `stage-3-renderer-integration`
 
 Scope:
 
-- immutable semantic projection types for the frozen supported-V1 comparison surface;
-- canonical `Score` semantic projection that excludes generator-only provenance such as score ID, seed, generator version, and config/source metadata;
-- limited MusicXML parser that accepts only documents which already pass the independent Stage 2-C XSD and semantic gates;
-- exact whole-note `Fraction` reconstruction from MusicXML divisions and duration values;
-- effective per-measure time-signature projection, including time changes;
-- note, rest, and chord reconstruction with chord-member order preserved and chord continuations not advancing musical position;
-- pitch step/alter/octave and visible sharp/flat/natural intent projection;
-- independent field-by-field semantic comparator for part, measure, voice, staff, event timing/type, chord membership, pitch, and accidental intent;
-- end-to-end verifier: canonical Score → Stage 2-B writer → Stage 2-C validation → limited parser → semantic comparison;
-- fail-closed rejection of unsupported/noncanonical MusicXML rather than silent normalization.
+- renderer boundary frozen in `RENDERER_CONTRACT.md`;
+- Verovio Python toolkit pinned to `verovio==6.2.1`;
+- isolated `st_omr_training.renderer` adapter;
+- Stage 2-C validation before renderer import/invocation;
+- explicit MusicXML input mode;
+- frozen page/layout/font/SVG options and deterministic renderer-config fingerprint;
+- Leipzig music font pinned for V1;
+- immutable render result with source MusicXML hash, renderer/runtime provenance, per-page SVG bytes and SHA-256;
+- fail-closed page-count limit and renderer setup/load errors;
+- SVG output checks rejecting non-SVG/malformed output, active elements, external references, and external stylesheet URL surfaces;
+- exact tested runtime identity recorded in `VEROVIO_RUNTIME_EVIDENCE.md`.
 
 Explicitly out of scope:
 
-- general-purpose MusicXML import;
-- reconstruction of generator-only provenance or score identity;
-- `.mxl` packaging;
-- MusicXML rewriting or normalization;
-- Verovio or renderer integration;
-- image augmentation;
-- dataset creation or storage;
+- PNG/JPEG rasterization;
+- blur, noise, skew, perspective, compression, or other degradation;
+- dataset construction/storage/splitting;
 - model files or AI training;
-- real-score ingestion;
+- real-score/user-file ingestion;
 - ScoreMosaic integration;
 - Guitar TAB work;
 - GitHub Actions / CI changes.
 
-## Verification status
+## Stage 3 local verification
 
-Local Stage 2-D verification results:
+Exact runtime used:
 
-- focused Stage 2-D round-trip suite: 21 tests passed;
-- full available unit/regression suite: 207 tests passed;
-- Python compile validation passed;
-- supplemental semantic round-trip stress: 600 generated scores across mixed, note-only, rest-only, chord-only, fixed 2/4, and accidentals-disabled configurations passed writer determinism, Stage 2-C validation, limited parsing, and exact semantic projection comparison.
+- `verovio==6.2.1`;
+- CPython 3.13 manylinux x86-64 wheel;
+- wheel SHA-256 `00b9ab551de859fa61ac67d6a5f4f3d97a7f9389197644d9493b5e9c0b7b69ab`;
+- locally computed wheel hash matched the published PyPI hash for the exact wheel.
 
-This is `LOCAL VERIFIED — CI NOT AVAILABLE`.
+Verification results on the committed Stage 3 implementation state:
+
+- focused Stage 3 adapter + real-runtime suite: 29 tests passed;
+- full available unit/regression suite: 236 tests passed;
+- all six Stage 2 golden MusicXML fixtures rendered successfully with the exact pinned runtime;
+- committed live-runtime generated-score coverage: 50 renders passed;
+- same-input real rendering produced byte-identical SVG and identical page hashes;
+- supplemental real-render stress: 120 generated scores passed across mixed, note-only, rest-only, chord-only, fixed 2/4, fixed 3/4, fixed 4/4, and accidentals-disabled configurations;
+- supplemental deterministic repeats: 20/20 byte-identical;
+- Python compile validation passed.
+
+This is `LOCAL VERIFIED — CI NOT AVAILABLE`. GitHub-hosted CI did not run and is not claimed.
 
 ## Next gate
 
-Stage 2-D must be reviewed as one bounded PR package. Merge requires separate explicit approval. Stage 3 renderer integration remains locked until Stage 2-D is merged and post-merge state is verified.
+Stage 3 is ready for bounded PR review. Merge requires separate explicit approval. Stage 4 remains locked until Stage 3 is merged and post-merge state is verified.

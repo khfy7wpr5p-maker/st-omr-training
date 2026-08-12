@@ -66,6 +66,20 @@ from .musicxml_roundtrip import (
     project_score_semantics,
     verify_supported_v1_round_trip,
 )
+from .renderer import (
+    MAX_RENDER_PAGES,
+    RENDERER_ADAPTER_VERSION,
+    RENDERER_NAME,
+    VEROVIO_PINNED_VERSION,
+    RenderExecutionError,
+    RenderInputError,
+    RenderResult,
+    RenderedPage,
+    RendererConfig,
+    RendererUnavailableError,
+    render_musicxml_svg,
+    renderer_config_fingerprint,
+)
 
 __all__ = [
     "ChordEvent",
@@ -125,4 +139,16 @@ __all__ = [
     "parse_supported_v1_musicxml_projection",
     "project_score_semantics",
     "verify_supported_v1_round_trip",
+    "MAX_RENDER_PAGES",
+    "RENDERER_ADAPTER_VERSION",
+    "RENDERER_NAME",
+    "VEROVIO_PINNED_VERSION",
+    "RenderExecutionError",
+    "RenderInputError",
+    "RenderResult",
+    "RenderedPage",
+    "RendererConfig",
+    "RendererUnavailableError",
+    "render_musicxml_svg",
+    "renderer_config_fingerprint",
 ]
