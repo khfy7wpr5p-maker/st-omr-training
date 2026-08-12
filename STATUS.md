@@ -42,7 +42,7 @@ Scope:
 - immutable `NoteEvent`
 - immutable `RestEvent`
 - immutable `ChordEvent`
-- Stage 1-A unit, negative, immutability, equality, and hash tests
+- Stage 1-A unit, negative, immutability, exact-rational, equality, and hash-behavior tests
 - update this status file to reflect the active package
 
 Explicitly out of scope:
@@ -60,7 +60,7 @@ Explicitly out of scope:
 
 ## Verification status
 
-The Stage 1-A implementation has been exercised locally with the standard-library unittest suite: 28 tests passed. Python compile validation also passed. GitHub CI is currently unavailable, so this evidence must be reported as `LOCAL VERIFIED — CI NOT AVAILABLE`, never as CI evidence.
+The Stage 1-A implementation has been exercised locally with the standard-library unittest suite: 33 tests passed. Python compile validation also passed. GitHub CI is currently unavailable, so this evidence must be reported as `LOCAL VERIFIED — CI NOT AVAILABLE`, never as CI evidence.
 
 The final package still requires branch diff review and PR review before merge.
 
