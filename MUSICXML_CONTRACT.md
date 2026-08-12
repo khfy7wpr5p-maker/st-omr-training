@@ -2,17 +2,19 @@
 
 ## Status
 
-This document freezes the Stage 2-A MusicXML boundary for ST-OMR Training Lab before any MusicXML writer implementation begins.
+This document is the frozen Stage 2-A MusicXML boundary for ST-OMR Training Lab.
 
-Stage 1 has produced and independently validated the canonical in-memory ST music model. MusicXML is a deterministic serialization of that model; it is not the primary musical source of truth.
+The contract was defined before implementation and remains the architectural authority for the supported V1 MusicXML path. Stage 2-B deterministic writing, Stage 2-C offline XSD plus independent semantic validation, and Stage 2-D supported-V1 semantic round-trip verification are now implemented and merged.
 
-Changing this contract later requires an explicit architecture decision and regression review.
+MusicXML remains a deterministic serialization of the canonical in-memory ST music model; it is not the primary musical source of truth.
+
+Changing this contract requires an explicit architecture decision and regression review.
 
 ## 1. Pinned MusicXML version
 
-ST-OMR V1 targets **MusicXML 4.0**, the current published final MusicXML specification at the time of this contract.
+ST-OMR V1 targets **MusicXML 4.0**, the published final version frozen for this contract.
 
-MusicXML 4.1 is under active roadmap work but is not a final release at this point. ST-OMR must not auto-upgrade when a later MusicXML version appears. Any version change requires a separate compatibility package and explicit approval.
+ST-OMR must not auto-upgrade when a later MusicXML version appears. Any version change requires a separate compatibility package and explicit approval.
 
 V1 root format:
 
@@ -22,7 +24,7 @@ V1 root format:
 
 `score-timewise` is out of scope.
 
-V1 initially emits uncompressed XML (`.musicxml` / XML bytes). Compressed `.mxl` packaging is deferred.
+V1 emits uncompressed XML (`.musicxml` / XML bytes). Compressed `.mxl` packaging is deferred.
 
 MusicXML 4.0's XSD has no MusicXML default namespace. The V1 writer must not invent one.
 
@@ -93,7 +95,7 @@ For the current V1 duration set (whole, half, quarter, eighth), the resulting va
 divisions = 2
 ```
 
-The writer must compute the value from the score rather than hard-code `2`, so the rule remains auditable if the supported duration set is deliberately extended later.
+The writer computes the value from the score rather than hard-coding `2`, so the rule remains auditable if the supported duration set is deliberately extended later.
 
 A single divisions value is used for the entire V1 score and is emitted in the first measure. Changing divisions mid-score is out of scope.
 
@@ -180,7 +182,7 @@ The Stage 1 independent validator remains authoritative for accidental/alter coh
 
 ## 9. XML construction and deterministic bytes
 
-Stage 2-B must construct XML with Python's standard-library `xml.etree.ElementTree` API.
+Stage 2-B constructs XML with Python's standard-library `xml.etree.ElementTree` API.
 
 Raw XML string concatenation is prohibited.
 
@@ -204,24 +206,22 @@ The MusicXML hash is a derived-artifact hash. It does not replace the canonical 
 
 The schema authority for V1 is the official **W3C MusicXML 4.0 XSD set**, including `musicxml.xsd` and its required local schema resources/catalog.
 
-Validation must be offline and reproducible:
+Validation is offline and reproducible:
 
-- tests and validation must not download schemas from the network;
-- the exact schema asset set must be version-pinned and SHA-256 recorded;
-- schema imports must resolve only to approved local assets;
+- tests and validation do not download schemas from the network;
+- the exact schema asset set is version-pinned and SHA-256 recorded;
+- schema imports resolve only to approved local assets;
 - remote DTD/entity resolution is prohibited.
 
-Stage 2-A adds no dependency and vendors no schema file yet.
+Stage 2-C vendors the exact approved MusicXML 4.0 schema assets and pins `lxml==6.1.1` for XSD validation. The schema files are integrity-checked before compilation, and the resolver fails closed for unapproved imports.
 
-Stage 2-C will introduce the independent schema-validation adapter. The intended validation engine is an XSD-capable parser such as `lxml.etree.XMLSchema`, but adding and pinning that dependency requires its own explicit dependency/license/security review before it enters the repository.
+If the approved XSD validation engine or exact schema assets are unavailable or invalid, validation fails closed. XML well-formedness alone is never reported as MusicXML schema validation.
 
-If the approved XSD validation engine is unavailable, Stage 2-C must fail closed. XML well-formedness alone must never be reported as MusicXML schema validation.
-
-Schema validity is necessary but not sufficient. A separate ST MusicXML semantic validator must also verify the V1 project rules independently from the writer.
+Schema validity is necessary but not sufficient. The independent ST MusicXML semantic validator separately verifies V1 project rules.
 
 ## 11. Independent MusicXML semantic validation
 
-Stage 2-C must independently verify at least:
+Stage 2-C independently verifies at least:
 
 - root is `score-partwise` and version is `4.0`;
 - exactly one `score-part` / one `part`, with matching `P1` identity;
@@ -239,11 +239,11 @@ Stage 2-C must independently verify at least:
 - explicit accidental display remains coherent with pitch alteration;
 - total musical duration exactly fills each measure.
 
-The validator must parse and recompute these facts. It must not trust values produced by the writer merely because the writer emitted them.
+The validator parses and recomputes these facts. It does not trust values produced by the writer merely because the writer emitted them.
 
 ## 12. Golden MusicXML fixtures
 
-Stage 2-B/2-C verification must include small human-reviewable golden outputs for at least:
+Stage 2 verification includes small human-reviewable golden outputs covering:
 
 - quarter note;
 - half rest;
@@ -258,13 +258,13 @@ Stage 2-B/2-C verification must include small human-reviewable golden outputs fo
 - context-controlled natural;
 - time-signature change across consecutive measures.
 
-Golden fixtures must be synthetic and small. They are test artifacts, not training data.
+Golden fixtures are synthetic and small. They are test artifacts, not training data.
 
 ## 13. Round-trip boundary
 
 Stage 2-D is a **supported-V1 semantic round-trip verifier**, not a general-purpose MusicXML importer.
 
-Target verification path:
+Verification path:
 
 ```text
 Canonical Score
@@ -278,7 +278,7 @@ Canonical V1 semantic projection
 Original canonical semantic projection
 ```
 
-The round-trip comparison must include:
+The round-trip comparison includes:
 
 - part/measure/voice/staff structure;
 - measure numbering;
@@ -293,18 +293,18 @@ The round-trip comparison must include:
 
 V1 round-trip equivalence does **not** require reconstruction of generator-only provenance such as `seed`, config fingerprint, generator version, source ID, or score ID unless a later contract explicitly serializes those fields.
 
-The parser must reject unsupported constructs rather than silently normalize them into V1.
+The parser rejects unsupported constructs rather than silently normalizing them into V1.
 
-Stage 3 renderer integration must not start until the Stage 2 writer, independent validation, golden fixtures, and supported-V1 semantic round-trip gate are complete.
+The Stage 2 writer, independent validation, golden fixtures, and supported-V1 semantic round-trip gate are complete; Stage 3 renderer integration was subsequently implemented behind its own renderer contract.
 
 ## 14. Frozen Stage 2 decomposition
 
 ```text
-Stage 2-A  MusicXML contract freeze                 ← this package
-Stage 2-B  Deterministic MusicXML 4.0 writer
-Stage 2-C  Offline XSD + independent semantic validator
-Stage 2-D  Supported-V1 semantic round-trip verifier
-Stage 3    Renderer integration
+Stage 2-A  MusicXML contract freeze                         ✅
+Stage 2-B  Deterministic MusicXML 4.0 writer               ✅
+Stage 2-C  Offline XSD + independent semantic validator    ✅
+Stage 2-D  Supported-V1 semantic round-trip verifier       ✅
+Stage 3    Renderer integration                             ✅ separate contract
 ```
 
-Stage 2-B, 2-C, and 2-D require separate implementation packages. This contract package contains no MusicXML implementation code, schema dependency, renderer, dataset, or model-training work.
+The decomposition remains part of the architecture history and continues to define separation of responsibilities. MusicXML writing, validation, round-trip verification, rendering, dataset work, and model training must remain independently gated concerns.
