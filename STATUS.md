@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1 ST Music Generator is closed with local verification only. Stage 2-A through Stage 2-D are merged, so the bounded MusicXML pipeline is closed. Stage 3 Renderer Integration is the active package. Controlled degradation, dataset generation, model training, and ScoreMosaic integration have not started.
+Stage 0 safety/architecture baseline is closed with GitHub CI deferred. Stage 1 ST Music Generator is closed. Stage 2-A through Stage 2-D are merged, so the bounded MusicXML pipeline is closed. Stage 3 Renderer Integration is implemented and locally verified with the exact pinned Verovio runtime. Stage 4 Controlled Degradation has not started.
 
 ## Stage status
 
@@ -28,7 +28,7 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 2-C | Offline XSD + independent MusicXML validator | ✅ Complete |
 | 2-D | Supported-V1 semantic round-trip verifier | ✅ Complete |
 | 2 | MusicXML pipeline | ✅ Closed — local verification only |
-| 3 | Renderer integration | 🔄 Active package — real runtime evidence pending |
+| 3 | Renderer integration | ✅ PR package ready — local verification only |
 | 4 | Controlled degradation | 🔒 Not started |
 | 5 | Dataset validation | 🔒 Not started |
 | 6 | Synthetic Dataset v1 | 🔒 Not started |
@@ -37,17 +37,15 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 9 | Benchmark and candidate decision | 🔒 Not started |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
 
-## Completed evidence
+## Completed Stage 2 evidence
 
-Stage 1-D merged through PR #6 at main commit `4d10aac736ddb41191f1ed55a868932ea479fd9d` with recorded local verification only.
+Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`.
 
-Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`. Its pre-merge evidence was 24 focused writer tests, 146 full available regression tests, Python compile validation, and 1,000 deterministic serialization stress cases.
+Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8f4ee5cbd50960a7a75049f0`.
 
-Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8b8f4ee5cbd50960a7a75049f0`. Its pre-merge evidence was 40 focused validation tests, 186 full available regression tests, Python compile validation, 300 real official-XSD plus semantic stress cases, and 7 fail-closed security-negative cases.
+Stage 2-D merged through PR #10 at main commit `4f36da277540d5a1b7a074215f2def968db73739`.
 
-Stage 2-D merged through PR #10 at main commit `4f36da277540d5a1b7a074215f2def968db73739`. Its pre-merge evidence was 21 focused round-trip tests, 207 full available regression tests, Python compile validation, and 600 generated-score semantic round-trip stress cases.
-
-GitHub CI remains unavailable. No stage in this repository may be reported as CI-verified unless GitHub-hosted evidence actually exists.
+Stage 2 remains `LOCAL VERIFIED — CI NOT AVAILABLE`.
 
 ## Current branch package
 
@@ -57,16 +55,15 @@ Scope:
 
 - renderer boundary frozen in `RENDERER_CONTRACT.md`;
 - Verovio Python toolkit pinned to `verovio==6.2.1`;
-- dedicated `st_omr_training.renderer` adapter so generator/MusicXML layers never call Verovio directly;
-- Stage 2-C validation required before the renderer runtime is imported or invoked;
-- explicit direct MusicXML input mode (`xml`);
-- frozen V1 layout/font/SVG options, including Leipzig font and checksum-derived XML IDs;
-- deterministic renderer-config fingerprint;
-- per-page SVG bytes and SHA-256 plus source/renderer provenance in immutable render results;
-- fail-closed page-count/resource limits;
-- SVG output checks that reject active elements and external references;
-- mocked/fake-runtime tests for adapter boundaries and failure modes;
-- separate real-runtime tests that must run against the exact pinned Verovio package before Stage 3 may close.
+- isolated `st_omr_training.renderer` adapter;
+- Stage 2-C validation before renderer import/invocation;
+- explicit MusicXML input mode;
+- frozen page/layout/font/SVG options and deterministic renderer-config fingerprint;
+- Leipzig music font pinned for V1;
+- immutable render result with source MusicXML hash, renderer/runtime provenance, per-page SVG bytes and SHA-256;
+- fail-closed page-count limit and renderer setup/load errors;
+- SVG output checks rejecting non-SVG/malformed output, active elements, external references, and external stylesheet URL surfaces;
+- exact tested runtime identity recorded in `VEROVIO_RUNTIME_EVIDENCE.md`.
 
 Explicitly out of scope:
 
@@ -79,20 +76,28 @@ Explicitly out of scope:
 - Guitar TAB work;
 - GitHub Actions / CI changes.
 
-## Verification status
+## Stage 3 local verification
 
-Current local evidence while the real Verovio binary dependency is unavailable in the execution environment:
+Exact runtime used:
 
-- focused Stage 3 adapter suite using an injected fake renderer runtime: 26 tests passed;
-- full available unit/regression suite excluding the real-runtime-required Stage 3 file: 233 tests passed;
-- Python compile validation passed;
-- generated MusicXML crossed the adapter boundary in 30 fake-runtime cases;
-- fail-closed tests cover invalid MusicXML, version drift, renderer setup/load failures, invalid page counts, malformed/non-SVG output, active SVG content, and external SVG references.
+- `verovio==6.2.1`;
+- CPython 3.13 manylinux x86-64 wheel;
+- wheel SHA-256 `00b9ab551de859fa61ac67d6a5f4f3d97a7f9389197644d9493b5e9c0b7b69ab`;
+- locally computed wheel hash matched the published PyPI hash for the exact wheel.
 
-The real-runtime test file is intentionally not skipped. It currently fails closed because `verovio==6.2.1` cannot be installed from the network in this local execution environment.
+Verification results on the committed Stage 3 implementation state:
 
-Stage 3 therefore remains **UNVERIFIED — REAL VEROVIO RUNTIME EVIDENCE PENDING**. Mock-backed adapter tests are not sufficient to close the renderer stage.
+- focused Stage 3 adapter + real-runtime suite: 29 tests passed;
+- full available unit/regression suite: 236 tests passed;
+- all six Stage 2 golden MusicXML fixtures rendered successfully with the exact pinned runtime;
+- committed live-runtime generated-score coverage: 50 renders passed;
+- same-input real rendering produced byte-identical SVG and identical page hashes;
+- supplemental real-render stress: 120 generated scores passed across mixed, note-only, rest-only, chord-only, fixed 2/4, fixed 3/4, fixed 4/4, and accidentals-disabled configurations;
+- supplemental deterministic repeats: 20/20 byte-identical;
+- Python compile validation passed.
+
+This is `LOCAL VERIFIED — CI NOT AVAILABLE`. GitHub-hosted CI did not run and is not claimed.
 
 ## Next gate
 
-Obtain the exact Verovio 6.2.1 Python wheel for the local Python/platform, install it only into the local verification environment, then run the real-runtime renderer suite, full regression, compile validation, deterministic repeated rendering, and bounded generated-score render stress. Only after those pass should Stage 3 be opened as a merge-ready PR. Stage 4 remains locked.
+Stage 3 is ready for bounded PR review. Merge requires separate explicit approval. Stage 4 remains locked until Stage 3 is merged and post-merge state is verified.
