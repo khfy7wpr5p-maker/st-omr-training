@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-The project is in Stage 0 baseline setup. No ST Music Generator implementation, dataset generation, model training, or ScoreMosaic integration has started.
+Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. No ST Music Generator implementation, dataset generation, model training, or ScoreMosaic integration has started.
 
 ## Stage status
 
@@ -16,7 +16,8 @@ The project is in Stage 0 baseline setup. No ST Music Generator implementation, 
 | 0-D | Local verification strategy | ✅ Complete |
 | 0-E | GitHub CI | ⏸ Deferred / unavailable |
 | 0-F | Architecture consistency audit | ✅ Complete |
-| 0-G | Baseline documentation | 🔄 In progress on `stage-0g-baseline-docs` |
+| 0-G | Baseline documentation | ✅ Complete |
+| 0 | Safety and architecture baseline | ✅ Closed with CI deferred |
 | 1 | ST Music Generator | 🔒 Not started |
 | 2 | Canonical / MusicXML validation | 🔒 Not started |
 | 3 | Renderer integration | 🔒 Not started |
@@ -30,15 +31,14 @@ The project is in Stage 0 baseline setup. No ST Music Generator implementation, 
 
 ## Current branch package
 
-Branch: `stage-0g-baseline-docs`
+Branch: `stage-0-closure-status`
 
 Scope:
 
-- `ARCHITECTURE.md`
-- `DATA_CONTRACT.md`
-- `SAFETY.md`
-- `STATUS.md`
-- limited `README.md` navigation update
+- update `STATUS.md` only
+- record the successful completion of Stage 0-G
+- close Stage 0 while preserving the explicit CI-deferred status
+- keep Stage 1 locked and not started
 
 Out of scope for this package:
 
@@ -53,10 +53,10 @@ Out of scope for this package:
 
 ## Verification status
 
-Stage 0-G documentation is not complete until the branch diff is reviewed and confirmed to contain only the approved documentation scope.
+This is a documentation-only closure package. Its required verification is a branch diff confirming that only the approved `STATUS.md` state correction is present.
 
 GitHub CI is currently unavailable. Local verification evidence, when later produced, must not be reported as GitHub CI evidence.
 
 ## Next gate
 
-After Stage 0-G documentation is reviewed and explicitly accepted, the next planned work is to define the first small Stage 1 ST Music Generator implementation package. Stage 1 must not begin implicitly as part of Stage 0-G.
+The next planned work is Stage 1-A: define and implement the smallest canonical core model package for the ST Music Generator. Stage 1 must begin only as a separate approved package and must not include MusicXML rendering, datasets, model training, or ScoreMosaic integration.
