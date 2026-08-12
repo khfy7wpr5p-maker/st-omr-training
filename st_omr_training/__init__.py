@@ -43,6 +43,16 @@ from .musicxml_writer import (
     musicxml_sha256,
     write_musicxml,
 )
+from .musicxml_validator import (
+    MAX_MUSICXML_BYTES,
+    MUSICXML_SCHEMA_SOURCE_BLOBS,
+    MUSICXML_SCHEMA_SOURCE_COMMIT,
+    MUSICXML_SCHEMA_SHA256,
+    validate_musicxml,
+    validate_musicxml_semantics,
+    validate_musicxml_xsd,
+    verify_musicxml_schema_assets,
+)
 
 __all__ = [
     "ChordEvent",
@@ -83,4 +93,12 @@ __all__ = [
     "compute_musicxml_divisions",
     "musicxml_sha256",
     "write_musicxml",
+    "MAX_MUSICXML_BYTES",
+    "MUSICXML_SCHEMA_SOURCE_BLOBS",
+    "MUSICXML_SCHEMA_SOURCE_COMMIT",
+    "MUSICXML_SCHEMA_SHA256",
+    "validate_musicxml",
+    "validate_musicxml_semantics",
+    "validate_musicxml_xsd",
+    "verify_musicxml_schema_assets",
 ]
