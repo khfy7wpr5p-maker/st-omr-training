@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1-A canonical core model, Stage 1-B independent V1 validator, and Stage 1-C score-structure model/validator are merged. Stage 1-D is the active package and adds the deterministic ST Music Generator v1. No MusicXML writer, renderer, dataset generation, model training, or ScoreMosaic integration has started.
+Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is currently unavailable. Stage 1 ST Music Generator is complete through the merged deterministic generator package. Stage 2-A is the active documentation/architecture package and freezes the MusicXML boundary before any MusicXML implementation begins. No MusicXML writer, renderer, dataset generation, model training, or ScoreMosaic integration has started.
 
 ## Stage status
 
@@ -18,12 +18,15 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 0-F | Architecture consistency audit | ✅ Complete |
 | 0-G | Baseline documentation | ✅ Complete |
 | 0 | Safety and architecture baseline | ✅ Closed with CI deferred |
-| 1 | ST Music Generator | 🔄 In progress |
 | 1-A | Canonical core model | ✅ Complete |
 | 1-B | Independent V1 validator | ✅ Complete |
 | 1-C | Score structure model and validator | ✅ Complete |
-| 1-D | Deterministic ST Music Generator v1 | 🔄 PR package in progress |
-| 2 | Canonical / MusicXML validation | 🔒 Not started |
+| 1-D | Deterministic ST Music Generator v1 | ✅ Complete |
+| 1 | ST Music Generator | ✅ Closed — local verification only |
+| 2-A | MusicXML contract freeze | 🔄 PR package in progress |
+| 2-B | Deterministic MusicXML 4.0 writer | 🔒 Not started |
+| 2-C | Offline XSD + independent MusicXML validator | 🔒 Not started |
+| 2-D | Supported-V1 semantic round-trip verifier | 🔒 Not started |
 | 3 | Renderer integration | 🔒 Not started |
 | 4 | Controlled degradation | 🔒 Not started |
 | 5 | Dataset validation | 🔒 Not started |
@@ -33,49 +36,59 @@ Stage 0 baseline is complete, with GitHub CI explicitly deferred because it is c
 | 9 | Benchmark and candidate decision | 🔒 Not started |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
 
+## Completed Stage 1 evidence
+
+Stage 1-D merged through PR #6 at main commit `4d10aac736ddb41191f1ed55a868932ea479fd9d`.
+
+Recorded local evidence before merge:
+
+- 122 unit/regression tests passed;
+- Python compile validation passed;
+- 2,000 generated scores across mixed and constrained configurations passed independent `validate_score()` validation;
+- cross-process checks with different `PYTHONHASHSEED` values produced the same deterministic score representation digest for the same generator version, config, and seed.
+
+GitHub CI was unavailable, so Stage 1 closure means **local verification only**. It must never be reported as CI-verified.
+
 ## Current branch package
 
-Branch: `stage-1d-deterministic-generator`
+Branch: `stage-2a-musicxml-contract`
 
 Scope:
 
-- immutable `GeneratorConfig`
-- deterministic SHA-256 counter-based pseudo-random selection independent of Python `random` implementation changes
-- same generator version + normalized config + seed produces the same canonical `Score`
-- deterministic score identity and stable provenance without runtime timestamps
-- V1 generation for 2/4, 3/4, and 4/4
-- exact measure filling with rational eighth, quarter, half, and where valid whole-note durations
-- eighth, quarter, and half rhythmic rests only; full-measure-rest notation remains deferred
-- single notes and 2–4 note chords
-- default staff-oriented generator pitch policy with configurable V1-safe steps/octaves inside a restricted octave range
-- controlled sharp, flat, and context-dependent natural display intent within each measure
-- one part, one staff, one voice, treble clef, key signature 0
-- mandatory independent `validate_score()` gate before generated output is accepted
-- configuration, determinism, provenance, accidental-state, chord, rest, whole-note, exact-fill, and hard-validator-gate tests
+- close Stage 1 status after the merged Stage 1-D generator;
+- add the frozen V1 MusicXML contract;
+- pin MusicXML 4.0 `score-partwise` for V1;
+- freeze exact rational divisions conversion;
+- freeze note/rest/chord/accidental mapping;
+- freeze deterministic XML construction rules;
+- define offline official W3C MusicXML 4.0 XSD validation strategy;
+- define independent MusicXML semantic validation requirements;
+- define golden fixture requirements;
+- define supported-V1 semantic round-trip boundary;
+- split Stage 2 into 2-A / 2-B / 2-C / 2-D before implementation.
 
 Explicitly out of scope:
 
-- MusicXML writer or parser
-- canonical MusicXML schema validation
-- Verovio or any renderer
-- image augmentation
-- dataset creation or storage
-- model files or AI training
-- real-score ingestion
-- ScoreMosaic integration
-- Guitar TAB work
-- dependencies or GitHub Actions
+- MusicXML writer implementation;
+- MusicXML parser implementation;
+- schema files or schema-validation dependency;
+- Verovio or renderer integration;
+- image augmentation;
+- dataset creation or storage;
+- model files or AI training;
+- real-score ingestion;
+- ScoreMosaic integration;
+- Guitar TAB work;
+- GitHub Actions / CI changes.
 
 ## Verification status
 
-The Stage 1-D candidate and the existing Stage 1-A, Stage 1-B, and Stage 1-C regression suite were exercised locally with the standard-library unittest runner: 122 tests passed. Python compile validation also passed. All current Python implementation and test files in the local verification mirror matched their GitHub branch blob identities before the final run.
+Stage 2-A is documentation and architecture only. The branch must be reviewed against `main` and confirmed to contain only the approved contract/status/navigation changes.
 
-As supplemental stress evidence, 2,000 generated scores across mixed, note-only, rest-only, chord-only, each supported time signature, and accidentals-disabled configurations passed independent `validate_score()` validation. A cross-process check with different `PYTHONHASHSEED` values also produced the same deterministic score representation digest for the same generator version, config, and seed.
+The MusicXML version decision is pinned to MusicXML 4.0 for V1. A future MusicXML 4.1 or later release must not be adopted automatically; it requires a separate compatibility decision.
 
-GitHub CI remains unavailable, so this evidence is `LOCAL VERIFIED — CI NOT AVAILABLE`, not CI evidence.
-
-The final package still requires branch diff review and PR review before merge.
+GitHub CI remains unavailable. No CI verification claim is permitted.
 
 ## Next gate
 
-After Stage 1-D is reviewed and explicitly accepted for merge, Stage 1 can be closed and Stage 2 can be scoped. MusicXML serialization/validation must not begin implicitly, and renderer, dataset, model-training, and ScoreMosaic work remain locked.
+After Stage 2-A is reviewed and explicitly accepted for merge, the next implementation package is Stage 2-B: deterministic MusicXML 4.0 writer plus small golden fixtures. Stage 2-C XSD/semantic validation and Stage 2-D round-trip verification remain separate packages. Renderer, dataset, model-training, and ScoreMosaic work remain locked.

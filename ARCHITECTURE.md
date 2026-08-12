@@ -92,22 +92,60 @@ Explicitly deferred:
 
 ## Determinism boundary
 
-For a fixed generator version, configuration, and seed, the canonical model output must be reproducible and yield the same canonical-model hash.
+For a fixed generator version, configuration, and seed, the canonical model output must be reproducible and yield the same canonical-model identity.
+
+MusicXML is a derived deterministic serialization. For the same canonical `Score` and writer version, Stage 2 requires stable MusicXML bytes and a stable MusicXML SHA-256 digest under the supported runtime contract.
 
 Rendered binary identity is not assumed until renderer version, fonts, rendering configuration, and environment are also pinned and verified.
+
+## MusicXML serialization boundary
+
+Stage 2 is governed by [MUSICXML_CONTRACT.md](MUSICXML_CONTRACT.md).
+
+The frozen V1 direction is:
+
+```text
+Validated Canonical Score
+        ↓
+Stage 2-B Deterministic MusicXML 4.0 Writer
+        ↓
+MusicXML 4.0 score-partwise
+        ↓
+Stage 2-C Offline XSD Validation
+        +
+Independent ST MusicXML Semantic Validation
+        ↓
+Stage 2-D Supported-V1 Semantic Round Trip
+        ↓
+Renderer Gate
+```
+
+Key architectural rules:
+
+1. MusicXML 4.0 `score-partwise` is pinned for V1. Later MusicXML versions require a separate compatibility decision.
+2. The writer must use an XML tree API, not raw XML string concatenation.
+3. Duration conversion is exact rational arithmetic; floating point is prohibited.
+4. One score-wide divisions value is computed deterministically from canonical durations.
+5. MusicXML schema validation is offline and based on an exact pinned official W3C MusicXML 4.0 XSD asset set.
+6. Schema validation and ST semantic validation are independent of the writer and fail closed.
+7. The supported-V1 round-trip verifier rejects unsupported constructs rather than silently normalizing them.
+8. Stage 3 rendering remains locked until Stage 2-B, 2-C, and 2-D gates are complete.
 
 ## Stage roadmap
 
 ```text
-Stage 0  Safety and architecture baseline
-Stage 1  ST Music Generator
-Stage 2  Canonical / MusicXML validation
-Stage 3  Renderer integration
-Stage 4  Controlled degradation
-Stage 5  Dataset validation
-Stage 6  Synthetic Dataset v1
-Stage 7  Baseline ST-OMR training
-Stage 8  Real-data fine-tuning
-Stage 9  Benchmark and candidate decision
-Stage 10 ScoreMosaic candidate integration
+Stage 0   Safety and architecture baseline
+Stage 1   ST Music Generator
+Stage 2-A MusicXML contract freeze
+Stage 2-B Deterministic MusicXML 4.0 writer
+Stage 2-C Offline XSD + independent MusicXML validator
+Stage 2-D Supported-V1 semantic round-trip verifier
+Stage 3   Renderer integration
+Stage 4   Controlled degradation
+Stage 5   Dataset validation
+Stage 6   Synthetic Dataset v1
+Stage 7   Baseline ST-OMR training
+Stage 8   Real-data fine-tuning
+Stage 9   Benchmark and candidate decision
+Stage 10  ScoreMosaic candidate integration
 ```
