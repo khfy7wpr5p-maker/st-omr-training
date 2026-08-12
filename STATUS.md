@@ -68,7 +68,9 @@ Explicitly out of scope:
 
 ## Verification status
 
-The Stage 1-D candidate and the existing Stage 1-A, Stage 1-B, and Stage 1-C regression suite were exercised locally with the standard-library unittest runner: 122 tests passed. Python compile validation also passed. The new `generator.py`, `test_generator.py`, and exported package API were matched to their GitHub branch blobs before reporting the result.
+The Stage 1-D candidate and the existing Stage 1-A, Stage 1-B, and Stage 1-C regression suite were exercised locally with the standard-library unittest runner: 122 tests passed. Python compile validation also passed. All current Python implementation and test files in the local verification mirror matched their GitHub branch blob identities before the final run.
+
+As supplemental stress evidence, 2,000 generated scores across mixed, note-only, rest-only, chord-only, each supported time signature, and accidentals-disabled configurations passed independent `validate_score()` validation. A cross-process check with different `PYTHONHASHSEED` values also produced the same deterministic score representation digest for the same generator version, config, and seed.
 
 GitHub CI remains unavailable, so this evidence is `LOCAL VERIFIED — CI NOT AVAILABLE`, not CI evidence.
 
