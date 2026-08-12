@@ -39,7 +39,12 @@ jobs:
         run: |
           python - <<'PY'
           from importlib import metadata
-          expected = {"lxml": "6.1.1", "verovio": "6.2.1"}
+          expected = {
+              "lxml": "6.1.1",
+              "verovio": "6.2.1",
+              "CairoSVG": "2.8.2",
+              "Pillow": "12.3.0",
+          }
           for package, version in expected.items():
               actual = metadata.version(package)
               if actual != version:
