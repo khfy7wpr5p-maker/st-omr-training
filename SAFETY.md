@@ -24,7 +24,7 @@ Large datasets and model artifacts must use separate approved storage when those
 
 ## Synthetic versus real data
 
-Synthetic and real data must remain explicitly distinguishishable.
+Synthetic and real data must remain explicitly distinguishable.
 
 Synthetic data may enter training only after generator, musical, MusicXML, renderer/degradation provenance, and dataset validation gates pass.
 
