@@ -14,17 +14,22 @@ import torch
 
 from .dataset_builder import SyntheticDatasetBuild
 from .stage7c_dataset import STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT
-from .training_data import InputPreprocessConfig
+from .stage7c_profile import (
+    STAGE7C_FROZEN_MODEL_CONFIG,
+    STAGE7C_FROZEN_PREPROCESS_CONFIG,
+    STAGE7C_FROZEN_RUN_CONFIG,
+    STAGE7C_FROZEN_RUN_FINGERPRINT,
+    STAGE7C_FROZEN_TRAINER_CONFIG,
+)
 from .training_model import (
     BaselineModelConfig,
-    TrainerConfig,
     assert_model_finite,
     build_baseline_model,
     model_config_fingerprint,
     model_state_sha256,
     verify_torch_runtime,
 )
-from .training_run import BaselineRunConfig, BaselineRunResult, run_baseline_training
+from .training_run import BaselineRunResult, run_baseline_training
 
 
 STAGE7C_EXECUTION_GATE_VERSION: Final[str] = "stage7c-authoritative-execution-v1"
@@ -191,6 +196,8 @@ def _load_and_verify_checkpoint(
     if not isinstance(model_payload, dict):
         raise Stage7CExecutionError("metrics evidence model configuration is invalid")
     model_config = _model_config_from_evidence(model_payload)
+    if model_config != STAGE7C_FROZEN_MODEL_CONFIG:
+        raise Stage7CExecutionError("checkpoint model config differs from frozen Stage 7-C profile")
 
     try:
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
@@ -271,6 +278,9 @@ def _verify_run_evidence(
         raise Stage7CExecutionError("metrics evidence dataset provenance mismatch")
     if dataset.get("config_fingerprint") != STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT:
         raise Stage7CExecutionError("metrics evidence dataset profile fingerprint mismatch")
+    fingerprints = evidence.get("fingerprints")
+    if not isinstance(fingerprints, dict) or fingerprints.get("run") != STAGE7C_FROZEN_RUN_FINGERPRINT:
+        raise Stage7CExecutionError("metrics evidence run profile fingerprint mismatch")
     runtime = evidence.get("runtime")
     if not isinstance(runtime, dict) or runtime.get("dependencies") != runtime_versions:
         raise Stage7CExecutionError("metrics evidence runtime provenance mismatch")
@@ -286,13 +296,8 @@ def run_verified_baseline_training(
     dataset_root: str | Path,
     run_root: str | Path,
     repository_root: str | Path,
-    *,
-    run_config: BaselineRunConfig = BaselineRunConfig(),
-    model_config: BaselineModelConfig = BaselineModelConfig(),
-    trainer_config: TrainerConfig = TrainerConfig(),
-    preprocess_config: InputPreprocessConfig = InputPreprocessConfig(),
 ) -> VerifiedBaselineRunResult:
-    """Run Stage 7-C only with the frozen dataset and source-bound clean provenance."""
+    """Run the one frozen Stage 7-C profile with source-bound clean provenance."""
 
     if not isinstance(build, SyntheticDatasetBuild):
         raise TypeError("build must be SyntheticDatasetBuild")
@@ -307,10 +312,10 @@ def run_verified_baseline_training(
         dataset_root,
         run_root,
         repository_sha=repository_sha,
-        run_config=run_config,
-        model_config=model_config,
-        trainer_config=trainer_config,
-        preprocess_config=preprocess_config,
+        run_config=STAGE7C_FROZEN_RUN_CONFIG,
+        model_config=STAGE7C_FROZEN_MODEL_CONFIG,
+        trainer_config=STAGE7C_FROZEN_TRAINER_CONFIG,
+        preprocess_config=STAGE7C_FROZEN_PREPROCESS_CONFIG,
     )
 
     ending_sha, ending_origin = verify_authoritative_repository(repository_root)
@@ -335,6 +340,7 @@ def run_verified_baseline_training(
         "dataset_build_id": build.build_id,
         "dataset_config_fingerprint": build.config_fingerprint,
         "manifest_sha256": build.manifest_sha256,
+        "run_profile_fingerprint": STAGE7C_FROZEN_RUN_FINGERPRINT,
         "metrics_sha256": result.metrics_sha256,
         "checkpoint_sha256": result.checkpoint_sha256,
         "checkpoint_state_sha256": reloaded_state_sha,
@@ -348,6 +354,7 @@ def run_verified_baseline_training(
             "prediction_metrics": asdict(result.prediction_metrics),
         },
         "frozen_stage7c_dataset_verified": True,
+        "frozen_stage7c_training_profile_verified": True,
         "source_tree_bound_to_executing_package": True,
         "source_clean_before_and_after": True,
         "checkpoint_reloaded_strictly": True,
