@@ -13,6 +13,7 @@ from typing import Final
 import torch
 
 from .dataset_builder import SyntheticDatasetBuild
+from .stage7c_dataset import STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT
 from .training_data import InputPreprocessConfig
 from .training_model import (
     BaselineModelConfig,
@@ -223,6 +224,9 @@ def _verify_run_evidence(
     repository_sha: str,
     runtime_versions: dict[str, str],
 ) -> tuple[dict[str, object], str]:
+    if build.config_fingerprint != STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT:
+        raise Stage7CExecutionError("run did not use the frozen Stage 7-C dataset profile")
+
     metrics_path = result.run_directory / f"metrics-{result.metrics_sha256}.json"
     checkpoint_path = result.run_directory / f"checkpoint-{result.checkpoint_sha256}.pt"
     complete_path = result.run_directory / "COMPLETE"
@@ -252,6 +256,8 @@ def _verify_run_evidence(
         raise Stage7CExecutionError("metrics evidence is missing dataset provenance")
     if dataset.get("build_id") != build.build_id or dataset.get("manifest_sha256") != build.manifest_sha256:
         raise Stage7CExecutionError("metrics evidence dataset provenance mismatch")
+    if dataset.get("config_fingerprint") != STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT:
+        raise Stage7CExecutionError("metrics evidence dataset profile fingerprint mismatch")
     runtime = evidence.get("runtime")
     if not isinstance(runtime, dict) or runtime.get("dependencies") != runtime_versions:
         raise Stage7CExecutionError("metrics evidence runtime provenance mismatch")
@@ -273,10 +279,13 @@ def run_verified_baseline_training(
     trainer_config: TrainerConfig = TrainerConfig(),
     preprocess_config: InputPreprocessConfig = InputPreprocessConfig(),
 ) -> VerifiedBaselineRunResult:
-    """Run Stage 7-C only after proving source-bound clean provenance before and after."""
+    """Run Stage 7-C only with the frozen dataset and source-bound clean provenance."""
 
     if not isinstance(build, SyntheticDatasetBuild):
         raise TypeError("build must be SyntheticDatasetBuild")
+    if build.config_fingerprint != STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT:
+        raise Stage7CExecutionError("authoritative run requires the frozen Stage 7-C dataset profile")
+
     repository_sha, repository_origin = verify_authoritative_repository(repository_root)
     runtime_versions = verify_stage7c_runtime()
 
@@ -311,6 +320,7 @@ def run_verified_baseline_training(
         "repository_origin": repository_origin,
         "repository_sha": repository_sha,
         "dataset_build_id": build.build_id,
+        "dataset_config_fingerprint": build.config_fingerprint,
         "manifest_sha256": build.manifest_sha256,
         "metrics_sha256": result.metrics_sha256,
         "checkpoint_sha256": result.checkpoint_sha256,
@@ -324,6 +334,7 @@ def run_verified_baseline_training(
             "best_validation_loss": result.best_validation_loss,
             "prediction_metrics": asdict(result.prediction_metrics),
         },
+        "frozen_stage7c_dataset_verified": True,
         "source_tree_bound_to_executing_package": True,
         "source_clean_before_and_after": True,
         "checkpoint_reloaded_strictly": True,
