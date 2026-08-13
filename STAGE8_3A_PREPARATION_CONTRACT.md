@@ -22,7 +22,7 @@ The implementation performs no filesystem scanning, Drive access, network access
 
 ## First-pilot source-image policy
 
-The first pilot intentionally accepts **source PNG only**. This is narrower than the general Stage 8-1 source-document boundary and prevents PDF/JPEG renderer, DPI, crop, EXIF orientation, and codec choices from entering the pilot without a separately frozen policy.
+The first pilot intentionally accepts **source PNG only**. This is narrower than the general Stage 8-1 source-document boundary and prevents PDF/JPEG renderer, DPI, crop, EXIF orientation, codec, and color-management choices from entering the pilot without a separately frozen policy.
 
 The exact source bytes are retained unchanged outside Git and hash-bound. `prepare_training_png(...)` may derive a training image only under the following frozen policy:
 
@@ -30,15 +30,16 @@ The exact source bytes are retained unchanged outside Git and hash-bound. `prepa
 - input must be a non-empty PNG within the existing Stage 8 source-byte bound;
 - one frame only;
 - no transparency/alpha;
-- accepted source image modes: `1`, `L`, `P`, or `RGB`;
+- accepted source image modes are only `1`, `L`, or `P`;
+- `RGB`, `RGBA`, CMYK, floating-point, and other source modes are rejected in this first pilot rather than silently color-normalized;
 - width and height must already be positive and within the Stage 8-1 pixel bound;
 - **no crop**;
 - **no resize**;
 - **no rotation/orientation rewrite**;
-- convert pixels deterministically to Pillow mode `L`;
+- convert accepted pixels deterministically to Pillow mode `L`;
 - construct a new `L` image from the resulting pixel bytes so source metadata is not copied;
 - write PNG with `optimize=False` and `compress_level=9`;
-- verify the derivative as 8-bit grayscale, non-interlaced, single-frame PNG;
+- independently verify the derived IHDR CRC and verify the derivative as 8-bit grayscale, non-interlaced, single-frame PNG;
 - verify derivative geometry equals source geometry;
 - return the derivative bytes to the caller plus hash-only preparation evidence.
 
@@ -56,7 +57,7 @@ Some external pilot candidates are available as packages containing:
 
 Stage 8-3A treats MEI, semantic, and agnostic files as **auxiliary triage evidence only**. MIDI and Plaine & Easie are not part of the admission target contract. macOS `._*` sidecar/resource files are ignored by external orchestration and are not data samples.
 
-`inspect_primus_auxiliary_package(...)` may check bounded parseability, MEI/semantic header agreement, and obvious supported-V1 exclusions. A successful auxiliary triage result does **not** establish:
+`inspect_primus_auxiliary_package(...)` may check bounded parseability, MEI/semantic header agreement, and obvious supported-V1 exclusions. It fails triage for empty event streams, unsupported accidentals/durations, deferred structures, unsupported staff/layer structure, unsupported clef/key/meter, or header mismatch. A successful auxiliary triage result does **not** establish:
 
 - legal rights or training permission;
 - image↔symbolic pairing approval;
@@ -78,8 +79,8 @@ The current model/tokenizer boundary remains unchanged. For a candidate to proce
 - meter only `2/4`, `3/4`, or `4/4`;
 - note durations only whole, half, quarter, or eighth;
 - rest durations only half, quarter, or eighth;
-- supported pitch spelling/accidentals only;
-- no deferred structure such as explicit beam semantics, ties/slurs, tuplets, multi-measure rests, or other unsupported notation.
+- supported pitch spelling and only the frozen sharp/flat/natural accidental surface;
+- no deferred structure such as explicit beam semantics, ties/slurs, tuplets, multi-measure rests, implicit measure-space proxies, or other unsupported notation.
 
 Auxiliary packages outside this surface remain useful future-scope data but do not enter the first 40/10 pilot.
 
@@ -144,4 +145,4 @@ The present implementation package establishes items 1–3 only. Actual 50-pair 
 
 ## Explicitly out of scope
 
-Stage 8-3A does not run fine-tuning or training, compare Candidate A/B model results, access/move/publish the Stage 7-C checkpoint, open or enumerate either sealed test split, expand the V1 model/tokenizer vocabulary, generalize PDF/JPEG preparation, integrate with ScoreMosaic, or enable automatic/online learning.
+Stage 8-3A does not run fine-tuning or training, compare Candidate A/B model results, access/move/publish the Stage 7-C checkpoint, open or enumerate either sealed test split, expand the V1 model/tokenizer vocabulary, generalize PDF/JPEG/RGB preparation, integrate with ScoreMosaic, or enable automatic/online learning.
