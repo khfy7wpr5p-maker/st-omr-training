@@ -42,7 +42,7 @@ The substage names after Stage 8-0 are planning labels only. They do not authori
 
 Real data is untrusted until independently admitted. A path, filename, uploader claim, license URL, consent checkbox, existing MusicXML file, or successful parser result is not sufficient by itself.
 
-Every future training-eligible real sample must have an immutable metadata record that binds:
+Every future train/validation-eligible real sample must have an immutable metadata record that binds:
 
 - one broad leakage `family_id`;
 - one immutable source-document SHA-256;
@@ -54,6 +54,8 @@ Every future training-eligible real sample must have an immutable metadata recor
 - image–MusicXML pairing-review evidence SHA-256;
 - split assignment;
 - quarantine/admission review state.
+
+The Stage 8 development manifest contains **train and validation metadata only** and records only the SHA-256 commitment of the separately sealed real-test manifest. Test sample identities, labels, hashes, or evidence records must not be copied into the development manifest.
 
 The Stage 8-0 validator in `st_omr_training/real_data_contract.py` validates only this metadata boundary. It deliberately performs no file ingestion. Stage 8-1 must separately implement byte-level source, image, MusicXML, and pairing validation before any real sample becomes train/validation accessible.
 
@@ -124,15 +126,15 @@ An admitted real-data manifest must reject at minimum:
 
 ## Split policy and sealed test
 
-Real data uses exactly three family-exclusive splits:
+Real data uses exactly three family-exclusive splits, but Stage 8 development must not place all three into one inspectable manifest:
 
 - `train`: may update model parameters in a later authorized Stage 8 training package;
 - `validation`: may select checkpoints and report Stage 8 development metrics;
-- `test`: sealed throughout Stage 8 and reserved for Stage 9.
+- `test`: stored as a separately sealed manifest and reserved for Stage 9.
 
-Stage 8 development code may expose only admitted train and validation records. `select_stage8_development_records(...)` fails closed on `test`.
+The Stage 8 development manifest must contain admitted `train` and `validation` records only plus `sealed_test_manifest_sha256`, an opaque commitment to the separately controlled test manifest. A `test` record appearing in the development manifest is a hard veto. `select_stage8_development_records(...)` also fails closed immediately on `test`.
 
-The existing Stage 6 synthetic test split also remains sealed. Stage 8-0 does not open it, enumerate its contents, or use it for data selection, hyperparameters, architecture choices, threshold choices, or experiment comparison.
+The existing Stage 6 synthetic test split also remains sealed. Stage 8-0 does not open either test partition, enumerate test contents, or use test records for data selection, hyperparameters, architecture choices, threshold choices, or experiment comparison. Stage 8-1 must define the future one-time test-sealing procedure before any real test material exists; Stage 8-0 does not implement that procedure.
 
 ## Frozen experiment candidates
 

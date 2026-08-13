@@ -86,8 +86,8 @@ def make_manifest() -> RealDataManifest:
         samples=(
             make_sample(family="fam-train", split=RealDataSplit.TRAIN, page=1, source=h("1"), image=h("2"), target=h("3"), semantic=h("4")),
             make_sample(family="fam-val", split=RealDataSplit.VALIDATION, page=1, source=h("5"), image=h("6"), target=h("7"), semantic=h("8")),
-            make_sample(family="fam-test", split=RealDataSplit.TEST, page=1, source=h("9"), image=h("d"), target=h("e"), semantic=h("f")),
         ),
+        sealed_test_manifest_sha256=h("9"),
     )
 
 
@@ -160,7 +160,7 @@ class RealDataContractTests(unittest.TestCase):
                 semantic_fingerprint=duplicate.semantic_fingerprint,
             ),
         )
-        result = validate_real_data_manifest(replace(manifest, samples=(manifest.samples[0], duplicate, manifest.samples[2])))
+        result = validate_real_data_manifest(replace(manifest, samples=(manifest.samples[0], duplicate)))
         self.assertIn("duplicate.image_sha256", {issue.code for issue in result.issues})
 
     def test_family_split_leakage_is_rejected(self) -> None:
@@ -177,7 +177,7 @@ class RealDataContractTests(unittest.TestCase):
                 semantic_fingerprint=leaked.semantic_fingerprint,
             ),
         )
-        result = validate_real_data_manifest(replace(manifest, samples=(manifest.samples[0], leaked, manifest.samples[2])))
+        result = validate_real_data_manifest(replace(manifest, samples=(manifest.samples[0], leaked)))
         self.assertIn("leakage.family_split", {issue.code for issue in result.issues})
 
     def test_target_and_semantic_split_leakage_are_rejected(self) -> None:
@@ -198,7 +198,7 @@ class RealDataContractTests(unittest.TestCase):
                 semantic_fingerprint=leaked.semantic_fingerprint,
             ),
         )
-        result = validate_real_data_manifest(replace(manifest, samples=(manifest.samples[0], leaked, manifest.samples[2])))
+        result = validate_real_data_manifest(replace(manifest, samples=(manifest.samples[0], leaked)))
         codes = {issue.code for issue in result.issues}
         self.assertIn("leakage.target_split", codes)
         self.assertIn("leakage.semantic_split", codes)
@@ -215,16 +215,25 @@ class RealDataContractTests(unittest.TestCase):
             semantic=manifest.samples[0].semantic_fingerprint,
         )
         result = validate_real_data_manifest(
-            replace(manifest, samples=(manifest.samples[0], alias, manifest.samples[1], manifest.samples[2]))
+            replace(manifest, samples=(manifest.samples[0], alias, manifest.samples[1]))
         )
         codes = {issue.code for issue in result.issues}
         self.assertIn("leakage.target_family", codes)
         self.assertIn("leakage.semantic_family", codes)
 
-    def test_manifest_requires_all_three_splits(self) -> None:
+    def test_manifest_requires_train_and_validation(self) -> None:
         manifest = make_manifest()
-        result = validate_real_data_manifest(replace(manifest, samples=manifest.samples[:2]))
+        result = validate_real_data_manifest(replace(manifest, samples=manifest.samples[:1]))
         self.assertIn("manifest.missing_split", {issue.code for issue in result.issues})
+
+    def test_test_metadata_is_rejected_from_development_manifest(self) -> None:
+        manifest = make_manifest()
+        test_sample = make_sample(
+            family="fam-test", split=RealDataSplit.TEST, page=1,
+            source=h("a"), image=h("b"), target=h("c"), semantic=h("d"),
+        )
+        result = validate_real_data_manifest(replace(manifest, samples=manifest.samples + (test_sample,)))
+        self.assertIn("test.sealed", {issue.code for issue in result.issues})
 
     def test_test_split_is_sealed_for_stage8_development(self) -> None:
         manifest = make_manifest()
@@ -234,7 +243,7 @@ class RealDataContractTests(unittest.TestCase):
         self.assertEqual(len(select_stage8_development_records(manifest, RealDataSplit.VALIDATION)), 1)
 
     def test_invalid_manifest_cannot_be_selected(self) -> None:
-        manifest = replace(make_manifest(), samples=make_manifest().samples[:2])
+        manifest = replace(make_manifest(), samples=make_manifest().samples[:1])
         with self.assertRaises(RealDataContractError):
             select_stage8_development_records(manifest, RealDataSplit.TRAIN)
 

@@ -166,6 +166,7 @@ class RealDataManifest:
     dataset_name: str
     dataset_version: str
     samples: tuple[RealDataSample, ...]
+    sealed_test_manifest_sha256: str
     schema_version: str = REAL_DATA_SCHEMA_VERSION
     source_class: str = REAL_DATA_SOURCE_CLASS
     split_policy: str = REAL_DATA_SPLIT_POLICY
@@ -176,6 +177,7 @@ class RealDataManifest:
             raise RealDataContractError("dataset_version must match the bounded version contract")
         if not isinstance(self.samples, tuple):
             raise RealDataContractError("samples must be an immutable tuple")
+        _require_hex64("sealed_test_manifest_sha256", self.sealed_test_manifest_sha256)
         if len(self.samples) > MAX_REAL_DATA_SAMPLES:
             raise RealDataContractError("manifest exceeds the Stage 8-0 sample-count limit")
         if self.schema_version != REAL_DATA_SCHEMA_VERSION:
@@ -353,14 +355,18 @@ def validate_real_data_manifest(manifest: object) -> RealDataValidationResult:
     target_split: dict[str, RealDataSplit] = {}
     semantic_family: dict[str, str] = {}
     semantic_split: dict[str, RealDataSplit] = {}
-    split_counts = {split: 0 for split in RealDataSplit}
+    split_counts = {RealDataSplit.TRAIN: 0, RealDataSplit.VALIDATION: 0}
 
     for index, sample in enumerate(manifest.samples):
         path = f"manifest.samples[{index}]"
+        if not isinstance(sample, RealDataSample):
+            issues.append(_issue("sample.type", path, "sample must be RealDataSample"))
+            continue
+        if sample.split is RealDataSplit.TEST:
+            issues.append(_issue("test.sealed", f"{path}.split", "test sample metadata must remain outside the Stage 8 development manifest"))
+            continue
         sample_result = validate_real_data_sample(sample, path=path)
         issues.extend(sample_result.issues)
-        if not isinstance(sample, RealDataSample):
-            continue
         split_counts[sample.split] += 1
 
         for code, value, seen in (
@@ -400,7 +406,7 @@ def validate_real_data_manifest(manifest: object) -> RealDataValidationResult:
 
     for split, count in split_counts.items():
         if count == 0:
-            issues.append(_issue("manifest.missing_split", f"manifest.split.{split.value}", "admitted manifest requires every split"))
+            issues.append(_issue("manifest.missing_split", f"manifest.split.{split.value}", "development manifest requires both train and validation"))
 
     return _sorted_result(issues)
 
@@ -428,6 +434,7 @@ def canonical_real_data_manifest_bytes(manifest: RealDataManifest) -> bytes:
         "split_policy": manifest.split_policy,
         "dataset_name": manifest.dataset_name,
         "dataset_version": manifest.dataset_version,
+        "sealed_test_manifest_sha256": manifest.sealed_test_manifest_sha256,
         "samples": [_sample_payload(sample) for sample in samples],
     }
     return _canonical_json_bytes(payload)
@@ -443,12 +450,12 @@ def select_stage8_development_records(
 ) -> tuple[RealDataSample, ...]:
     """Expose only admitted train/validation metadata; Stage 8 test stays sealed."""
 
+    if split is RealDataSplit.TEST:
+        raise SealedTestAccessError("Stage 8 test records are sealed until the Stage 9 benchmark gate")
     result = validate_real_data_manifest(manifest)
     if not result.is_valid:
         first = result.issues[0]
         raise RealDataContractError(f"manifest is invalid: {first.code} at {first.path}: {first.message}")
-    if split is RealDataSplit.TEST:
-        raise SealedTestAccessError("Stage 8 test records are sealed until the Stage 9 benchmark gate")
     if split not in (RealDataSplit.TRAIN, RealDataSplit.VALIDATION):
         raise RealDataContractError("split must be train or validation during Stage 8 development")
     return tuple(sample for sample in manifest.samples if sample.split is split)
