@@ -12,7 +12,7 @@ from .stage7c_dataset import (
 )
 from .stage7c_execution import (
     run_verified_baseline_training,
-    verify_repository_checkout,
+    verify_authoritative_repository,
     verify_stage7c_runtime,
 )
 
@@ -38,7 +38,9 @@ def run_frozen_stage7c_baseline(workspace: str | Path) -> dict[str, object]:
 
     repository_root = _repository_root()
     target = validate_workspace_path(workspace, repository_root)
-    initial_repository_sha = verify_repository_checkout(repository_root)
+    initial_repository_sha, initial_repository_origin = verify_authoritative_repository(
+        repository_root
+    )
     runtime = verify_stage7c_runtime()
 
     target.mkdir(parents=True, exist_ok=False)
@@ -59,6 +61,7 @@ def run_frozen_stage7c_baseline(workspace: str | Path) -> dict[str, object]:
 
     return {
         "schema_version": "stage7c-cli-summary-v1",
+        "repository_origin": initial_repository_origin,
         "repository_sha": verified.result.repository_sha,
         "dataset_build_id": verified.result.dataset_build_id,
         "manifest_sha256": verified.result.manifest_sha256,
