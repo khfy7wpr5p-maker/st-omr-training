@@ -127,9 +127,6 @@ jobs:
     if: needs.stage7c-benchmark.outputs.enabled == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 330
-    env:
-      STAGE7C_WORKSPACE: ${{ runner.temp }}/stage7c-authoritative-workspace
-      STAGE7C_SUMMARY: ${{ runner.temp }}/stage7c-authoritative-summary.json
 
     steps:
       - name: Checkout exact benchmarked PR source head
@@ -160,8 +157,8 @@ jobs:
       - name: Run exact frozen synthetic-only Stage 7-C training
         run: |
           python -m st_omr_training.stage7c_cli \
-            --workspace "$STAGE7C_WORKSPACE" \
-            > "$STAGE7C_SUMMARY"
+            --workspace "$RUNNER_TEMP/stage7c-authoritative-workspace" \
+            > "$RUNNER_TEMP/stage7c-authoritative-summary.json"
 
       - name: Upload authoritative run evidence
         if: always()
@@ -169,8 +166,8 @@ jobs:
         with:
           name: stage7c-authoritative-${{ github.event.pull_request.head.sha }}
           path: |
-            ${{ env.STAGE7C_SUMMARY }}
-            ${{ env.STAGE7C_WORKSPACE }}
+            ${{ runner.temp }}/stage7c-authoritative-summary.json
+            ${{ runner.temp }}/stage7c-authoritative-workspace
           if-no-files-found: warn
           retention-days: 30
           compression-level: 6
