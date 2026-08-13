@@ -6,11 +6,11 @@ This file is the current stage-status source for this repository.
 
 The repository is public and GitHub Actions CI is active.
 
-Stages 0 through 6, all Stage 7 packages, Stage 8-0, and Stage 8-1 are complete on `main`.
+Stages 0 through 6, all Stage 7 packages, Stage 8-0, Stage 8-1, and Stage 8-2 are complete on `main`.
 
-The exact verified Stage 8-2 starting main is `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`. That commit is the Stage 8-1 closure synchronization from PR #30; post-merge GitHub Actions run #94 (`31705382162`) succeeded with pinned dependency verification, the complete repository test suite, `pip check`, and `compileall`.
+Stage 8-2 implementation merged through PR #31 from exact source head `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` commit `ba93736efa1411bf49020e52ddb688d63f7876c1`. Post-merge GitHub Actions run #102 (`31710085383`) succeeded with pinned dependency verification, the complete repository test suite, `pip check`, and `compileall`. Stage 8-2 is therefore **closed and main CI verified**.
 
-Stage 8-2 — Paired Experiment Run Profile Freeze — is the only active package. It is contract/configuration/evidence-binding work only. No real data is ingested, no checkpoint is loaded or moved, no training/fine-tuning is executed, and neither sealed test split is opened.
+Stage 8-3A — Pilot Data Preparation + Admission — is the next gate but is not started by this closure synchronization. No real data is ingested, no checkpoint is loaded or moved, no training/fine-tuning is executed, and neither sealed test split is opened.
 
 The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. The accepted Stage 7-C model remains non-production: exact sequence accuracy is 0% and token error rate is approximately 80.5%.
 
@@ -31,8 +31,8 @@ The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled t
 | 7-C | Bounded baseline training run + evidence | ✅ Closed — main CI verified |
 | 8-0 | Real data & fine-tuning contract freeze | ✅ Closed — main CI verified |
 | 8-1 | Quarantine/intake + byte-level validation | ✅ Closed — main CI verified |
-| 8-2 | Paired experiment run profile freeze | 🔄 Active package — no training |
-| 8-3A | Pilot source→training-PNG preparation + admission | 🔒 Not started |
+| 8-2 | Paired experiment run profile freeze | ✅ Closed — main CI verified |
+| 8-3A | Pilot source→training-PNG preparation + admission | ⏭ Next — not started |
 | 8-3B | Paired real train/validation execution | 🔒 Not started |
 | 9 | Benchmark and candidate decision | 🔒 Not started — test sealed |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
@@ -46,6 +46,7 @@ The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled t
 - Stage 8-0 PR #25 merged to `86487a4c3c41264b02bd159cd647a1318d9b9b88`; run #75 (`31698691405`) succeeded. Closure synchronization PR #26 merged to `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; run #77 (`31699497562`) succeeded.
 - Stage 8-1 PR #29 merged from exact source `ed4113a25f6e12055b9277f959a4580259d37d40` to `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) succeeded with **394/394 tests**, `pip check`, pinned runtime checks, and `compileall`.
 - Stage 8-1 closure synchronization PR #30 merged to exact `main` `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`; post-merge run #94 (`31705382162`) succeeded.
+- Stage 8-2 PR #31 merged from exact source `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` `ba93736efa1411bf49020e52ddb688d63f7876c1`; post-merge run #102 (`31710085383`) succeeded.
 
 The `CI VERIFIED` statement applies only to exact GitHub commits or GitHub-generated PR merge candidates exercised by GitHub-hosted CI.
 
@@ -65,26 +66,26 @@ Contract: [STAGE8_1_INTAKE_CONTRACT.md](STAGE8_1_INTAKE_CONTRACT.md)
 
 Stage 8-1 froze and verified in-memory byte validation, pre-hash size guards, exact source/image/MusicXML hashes, grayscale-PNG validation, supported-V1 MusicXML/token semantics, deterministic hash-only receipts, bounded dHash near-duplicate review, a one-receipt-per-sample development handoff, and a contract-only real-test sealing boundary. No real files were ingested or persisted.
 
-## Stage 8-2 active boundary
+## Stage 8-2 closed capability boundary
 
 Contract: [STAGE8_2_RUN_PROFILE.md](STAGE8_2_RUN_PROFILE.md)
 
-Stage 8-2 may implement only:
+Stage 8-2 froze:
 
 - the exact first real-data pilot profile: **50 admitted development pairs = 40 train + 10 validation**;
 - a shared deterministic model/tokenizer/preprocess/trainer/data-order/metric/resource profile for Candidate A and Candidate B;
 - Candidate A binding to the exact accepted Stage 7-C checkpoint/model-state hashes with no fallback;
 - Candidate B binding to deterministic from-scratch initialization with no checkpoint;
 - deterministic Stage 8-2 profile, admitted-manifest, Stage 8-1 receipt-set, and sealed-test commitment bindings;
-- synthetic/hash-only focused tests and architecture/status documentation.
+- validation every epoch, finite-only numeric evidence, and strict improvement below pre-update validation loss before an experiment can be accepted.
 
-Stage 8-2 does not authorize real-data IO, source conversion, dataset persistence, checkpoint loading, optimizer steps, sealed-test access, Stage 9/10, or ScoreMosaic integration.
+Stage 8-2 did not authorize or perform real-data IO, source conversion, dataset persistence, checkpoint loading, optimizer steps, sealed-test access, Stage 9/10, or ScoreMosaic integration.
 
 ### First-pilot data rule
 
 The pilot requires exactly 50 **admitted** pairs, not merely 50 raw JPEG/PDF + MusicXML files. A pair that fails rights, pairing, semantic, duplicate, leakage, near-duplicate, or byte validation does not count and must be replaced.
 
-Source JPEG/PDF bytes remain unchanged outside Git. The model input remains Stage 8-1-valid grayscale PNG. Stage 8-1 deliberately did not define source-to-PNG normalization, so Stage 8-2 makes ad-hoc conversion a hard blocker. The next Stage 8 execution package must begin with Stage 8-3A to freeze and verify source→training-PNG derivation before any real training.
+Source JPEG/PDF bytes remain unchanged outside Git. The model input remains Stage 8-1-valid grayscale PNG. Stage 8-1 deliberately did not define source-to-PNG normalization, so ad-hoc conversion remains a hard blocker. Stage 8-3A must freeze and verify source→training-PNG derivation before any real training.
 
 ### Paired execution profile
 
@@ -117,11 +118,11 @@ exact PR-head GitHub CI
         ↓
 separate merge approval
         ↓
-post-merge exact-main CI
+post-merge exact-main CI #102
         ↓
-Stage 8-2 CLOSED
+Stage 8-2 CLOSED ✅
 ```
 
 ## Next gate
 
-Stage 8-2 must close through merge and exact-main CI before any real data preparation or training. The next small gate is **Stage 8-3A — Pilot Data Preparation + Admission**: freeze and verify source-document→training-PNG derivation, run Stage 8-0/8-1 admission on the external pilot material, and produce the exact 40/10 hash-bound handoff. It will still perform no model optimization until that handoff is accepted. Stage 8-3B training, Stage 9, and Stage 10 remain locked.
+Stage 8-2 is closed and exact-main CI verified. The next small gate is **Stage 8-3A — Pilot Data Preparation + Admission**: freeze and verify source-document→training-PNG derivation, run Stage 8-0/8-1 admission on the external pilot material, and produce the exact 40/10 hash-bound handoff. It still performs no model optimization. Stage 8-3B training, Stage 9, and Stage 10 remain locked.
