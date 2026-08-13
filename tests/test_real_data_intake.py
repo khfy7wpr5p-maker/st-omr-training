@@ -368,8 +368,8 @@ class RealDataIntakeTests(unittest.TestCase):
         self.assertLessEqual(candidates[0].hamming_distance, NEAR_DUPLICATE_MAX_HAMMING_DISTANCE)
 
     def test_near_duplicate_search_fails_closed_on_comparison_budget(self) -> None:
-        receipts = self._near_duplicate_receipts()
         with patch("st_omr_training.real_data_intake.MAX_NEAR_DUPLICATE_COMPARISONS", 0):
+            receipts = self._near_duplicate_receipts()
             with self.assertRaisesRegex(RealDataIntakeError, "comparison safety budget"):
                 find_near_duplicate_candidates(receipts)
 
