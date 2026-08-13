@@ -44,7 +44,11 @@ Stage 8-0 real-data + fine-tuning contract gate
         ↓
 Stage 8-1 quarantine/intake + byte-validation gate
         ↓
-Later admitted real-data experiments
+Stage 8-2 paired experiment profile freeze
+        ↓
+Stage 8-3A source→training-PNG preparation + admission
+        ↓
+Stage 8-3B paired real train/validation execution
         ↓
 Stage 9 sealed benchmark
         ↓
@@ -70,8 +74,9 @@ ScoreMosaic
 11. Stage 7 may update parameters only from the `train` split and may select checkpoints only from `validation`; the Stage 6 `test` split remains sealed until Stage 9.
 12. Training datasets and large model artifacts are not normal Git repository content.
 13. Real data must remain distinct from synthetic data and pass the closed Stage 8-0 rights/provenance/permission/pairing/admission/leakage contract plus the closed Stage 8-1 exact-byte handoff before any later Stage 8 train/validation loader may trust it.
-14. ScoreMosaic uploads and teacher corrections are not automatic training data; no online/automatic learning path is permitted.
-15. ST-OMR candidates never enter ScoreMosaic automatically. Integration is a later, independent decision after sealed held-out evaluation and regression evidence.
+14. Stage 8-2 requires the primary Candidate A/B comparison to use the same admitted manifest, Stage 8-1 receipt set, tokenizer, preprocessing, model/trainer surface, deterministic data order, metric family, and resource budget; only initialization may differ.
+15. ScoreMosaic uploads and teacher corrections are not automatic training data; no online/automatic learning path is permitted.
+16. ST-OMR candidates never enter ScoreMosaic automatically. Integration is a later, independent decision after sealed held-out evaluation and regression evidence.
 
 ## Canonicalization rule
 
@@ -125,6 +130,8 @@ Stage 7 adds a deterministic semantic token target, deterministic data ordering 
 Stage 8-0 adds deterministic metadata identities for real-data admission. A real sample identity excludes split and review-state changes, while the admitted manifest canonicalizes exact evidence/status fields and split assignments.
 
 Stage 8-1 adds a deterministic byte-validation policy fingerprint, a supported-V1 semantic fingerprint bound to the exact tokenizer fingerprint/token-id sequence, a canonical hash-only validation receipt, and deterministic dHash64 near-duplicate candidates. These identities establish reproducible validation evidence; they do not convert a heuristic perceptual match into proof of musical identity or a receipt into a digital signature.
+
+Stage 8-2 adds a deterministic paired-profile fingerprint plus an order-independent receipt-set fingerprint and candidate bindings. The two primary candidate bindings must carry the same profile, development-manifest, receipt-set, and sealed-test commitment hashes. Candidate A additionally binds the exact accepted Stage 7-C checkpoint/model-state hashes; Candidate B binds no checkpoint.
 
 Cross-platform SVG or raster byte identity is not assumed automatically. A different operating system, architecture, renderer resource bundle, Cairo runtime, image runtime, training framework, or accelerator stack must be separately verified before determinism claims are generalized.
 
@@ -279,6 +286,8 @@ Stage 7-B Tokenizer + Data + Model + Trainer smoke implementation
         ↓
 Stage 7-C Bounded baseline training run + evidence
         ↓
+Stage 8 real-data gates
+        ↓
 Stage 9 sealed-test benchmark gate
 ```
 
@@ -339,7 +348,7 @@ Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact ve
 
 ## Stage 8 real-data and fine-tuning boundary
 
-Stage 8-0 is governed by [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md) and is closed/main-CI verified. Stage 8-1 is governed by [STAGE8_1_INTAKE_CONTRACT.md](STAGE8_1_INTAKE_CONTRACT.md) and is also closed/main-CI verified. Stage 8-2 and later stages remain locked.
+Stage 8-0 is governed by [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md) and is closed/main-CI verified. Stage 8-1 is governed by [STAGE8_1_INTAKE_CONTRACT.md](STAGE8_1_INTAKE_CONTRACT.md) and is closed/main-CI verified. Stage 8-2 is governed by [STAGE8_2_RUN_PROFILE.md](STAGE8_2_RUN_PROFILE.md) and is the only active package.
 
 ```text
 Stage 7-C accepted baseline evidence
@@ -364,24 +373,26 @@ perceptual near-duplicate candidate veto
         ↓
 admitted manifest + receipt development handoff
         ↓
-Stage 8-2 paired experiment run profile            LOCKED
+Stage 8-2 paired experiment run profile            ACTIVE — NO TRAINING
         ↓
-Stage 8-3 real train/validation experiments        LOCKED
+Stage 8-3A source→PNG preparation + admission      LOCKED
+        ↓
+Stage 8-3B paired real train/validation execution  LOCKED
         ↓
 Stage 9 sealed benchmark                           LOCKED
 ```
 
-Stage 8-0 freezes two later experiment candidates: (A) fine-tuning from the exact Stage 7-C checkpoint identified by its accepted checkpoint/model-state hashes, and (B) the same frozen architecture initialized from scratch. The Stage 7-C Actions artifact is only a temporary location and is scheduled to expire on 2026-09-12. Stage 8-1 did not access or relocate it. If exact Candidate A bytes are unavailable or fail hash/state verification in a later authorized package, Candidate A is blocked rather than silently substituted.
+Stage 8-0 freezes two experiment candidates: (A) fine-tuning from the exact Stage 7-C checkpoint identified by its accepted checkpoint/model-state hashes, and (B) the same frozen architecture initialized from scratch. The Stage 7-C Actions artifact is only a temporary location and is scheduled to expire on 2026-09-12. Stage 8-2 does not access or relocate it. If exact Candidate A bytes are unavailable or fail hash/state verification at a later execution gate, Candidate A is blocked rather than silently substituted.
 
-Real sample identity is independent of split/review state. Stage 8-0 rejects exact duplicate and family/source/target/semantic aliases. Stage 8-1 independently rebinds exact source, training-image, and MusicXML bytes to those hashes and recomputes the supported-V1 semantic fingerprint before a later loader may trust the sample. The final validator checks encoded-size bounds before image/MusicXML digest work, checks expected digests before parsing/decode, and independently revalidates receipt policy/tokenizer/self-hash identity.
+Real sample identity is independent of split/review state. Stage 8-0 rejects exact duplicate and family/source/target/semantic aliases. Stage 8-1 independently rebinds exact source, training-image, and MusicXML bytes to those hashes and recomputes the supported-V1 semantic fingerprint before a later loader may trust the sample. Stage 8-1 additionally performs bounded deterministic dHash64 near-duplicate review and requires one independently revalidated receipt per admitted development sample.
 
-Stage 8-1 additionally flags deterministic dHash64 near-duplicate candidates using bounded radius-4 candidate indexing; a cross-family candidate is a fail-closed handoff veto pending family/leakage review. The heuristic is not proof of musical identity and does not claim complete duplicate recall.
+Stage 8-2 freezes the first pilot at exactly **50 admitted development pairs: 40 train + 10 validation**. Raw files do not count until they pass Stage 8-0 and Stage 8-1. Both paired candidates must bind the same admitted manifest hash, receipt-set hash, sealed-test commitment, model/tokenizer/preprocess/trainer identities, canonical data order, metrics, and CPU/time budget. The shared profile is 40 epochs, batch size 4, AdamW at 0.001, no scheduler, one retained min-validation-loss checkpoint, 8-measure/1536-token decode, one CPU thread, 1800 seconds maximum per candidate and 3600 seconds maximum for the pair.
 
-A Stage 8-1 receipt is deterministic hash-only validation evidence, not a digital signature and not a replacement for rights/pairing approval. Byte validation happens while the candidate is quarantined. Only a valid Stage 8-0 admitted train/validation manifest plus exactly matching Stage 8-1 receipts may cross a future development handoff.
+Source JPEG/PDF bytes remain unchanged outside Git. The Stage 8 model input remains the Stage 8-1-valid grayscale PNG. Source-document→training-PNG normalization is intentionally not improvised inside Stage 8-2: Stage 8-3A must freeze and verify crop/render/orientation/grayscale/provenance behavior before a real pair may enter the 40/10 handoff.
 
 User-derived material still requires separate explicit training permission and privacy review. ScoreMosaic uploads and teacher corrections cannot bypass quarantine, and no runtime action may trigger model updates.
 
-Both the Stage 6 synthetic test split and the later Stage 8 real test split remain sealed until Stage 9. The Stage 8 development manifest carries no test records, only the opaque sealed-test manifest commitment. `STAGE8_TEST_SEALING_BOUNDARY.md` freezes a future contract-only sealing boundary; Stage 8-1 contains no test writer/loader/validator and did not create, enumerate, validate, or open real test material.
+Both the Stage 6 synthetic test split and the later Stage 8 real test split remain sealed until Stage 9. The Stage 8 development manifest carries no test records, only the opaque sealed-test manifest commitment. `STAGE8_TEST_SEALING_BOUNDARY.md` remains contract-only; no current Stage 8 code creates, enumerates, validates, or opens real test material.
 
 ## Verification boundary
 
@@ -389,21 +400,17 @@ GitHub Actions CI is active for the public repository. The baseline uses GitHub-
 
 Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`; post-merge GitHub Actions run `31660215130` passed on that exact commit.
 
-Stage 5-A merged through PR #15 at exact `main` commit `d677f3d27ac710c56c5ce677a46dc62bcf77bd84`; post-merge GitHub Actions run `31671919885` passed on that exact commit. Stage 5 closure documentation merged through PR #16 at exact `main` commit `ed343d4984aae4507a2dd3238cfd1a98fb25b4b7`; post-merge run `31672540732` passed.
+Stage 5-A merged through PR #15 at exact `main` commit `d677f3d27ac710c56c5ce677a46dc62bcf77bd84`; Stage 5 closure documentation merged through PR #16 at exact `main` `ed343d4984aae4507a2dd3238cfd1a98fb25b4b7`; the corresponding post-merge runs passed.
 
-Stage 6 final PR head `cfd0ac780595a38e0fe041d2d70293b39f96fcf3` passed GitHub Actions run #17 (`31673631608`) with **309/309 tests**, pinned runtime verification, real Stage 1→6 integration/rebuild/persistence tests, `pip check`, and compile validation. PR #17 then merged at exact `main` commit `7c3c736e6d3755d1bd098e2874d73ce5ed41e39f`; post-merge run #18 (`31674014666`) passed on that exact commit. Stage 6 closure documentation merged through PR #18 at exact `main` commit `046c9a4e7e41e94b0b4465a2610f30361055a3ed`; post-merge run #20 (`31674836433`) also passed.
+Stage 6 merged through PR #17 to exact `main` `7c3c736e6d3755d1bd098e2874d73ce5ed41e39f`; closure PR #18 merged to `046c9a4e7e41e94b0b4465a2610f30361055a3ed`; post-merge runs passed.
 
-Stage 7-A PR merge candidate from source head `0eca1d881c494c763692aa72b1092d741c32be83` against exact base `046c9a4e7e41e94b0b4465a2610f30361055a3ed` passed GitHub Actions run #21 (`31675330236`) with **309/309 tests**, pinned runtime verification, `pip check`, and compile validation. PR #19 then merged at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) passed on that exact commit. Stage 7-A closure synchronization merged through PR #20 at exact `main` commit `6a13760d9d17130ea86636f4828ff1bff035f30d`; post-merge run #24 (`31676871798`) passed.
+Stage 7-A merged through PR #19 and closure PR #20; Stage 7-B merged through PR #21 and closure PR #22. The exact Stage 7-B final source passed **336/336 tests** before merge.
 
-Stage 7-B final source head `a8ad8bc9f14953f0ed35ef5a5a8275be69af5ebd` against exact base `6a13760d9d17130ea86636f4828ff1bff035f30d` passed GitHub Actions run #30 (`31679413312`) on GitHub-generated PR merge candidate `3d5ee4e2ca479614e2a3322e0339ca21f25e5cae` with **336/336 tests**, pinned runtime verification including `torch==2.13.0+cpu`, `pip check`, missing-`EOS` regression coverage, deterministic CPU smoke evidence, and compile validation. PR #21 then merged at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`; post-merge GitHub Actions run #31 (`31679810478`) passed on that exact commit with **336/336 tests**.
+Stage 7-C source `7a993304218fa19609ea512665148dac3eea503a` passed run #67 (`31691794239`) with **361/361 tests**, guarded benchmark, and authoritative run. PR #23 merged to `2c2c478eb361fa90a3bccd819b623680eb12de0b`; run #68 passed. Closure PR #24 merged to `e56fad04e43bc6302a8cda60c6f382e83a23d734`; run #70 passed.
 
-Stage 7-B closure documentation squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) passed on that exact SHA. This commit is the verified Stage 7-C base.
+Stage 8-0 merged through PR #25 to `86487a4c3c41264b02bd159cd647a1318d9b9b88`; run #75 passed. Closure PR #26 merged to `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; run #77 passed.
 
-Stage 7-C source head `7a993304218fa19609ea512665148dac3eea503a` passed run #67 (`31691794239`) with **361/361 tests**, the guarded benchmark, and the authoritative run. PR #23 squash-merged at exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`; post-merge run #68 (`31692849892`) passed **361/361 tests** on that commit. Stage 7-C closure synchronization merged through PR #24 at exact `main` commit `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) passed. The integrated repository through Stage 7-C is therefore `CI VERIFIED`.
-
-Stage 8-0 merged through PR #25 at exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`; post-merge run #75 (`31698691405`) passed pinned runtime verification, `pip check`, the complete repository test suite, and `compileall`. Closure synchronization merged through PR #26 to exact `main` commit `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; post-merge run #77 (`31699497562`) passed. The integrated repository through Stage 8-0 is therefore `CI VERIFIED`.
-
-Stage 8-1 final source head `ed4113a25f6e12055b9277f959a4580259d37d40` merged through PR #29 to exact `main` commit `d551cb27e0244477379100c45e06193ea7ca0cf8`. Post-merge run #92 (`31704137450`) passed exact pinned runtime verification, `pip check`, **394/394 tests**, including the pre-hash payload-size regressions, and `compileall`. The integrated implementation through Stage 8-1 is therefore `CI VERIFIED`.
+Stage 8-1 final source `ed4113a25f6e12055b9277f959a4580259d37d40` merged through PR #29 to `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) passed **394/394 tests**, `pip check`, pinned runtime verification, and `compileall`. Closure synchronization PR #30 merged to exact `main` `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`; post-merge run #94 (`31705382162`) passed. This is the exact Stage 8-2 starting baseline.
 
 ## Stage roadmap
 
@@ -424,8 +431,9 @@ Stage 7-B Tokenizer/data/model/trainer implementation   ✅ CLOSED — CI VERIFI
 Stage 7-C Bounded baseline training run + evidence      ✅ CLOSED — CI VERIFIED
 Stage 8-0 Real data & fine-tuning contract freeze       ✅ CLOSED — CI VERIFIED
 Stage 8-1 Quarantine/intake + byte validation           ✅ CLOSED — CI VERIFIED
-Stage 8-2 Paired experiment run profile                 🔒 NOT STARTED
-Stage 8-3 Real train/validation experiments             🔒 NOT STARTED
+Stage 8-2 Paired experiment run profile                 🔄 ACTIVE — NO TRAINING
+Stage 8-3A Pilot source→PNG preparation + admission     🔒 NOT STARTED
+Stage 8-3B Paired real train/validation execution       🔒 NOT STARTED
 Stage 9   Benchmark and candidate decision              🔒 TEST SEALED
 Stage 10  ScoreMosaic candidate integration             🔒
 ```
