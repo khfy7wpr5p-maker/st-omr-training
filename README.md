@@ -16,6 +16,7 @@ This repository is isolated from the ScoreMosaic production runtime. Its purpose
 - [Baseline ST-OMR training contract](TRAINING_CONTRACT.md)
 - [Stage 7-B training implementation profile](TRAINING_IMPLEMENTATION.md)
 - [Stage 7-C bounded run profile](STAGE7C_RUNBOOK.md)
+- [Stage 7-C accepted evidence](STAGE7C_EVIDENCE.md)
 - [Verovio runtime evidence](VEROVIO_RUNTIME_EVIDENCE.md)
 - [Safety and verification rules](SAFETY.md)
 - [Current project status](STATUS.md)
@@ -34,11 +35,12 @@ Completed and merged:
 - Stage 5 — synthetic dataset contract and independent manifest validation;
 - Stage 6 — deterministic Synthetic Dataset v1 construction and hash-addressed local persistence;
 - Stage 7-A — Baseline ST-OMR Training Contract Freeze;
-- Stage 7-B — deterministic tokenizer/data/model/trainer smoke implementation.
+- Stage 7-B — deterministic tokenizer/data/model/trainer smoke implementation;
+- Stage 7-C — bounded synthetic-only baseline training run and accepted evidence.
 
 Stage 7-B merged through PR #21 at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`. Its closure documentation then squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) succeeded on that exact SHA. The integrated repository through Stage 7-B is therefore **main CI verified**.
 
-Stage 7-C — bounded real baseline training run + evidence — is the **active bounded package** on branch `stage-7c-baseline-run` / draft PR #23. The run orchestrator, incremental grammar-constrained validation decoder, progress/heartbeat surface, authoritative evidence gate, and bounded CI regressions are implemented. The first benchmark-admitted diagnostic execution completed optimization but failed closed because unconstrained greedy output produced no semantically valid validation sequence. The decoder now enforces only the already-frozen supported-V1 grammar and eight-measure profile during greedy inference; the corrected exact-head evidence rerun remains the acceptance gate.
+Stage 7-C merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. GitHub Actions run #67 (`31691794239`) passed the source head with **361/361 tests**, the guarded benchmark, and the authoritative 40-epoch synthetic-only run. Post-merge run #68 (`31692849892`) then passed **361/361 tests** on the exact `main` commit. The accepted hashes, metrics, provenance, and limitations are recorded in `STAGE7C_EVIDENCE.md`. Stage 7 is therefore **closed and main CI verified**.
 
 Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
 
@@ -54,6 +56,6 @@ Stage 7-B uses only the compact frozen semantic target surface defined by Stage 
 
 Stage 7-C reuses the same from-scratch CNN/GRU baseline, tokenizer, trusted data adapter, deterministic preprocessing, optimizer/loss policy, and exact `torch==2.13.0+cpu` runtime. It adds only the bounded real-run orchestration, grammar-constrained greedy inference, validation metrics, selected-checkpoint handling, and auditable provenance/evidence surface defined in `STAGE7C_RUNBOOK.md`. The inference constraint masks invalid next-token choices; it does not use validation targets, an external teacher, or the sealed test split.
 
-The selected baseline uses no pretrained model, external OCR/OMR teacher, LLM, or network-dependent label source. Ordinary GitHub-hosted CI remains limited to bounded CPU smoke/contract evidence. Draft PR #23 has one narrow exact-head exception: a conservative benchmark may admit one synthetic-only authoritative run; unsafe estimates fail closed before training.
+The selected baseline uses no pretrained model, external OCR/OMR teacher, LLM, or network-dependent label source. The one-shot PR #23 benchmark/training exception has been retired from the workflow; ordinary GitHub-hosted CI again contains only the bounded regression/runtime/compile gate.
 
 Large datasets, model checkpoints, real user documents, private material, and rights-unclear score collections are not normal Git repository content.

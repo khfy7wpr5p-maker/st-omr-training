@@ -197,7 +197,7 @@ The frozen outer ceilings are:
 - at most `100` configured epochs for a Stage 7-C baseline run;
 - at most `10` retained checkpoints per run;
 - checkpoint and metric artifacts remain outside normal Git content;
-- GitHub-hosted CI may run only bounded smoke training, never the full Stage 7-C baseline run.
+- ordinary recurring GitHub-hosted CI may run only bounded smoke training; any one-shot full Stage 7-C execution requires separate explicit scope, an exact-head fail-closed benchmark, and removal of that execution path at Stage 7-C closure.
 
 Stage 7-B may choose tighter limits but may not enlarge these ceilings without a new contract change.
 

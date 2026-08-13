@@ -257,7 +257,7 @@ Stage 6 does not add training logic, real/user data ingestion, teacher-correctio
 
 ## Stage 7 baseline-training boundary
 
-Stage 7 is governed by [TRAINING_CONTRACT.md](TRAINING_CONTRACT.md). The closed Stage 7-B implementation profile is recorded in [TRAINING_IMPLEMENTATION.md](TRAINING_IMPLEMENTATION.md), and the active Stage 7-C execution profile is recorded in [STAGE7C_RUNBOOK.md](STAGE7C_RUNBOOK.md).
+Stage 7 is governed by [TRAINING_CONTRACT.md](TRAINING_CONTRACT.md). The closed Stage 7-B implementation profile is recorded in [TRAINING_IMPLEMENTATION.md](TRAINING_IMPLEMENTATION.md); the closed Stage 7-C execution profile and accepted evidence are recorded in [STAGE7C_RUNBOOK.md](STAGE7C_RUNBOOK.md) and [STAGE7C_EVIDENCE.md](STAGE7C_EVIDENCE.md).
 
 Stage 7 is decomposed so the contract, implementation, and actual baseline run cannot be silently combined:
 
@@ -271,7 +271,7 @@ Stage 7-C Bounded baseline training run + evidence
 Stage 9 sealed-test benchmark gate
 ```
 
-Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the active bounded package on `stage-7c-baseline-run` / draft PR #23. Its orchestrator, incremental grammar-constrained decoder, heartbeat surface, evidence gate, and bounded regressions are implemented; corrected authoritative run evidence remains the active gate.
+Stage 7-A, Stage 7-B, and Stage 7-C are closed and exact-main CI verified. Stage 7-C merged through PR #23 at exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`; post-merge run #68 (`31692849892`) passed **361/361 tests** on that SHA. Its accepted synthetic-only evidence is permanently summarized by hash without treating the model as a production candidate.
 
 ### Training input
 
@@ -324,7 +324,7 @@ The decoding constraint is an inference-time state machine over the existing 35-
 
 Every real Stage 7-C run records repository SHA, dataset build identity, manifest SHA, run/tokenizer/preprocess/model/trainer fingerprints, dependency/runtime/device identity, seeds, parameter count, epoch/step counts, checkpoint SHA-256, and metrics SHA-256. Checkpoints are hash-addressed derived artifacts and remain outside normal Git content.
 
-Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact verified CPU runtime. Ordinary GitHub-hosted CI remains limited to bounded smoke/contract testing. Draft PR #23 permits one exact-head exception only after a full-length incremental-decode and representative frozen-workload benchmark passes a conservative 2×/four-hour safety gate.
+Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact verified CPU runtime. Stage 7-C then used one explicitly approved, exact-head, benchmark-gated GitHub-hosted execution. That exception is historical and has been removed from the active workflow; ordinary CI is again limited to bounded regression/runtime/compile validation.
 
 ## Verification boundary
 
@@ -342,7 +342,7 @@ Stage 7-B final source head `a8ad8bc9f14953f0ed35ef5a5a8275be69af5ebd` against e
 
 Stage 7-B closure documentation squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) passed on that exact SHA. This commit is the verified Stage 7-C base.
 
-The integrated repository through the Stage 7-B implementation and closure-documentation boundary is therefore `CI VERIFIED`. Stage 7-C is active on draft PR #23 but is not merge-ready until both hosted PR verification and the separate real pinned-CPU run evidence are complete.
+Stage 7-C source head `7a993304218fa19609ea512665148dac3eea503a` passed run #67 (`31691794239`) with **361/361 tests**, the guarded benchmark, and the authoritative run. PR #23 squash-merged at exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`; post-merge run #68 (`31692849892`) passed **361/361 tests** on that commit. The integrated repository through Stage 7-C is therefore `CI VERIFIED`.
 
 ## Stage roadmap
 
@@ -360,7 +360,7 @@ Stage 5   Dataset validation                            ✅ CLOSED — CI VERIFI
 Stage 6   Synthetic Dataset v1                          ✅ CLOSED — CI VERIFIED
 Stage 7-A Baseline training contract freeze             ✅ CLOSED — CI VERIFIED
 Stage 7-B Tokenizer/data/model/trainer implementation   ✅ CLOSED — CI VERIFIED
-Stage 7-C Bounded baseline training run + evidence      🔄 ACTIVE — DRAFT PR #23
+Stage 7-C Bounded baseline training run + evidence      ✅ CLOSED — CI VERIFIED
 Stage 8   Real-data fine-tuning                         🔒
 Stage 9   Benchmark and candidate decision              🔒
 Stage 10  ScoreMosaic candidate integration             🔒

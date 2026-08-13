@@ -6,13 +6,13 @@ This file is the current stage-status source for this repository.
 
 The repository is public and GitHub Actions CI is active.
 
-Stages 0 through 6, Stage 7-A, and Stage 7-B are complete on `main`.
+Stages 0 through 6 and all Stage 7 packages are complete on `main`.
 
 Stage 7-A — Baseline Training Contract Freeze — merged through PR #19 at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) succeeded. Stage 7-A closure/status synchronization then merged through PR #20 at exact `main` commit `6a13760d9d17130ea86636f4828ff1bff035f30d`; post-merge run #24 (`31676871798`) also succeeded.
 
 Stage 7-B — Tokenizer/Data/Model/Trainer Implementation — merged through PR #21 at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`. Post-merge GitHub Actions run #31 (`31679810478`) succeeded on that exact commit with **336/336 tests**, pinned runtime verification, `pip check`, the missing-`EOS` regression, deterministic CPU smoke evidence, and `compileall`. Stage 7-B closure documentation then squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) succeeded on that exact SHA. The integrated repository through the Stage 7-B boundary is therefore `CI VERIFIED`.
 
-Stage 7-C — Bounded Baseline Training Run + Evidence — is the **active bounded package** on branch `stage-7c-baseline-run` / draft PR #23. The run orchestrator, incremental grammar-constrained validation decoder, progress/heartbeat surface, authoritative evidence gate, bounded contract tests, and execution documentation are implemented. The first admitted diagnostic run completed all 40 epochs/1560 steps and improved validation loss from `3.5603423876792655` to `1.0018396258589004`, but correctly failed closed when unconstrained greedy decoding yielded `0/21` semantically valid predictions. No accepted evidence exists until the corrected exact-head rerun and its uploaded artifacts pass review.
+Stage 7-C — Bounded Baseline Training Run + Evidence — merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. Exact-head run #67 (`31691794239`) passed **361/361 tests**, the guarded benchmark, and the authoritative synthetic-only run. Post-merge exact-main run #68 (`31692849892`) passed **361/361 tests**, exact runtime checks, `pip check`, and `compileall`. The accepted evidence is recorded in `STAGE7C_EVIDENCE.md`; Stage 7-C is `CLOSED — MAIN CI VERIFIED`.
 
 Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
 
@@ -30,7 +30,7 @@ Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stag
 | 6 | Synthetic Dataset v1 | ✅ Closed — main CI verified |
 | 7-A | Baseline training contract freeze | ✅ Closed — main CI verified |
 | 7-B | Tokenizer/data/model/trainer smoke implementation | ✅ Closed — main CI verified |
-| 7-C | Bounded baseline training run + evidence | 🔄 Active bounded package — draft PR #23 |
+| 7-C | Bounded baseline training run + evidence | ✅ Closed — main CI verified |
 | 8 | Real-data fine-tuning | 🔒 Not started |
 | 9 | Benchmark and candidate decision | 🔒 Not started |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
@@ -52,6 +52,8 @@ Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stag
 - Stage 7-B final source head `a8ad8bc9f14953f0ed35ef5a5a8275be69af5ebd` against exact base `6a13760d9d17130ea86636f4828ff1bff035f30d` passed GitHub Actions run #30 (`31679413312`) on GitHub-generated PR merge candidate `3d5ee4e2ca479614e2a3322e0339ca21f25e5cae` with **336/336 tests**, exact runtime pins, `pip check`, the missing-`EOS` regression, deterministic CPU smoke evidence, and `compileall`.
 - Stage 7-B merged through PR #21 at exact main commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`; post-merge GitHub Actions run #31 (`31679810478`) succeeded on that exact commit with **336/336 tests** and compile validation.
 - Stage 7-B closure documentation squash-merged through PR #22 at exact main commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) succeeded on that exact commit.
+- Stage 7-C exact source head `7a993304218fa19609ea512665148dac3eea503a` passed run #67 (`31691794239`) with **361/361 tests**, a safe guarded benchmark, and accepted authoritative evidence; PR #23 then squash-merged to exact main commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`.
+- Stage 7-C post-merge run #68 (`31692849892`) succeeded on exact main commit `2c2c478eb361fa90a3bccd819b623680eb12de0b` with **361/361 tests**, exact dependency checks, `pip check`, and `compileall`.
 
 The `CI VERIFIED` statement applies only to exact GitHub commits or GitHub-generated PR merge candidates that GitHub-hosted CI exercised.
 
@@ -93,11 +95,11 @@ Stage 7-B closed with:
 
 Stage 7-B does **not** run the real baseline training job, open test data, retain production checkpoints, ingest real/user material, or integrate with ScoreMosaic.
 
-## Stage 7-C active capability boundary
+## Stage 7-C closed capability boundary
 
 Execution profile: [STAGE7C_RUNBOOK.md](STAGE7C_RUNBOOK.md)
 
-The active Stage 7-C package is limited to:
+The closed Stage 7-C package established:
 
 - the already-frozen Stage 7-B CNN/GRU model, tokenizer, data adapter, preprocessing, optimizer/loss, and exact CPU runtime;
 - train-only optimization and validation-only checkpoint selection;
@@ -110,13 +112,13 @@ The active Stage 7-C package is limited to:
 - canonical SHA-256-addressed metrics/provenance evidence;
 - fresh no-resume run directories with explicit incomplete/complete state.
 
-The real Stage 7-C baseline run remains a separate execution/evidence gate. Ordinary GitHub-hosted CI may exercise only bounded smoke/contract tests and full repository regression. Draft PR #23 has one explicitly bounded exception: an exact-head benchmark with a 2× safety margin must fit within four hours before one synthetic-only authoritative job is admitted. The diagnostic failure preserved `INCOMPLETE` evidence and did not create `COMPLETE` or `VERIFIED`; its remediation changes inference validity only and does not alter training data, targets, optimization, or the sealed test split.
+The accepted run completed 40 epochs/1560 steps, improved validation loss from `3.560342441426505` to `0.9992435761603257`, and produced 21/21 semantically valid and MusicXML-regenerable validation predictions. Exact sequence accuracy remained 0% and token error rate remained approximately 80.5%, so no production-candidate claim is made. The sealed test split remained closed. Full hashes, provenance, retention limits, and interpretation boundaries are in [STAGE7C_EVIDENCE.md](STAGE7C_EVIDENCE.md).
 
 ## CI baseline
 
 The active `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, and manual dispatch using GitHub-hosted Ubuntu 24.04 / Python 3.13, read-only repository contents permission, pinned GitHub action commits, exact dependency/runtime checks, `pip check`, complete unittest discovery, and Python compile validation.
 
-The isolated official-PyTorch-CPU-index install verifies exact `torch==2.13.0+cpu`. Full Stage 7-C training remains prohibited in ordinary GitHub-hosted CI; only the benchmark-gated, exact-head PR #23 exception is authorized.
+The isolated official-PyTorch-CPU-index install verifies exact `torch==2.13.0+cpu`. The one-shot PR #23 benchmark/training exception is retired; the active workflow no longer contains a full Stage 7-C execution path.
 
 ## Required Stage 7-C gate
 
@@ -150,4 +152,4 @@ CLOSED
 
 ## Next gate
 
-Stage 7-C is active but **not merge-ready** until the final implementation passes hosted CI and the benchmark-admitted real pinned-CPU baseline run produces accepted evidence. Stage 8, Stage 9, and Stage 10 remain locked. The Stage 6 test split remains sealed.
+Stage 7-C is closed and main CI verified. No Stage 8, Stage 9, or Stage 10 work is authorized by this closure. Before any later model-byte reuse, a separate durable artifact-storage boundary is required because the accepted Actions artifact expires on 2026-09-12. The Stage 6 test split remains sealed.
