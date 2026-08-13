@@ -17,7 +17,7 @@ Do not commit:
 - API keys, tokens, credentials, or secrets
 - large generated image datasets
 - large model checkpoints or caches
-- temporary renderer output
+- temporary renderer/degradation output
 - binary dependency wheels or other large third-party runtime bundles
 
 Large datasets and model artifacts must use separate approved storage when those stages are introduced.
@@ -52,6 +52,10 @@ MusicXML Validator
 Supported-V1 Semantic Round Trip
    ↓
 Eligible for rendering
+   ↓
+Validated self-contained SVG
+   ↓
+Eligible for controlled degradation
 ```
 
 A failure at any validation stage rejects the sample.
@@ -74,7 +78,7 @@ Examples include:
 - V1 scope enforcement
 - MusicXML schema and semantic validity
 - safe renderer output structure
-- degradation parameter bounds and output integrity when Stage 4 is implemented
+- Stage 4 source hash, SVG safety, resource, parameter, and output-integrity checks
 
 ## Negative testing
 
@@ -95,8 +99,10 @@ Negative tests should include, as applicable:
 - invalid voice
 - unsupported notation outside the active stage contract
 - malformed or unsafe XML/SVG surfaces
+- source/hash lineage mismatch
 - out-of-range degradation parameters
-- transformations that remove required musical content
+- effectively blank/corrupt raster output
+- transformations that fail content-retention/resource gates
 
 ## Determinism
 
@@ -106,17 +112,30 @@ MusicXML determinism is independently verified at the serialization boundary.
 
 Stage 3 renderer determinism is scoped to the same pinned Verovio package/runtime, renderer configuration, platform/resource bundle, adapter version, and input bytes. The verified environment produced byte-identical SVG output for deterministic repeats, but cross-platform binary identity is not assumed without separate evidence.
 
-Stage 4 degradation must use explicit, replayable parameterization and seed/provenance recording. A derivative must be reproducible from its clean source artifact plus recorded degradation configuration where the chosen transform is defined as deterministic.
+Stage 4 uses explicit replay parameters. Seeded V1 profiles derive parameters without mutable global RNG state. Every derivative records the exact configuration and source/clean/final hashes. Byte identity is scoped to the same Stage 4 version, source SVG, direct dependency versions, Cairo runtime, Python/runtime platform, and configuration; cross-platform equality must be separately demonstrated.
 
-## Augmentation safety
+## Stage 4 augmentation safety
 
-Augmentation may alter visual quality but must not change symbolic ground truth.
+Stage 4 may alter visual quality but must not change symbolic ground truth.
 
-Allowed categories may include controlled blur, skew, perspective, noise, shadows, compression, fading, rasterization, and similar document degradation only after the Stage 4 contract defines bounds and validation rules.
+The frozen V1 operation set is intentionally conservative:
 
-Every degraded derivative must retain lineage to its clean rendered source and canonical symbolic family.
+- clean SVG-to-grayscale-PNG rasterization;
+- rotation limited to ±3 degrees with `expand=true` and white fill, so rotation does not intentionally crop the page;
+- Gaussian blur limited to 2 pixels;
+- deterministic grayscale noise limited to level 20;
+- brightness limited to 0.80..1.20;
+- contrast limited to 0.75..1.25;
+- optional JPEG round-trip limited to quality 65..95, with final output returned as PNG;
+- raster width limited to 512..2400 and output capped at 16,000,000 pixels.
 
-An augmentation result must be rejected if it destroys or removes required musical content, for example by cropping away a measure or staff region needed by the target, producing an empty/corrupt image, or violating configured geometry/resource bounds.
+Every derivative retains lineage to the self-contained Stage 3 SVG, clean raster, original MusicXML, renderer configuration, and symbolic `family_id`.
+
+Stage 4 rejects unsafe/external SVG resources before CairoSVG is invoked, validates source hashes, rejects effectively blank or implausibly dark images, and applies an ink-retention gate after rotation.
+
+V1 deliberately does **not** permit arbitrary cropping, perspective warp, shear, elastic deformation, synthetic shadows/occlusion, staff-line deletion, symbol deletion, or content-aware erasing. These operations can remove or relocate musical content and require stronger score-region/content-preservation validation before they can be considered.
+
+Stage 5 Dataset Validation remains an independent acceptance gate. Passing Stage 4 does not make a derivative automatically eligible for training.
 
 ## Dataset leakage prevention
 
@@ -156,13 +175,13 @@ Determinism tests
     ↓
 Golden / real-runtime tests where applicable
     ↓
-Full local regression
+Full local regression where a complete local runtime is available
     ↓
 Generated-artifact checks
     ↓
 Diff / scope review
     ↓
-LOCAL VERIFIED
+LOCAL VERIFIED when applicable
     ↓
 Pull-request GitHub-hosted CI
     ↓
@@ -184,9 +203,11 @@ A successful CI run must never be inferred from a different commit.
 
 ## Current CI baseline
 
-The merged baseline workflow uses GitHub-hosted Ubuntu, Python 3.13, pinned runtime dependencies, full unittest discovery including real Verovio runtime tests, and Python compile validation.
+The merged baseline workflow uses GitHub-hosted Ubuntu, Python 3.13, pinned runtime dependencies, full unittest discovery including real-runtime tests, and Python compile validation.
 
-After PR #12 merged, the exact `main` commit `5abbc9859a4a69bf9a17936bc41e722256f87472` passed GitHub Actions run `31647615123`. The current integrated state through Stage 3 is therefore CI verified.
+The exact pre-Stage-4 `main` commit `23739ddfab618a0406836e94bb0ced1a124f8886` passed GitHub Actions run `31648164533`. The integrated state through Stage 3 is therefore CI verified.
+
+Stage 4 adds exact direct pins for CairoSVG and Pillow to the branch CI runtime. The final Stage 4 PR head must pass the workflow with those pins and the real Verovio → raster/degradation integration tests before merge may be considered.
 
 ## Change-control rule
 
