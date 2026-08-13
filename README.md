@@ -42,7 +42,8 @@ Completed and merged:
 - Stage 7-B — deterministic tokenizer/data/model/trainer smoke implementation;
 - Stage 7-C — bounded synthetic-only baseline training run and accepted evidence;
 - Stage 8-0 — Real Data & Fine-Tuning Contract Freeze;
-- Stage 8-1 — Quarantine / Intake + Byte-Level Validation.
+- Stage 8-1 — Quarantine / Intake + Byte-Level Validation;
+- Stage 8-2 — Paired Experiment Run Profile Freeze.
 
 Stage 7-C merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. Its closure synchronization merged through PR #24 to `main` `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) succeeded. Stage 7 is therefore **closed and main CI verified**.
 
@@ -50,15 +51,17 @@ Stage 8-0 merged through PR #25 to exact `main` commit `86487a4c3c41264b02bd159c
 
 Stage 8-1 implementation merged through PR #29 from final source head `ed4113a25f6e12055b9277f959a4580259d37d40` to exact `main` commit `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) succeeded with **394/394 tests**. Closure synchronization PR #30 then merged to exact `main` `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`; post-merge run #94 (`31705382162`) succeeded. Stage 8-1 is therefore **closed and main CI verified**.
 
-Stage 8-2 — Paired Experiment Run Profile Freeze — is the only active package. It freezes the first real-data pilot as **50 admitted development pairs: 40 train + 10 validation**, with Candidate A (exact Stage 7-C checkpoint fine-tuning) and Candidate B (same architecture from scratch) bound to the same admitted manifest, Stage 8-1 receipt set, sealed-test commitment, model/tokenizer/preprocess/trainer fingerprints, deterministic data order, metric family, and bounded CPU/time budget. Stage 8-2 contains configuration, validators, tests, and documentation only; it does not ingest real files or run training.
+Stage 8-2 implementation merged through PR #31 from exact source head `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` commit `ba93736efa1411bf49020e52ddb688d63f7876c1`. Post-merge GitHub Actions run #102 (`31710085383`) succeeded. Stage 8-2 is therefore **closed and main CI verified**.
+
+The closed Stage 8-2 profile freezes the first real-data pilot as **50 admitted development pairs: 40 train + 10 validation**, with Candidate A (exact Stage 7-C checkpoint fine-tuning) and Candidate B (same architecture from scratch) bound to the same admitted manifest, Stage 8-1 receipt set, sealed-test commitment, model/tokenizer/preprocess/trainer fingerprints, deterministic data order, metric family, and bounded CPU/time budget. Stage 8-2 itself did not ingest real files or run training.
 
 The first 50 raw files are not automatically 50 training samples. A pair counts only after Stage 8-0 rights/pairing admission and Stage 8-1 byte/semantic/leakage validation. Rejected pairs must be replaced before the exact 40/10 pilot manifest can be frozen.
 
-Source JPEG/PDF files remain unchanged outside the repository. The model still requires the Stage 8-1 8-bit grayscale PNG training-image contract. Because source-to-training-PNG derivation was intentionally left unresolved by Stage 8-1, Stage 8-2 makes ad-hoc conversion a hard blocker: the later Stage 8-3 package must begin with a small Stage 8-3A source-to-PNG preparation/admission sub-gate before any optimization run.
+Source JPEG/PDF files remain unchanged outside the repository. The model still requires the Stage 8-1 8-bit grayscale PNG training-image contract. Because source-to-training-PNG derivation was intentionally left unresolved by Stage 8-1, ad-hoc conversion remains a hard blocker. The next gate is Stage 8-3A, which must freeze and verify source-to-training-PNG preparation and admission before any optimization run.
 
-Both held-out test partitions remain sealed. Stage 8-3 execution, Stage 9 benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
+Both held-out test partitions remain sealed. Stage 8-3A is next but not started by this closure synchronization; Stage 8-3B execution, Stage 9 benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
 
-The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. Stage 8-2 does not load, move, copy, publish, or preserve it; if exact Candidate A bytes are unavailable or hash/state mismatched at execution time, Candidate A is blocked rather than substituted.
+The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. Stage 8-2 did not load, move, copy, publish, or preserve it; if exact Candidate A bytes are unavailable or hash/state mismatched at execution time, Candidate A is blocked rather than substituted.
 
 The Stage 7-C model remains a trainability baseline rather than a production candidate: exact sequence accuracy is 0% and token error rate is approximately 80.5% on its validation evidence.
 
@@ -68,7 +71,7 @@ Each stage stays isolated behind explicit contracts and validation gates. Symbol
 
 All derivatives of one symbolic or real-source family remain in one dataset family and one train/validation/test split. Builders never validate themselves by assertion; independent validation remains a veto gate.
 
-Stage 7 training used only Stage 5/6 validated synthetic artifacts. Any later Stage 8 real data must pass the closed Stage 8-0 metadata contract and the closed Stage 8-1 byte-level handoff before a later train/validation loader may see it. Stage 8-2 additionally requires both paired candidates to use the exact same 40/10 admitted development manifest and receipt-set identity. Both synthetic and real held-out test partitions remain sealed until the Stage 9 benchmark gate.
+Stage 7 training used only Stage 5/6 validated synthetic artifacts. Any later Stage 8 real data must pass the closed Stage 8-0 metadata contract and the closed Stage 8-1 byte-level handoff before a later train/validation loader may see it. The closed Stage 8-2 profile additionally requires both paired candidates to use the exact same 40/10 admitted development manifest and receipt-set identity. Both synthetic and real held-out test partitions remain sealed until the Stage 9 benchmark gate.
 
 ScoreMosaic user uploads and teacher corrections are not automatic training data. User-derived material requires separate explicit training permission and the full quarantine/admission process. There is no online or automatic learning path, and no Stage 8 output may enter ScoreMosaic before Stage 9 candidate-quality evidence and the later Stage 10 integration gate.
 
