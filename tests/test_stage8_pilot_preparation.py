@@ -13,7 +13,7 @@ from st_omr_training.stage8_pilot_preparation import (
 )
 
 
-def _png_bytes(mode: str = "RGB", *, transparency: bool = False, metadata: bool = False) -> bytes:
+def _png_bytes(mode: str = "P", *, transparency: bool = False, metadata: bool = False) -> bytes:
     if mode == "P":
         image = Image.new("P", (12, 8), 0)
         palette = []
@@ -23,13 +23,20 @@ def _png_bytes(mode: str = "RGB", *, transparency: bool = False, metadata: bool 
         for x in range(12):
             for y in range(8):
                 image.putpixel((x, y), 0 if (x + y) % 3 else 255)
+    elif mode == "1":
+        image = Image.new("1", (12, 8), 1)
+        for x in range(2, 10):
+            image.putpixel((x, 4), 0)
     elif mode == "RGBA":
         image = Image.new("RGBA", (12, 8), (255, 255, 255, 255))
+    elif mode == "RGB":
+        image = Image.new("RGB", (12, 8), "white")
+        for x in range(2, 10):
+            image.putpixel((x, 4), (0, 0, 0))
     else:
-        image = Image.new(mode, (12, 8), "white" if mode != "L" else 255)
-        if mode in {"RGB", "L"}:
-            for x in range(2, 10):
-                image.putpixel((x, 4), (0, 0, 0) if mode == "RGB" else 0)
+        image = Image.new(mode, (12, 8), 255)
+        for x in range(2, 10):
+            image.putpixel((x, 4), 0)
 
     info = PngImagePlugin.PngInfo() if metadata else None
     if info is not None:
@@ -93,14 +100,16 @@ class Stage8PilotPreparationTests(unittest.TestCase):
             self.assertEqual(getattr(image, "n_frames", 1), 1)
             self.assertNotIn("private-test-metadata", image.info)
 
-    def test_prepare_training_png_accepts_rgb_and_l_without_geometry_changes(self) -> None:
-        for mode in ("RGB", "L"):
+    def test_prepare_training_png_accepts_only_monochrome_palette_or_l(self) -> None:
+        for mode in ("1", "L", "P"):
             with self.subTest(mode=mode):
                 derived, evidence = prepare_training_png(_png_bytes(mode))
                 self.assertEqual(evidence.source_mode, mode)
                 with Image.open(BytesIO(derived)) as image:
                     self.assertEqual(image.mode, "L")
                     self.assertEqual(image.size, (12, 8))
+        with self.assertRaises(Stage8PilotPreparationError):
+            prepare_training_png(_png_bytes("RGB"))
 
     def test_prepare_training_png_rejects_non_png_alpha_and_transparency(self) -> None:
         with self.assertRaises(Stage8PilotPreparationError):
@@ -169,6 +178,26 @@ class Stage8PilotPreparationTests(unittest.TestCase):
             "semantic_duration_outside_v1",
         ):
             self.assertIn(reason, inspection.v1_rejection_reasons)
+
+    def test_empty_mei_score_and_unsupported_accidental_fail_triage(self) -> None:
+        empty = _mei(body="<space dur=\"4\"/>")
+        inspection = inspect_primus_auxiliary_package(
+            mei_bytes=empty,
+            semantic_bytes=b"clef-G2\tkeySignature-CM\ttimeSignature-4/4\t",
+            agnostic_bytes=b"clef.G-L2\t",
+        )
+        self.assertFalse(inspection.v1_eligible)
+        self.assertIn("empty_mei_event_stream", inspection.v1_rejection_reasons)
+        self.assertIn("unsupported_mei_structure", inspection.v1_rejection_reasons)
+
+        accidental = _mei(body='<note dur="4" oct="4" pname="c"><accid accid="ss"/></note>')
+        inspection = inspect_primus_auxiliary_package(
+            mei_bytes=accidental,
+            semantic_bytes=b"clef-G2\tkeySignature-CM\ttimeSignature-4/4\tnote-C#4_quarter\t",
+            agnostic_bytes=b"clef.G-L2\taccidental.sharp\tnote.quarter-L3\t",
+        )
+        self.assertFalse(inspection.v1_eligible)
+        self.assertIn("unsupported_accidental", inspection.v1_rejection_reasons)
 
     def test_auxiliary_files_must_be_nonempty_and_mei_well_formed(self) -> None:
         with self.assertRaises(Stage8PilotPreparationError):
