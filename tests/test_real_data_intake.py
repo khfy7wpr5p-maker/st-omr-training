@@ -4,6 +4,7 @@ from dataclasses import replace
 from hashlib import sha256
 from io import BytesIO
 import unittest
+from unittest.mock import patch
 
 from PIL import Image
 
@@ -185,6 +186,41 @@ class RealDataIntakeTests(unittest.TestCase):
                         musicxml_bytes=xml,
                     )
 
+    def test_image_hash_is_checked_before_untrusted_png_decode(self) -> None:
+        image = make_png("vertical")
+        sample = make_quarantined_sample(
+            family="fam-hash-first",
+            split=RealDataSplit.TRAIN,
+            source_bytes=self.source_train,
+            image_bytes=image,
+            musicxml_bytes=self.xml_train,
+        )
+        with self.assertRaisesRegex(RealDataIntakeError, "image_sha256"):
+            validate_quarantined_sample_bytes(
+                sample,
+                source_document_bytes=self.source_train,
+                training_image_png_bytes=b"not-a-png-and-not-the-expected-hash",
+                musicxml_bytes=self.xml_train,
+            )
+
+    def test_pillow_runtime_drift_fails_closed(self) -> None:
+        image = make_png("vertical")
+        sample = make_quarantined_sample(
+            family="fam-runtime",
+            split=RealDataSplit.TRAIN,
+            source_bytes=self.source_train,
+            image_bytes=image,
+            musicxml_bytes=self.xml_train,
+        )
+        with patch("st_omr_training.real_data_intake.metadata.version", return_value="12.3.1"):
+            with self.assertRaisesRegex(RealDataIntakeError, "requires Pillow==12.3.0"):
+                validate_quarantined_sample_bytes(
+                    sample,
+                    source_document_bytes=self.source_train,
+                    training_image_png_bytes=image,
+                    musicxml_bytes=self.xml_train,
+                )
+
     def test_non_grayscale_and_truncated_png_are_rejected(self) -> None:
         for image in (make_png("vertical", mode="RGB"), make_png("vertical")[:40]):
             sample = make_quarantined_sample(
@@ -274,7 +310,26 @@ class RealDataIntakeTests(unittest.TestCase):
                 musicxml_bytes=self.xml_train,
             )
 
-    def test_perceptual_near_duplicate_detects_different_png_bytes(self) -> None:
+    def test_receipt_is_independently_revalidated_not_trusted_by_type(self) -> None:
+        image = make_png("vertical")
+        sample = make_quarantined_sample(
+            family="fam-receipt",
+            split=RealDataSplit.TRAIN,
+            source_bytes=self.source_train,
+            image_bytes=image,
+            musicxml_bytes=self.xml_train,
+        )
+        receipt = validate_quarantined_sample_bytes(
+            sample,
+            source_document_bytes=self.source_train,
+            training_image_png_bytes=image,
+            musicxml_bytes=self.xml_train,
+        )
+        object.__setattr__(receipt, "perceptual_hash64", "f" * 16)
+        with self.assertRaisesRegex(RealDataIntakeError, "receipt_sha256"):
+            validate_byte_receipt(sample, receipt)
+
+    def _near_duplicate_receipts(self):
         image_a = make_png("vertical", compress_level=1)
         image_b = make_png("vertical", compress_level=9)
         self.assertNotEqual(sha256(image_a).hexdigest(), sha256(image_b).hexdigest())
@@ -292,7 +347,7 @@ class RealDataIntakeTests(unittest.TestCase):
             image_bytes=image_b,
             musicxml_bytes=self.xml_validation,
         )
-        receipts = (
+        return (
             validate_quarantined_sample_bytes(
                 sample_a,
                 source_document_bytes=b"source-a",
@@ -306,9 +361,17 @@ class RealDataIntakeTests(unittest.TestCase):
                 musicxml_bytes=self.xml_validation,
             ),
         )
-        candidates = find_near_duplicate_candidates(receipts)
+
+    def test_perceptual_near_duplicate_detects_different_png_bytes(self) -> None:
+        candidates = find_near_duplicate_candidates(self._near_duplicate_receipts())
         self.assertEqual(len(candidates), 1)
         self.assertLessEqual(candidates[0].hamming_distance, NEAR_DUPLICATE_MAX_HAMMING_DISTANCE)
+
+    def test_near_duplicate_search_fails_closed_on_comparison_budget(self) -> None:
+        receipts = self._near_duplicate_receipts()
+        with patch("st_omr_training.real_data_intake.MAX_NEAR_DUPLICATE_COMPARISONS", 0):
+            with self.assertRaisesRegex(RealDataIntakeError, "comparison safety budget"):
+                find_near_duplicate_candidates(receipts)
 
     def _handoff_fixture(self, *, near_duplicate: bool = False):
         train_image = make_png("vertical", compress_level=1)
