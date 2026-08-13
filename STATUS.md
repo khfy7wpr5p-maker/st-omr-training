@@ -38,7 +38,7 @@ Stage 6 Synthetic Dataset v1, model training, real-data work, and ScoreMosaic in
 | 2 | MusicXML pipeline | ✅ Closed — main CI verified |
 | 3 | Renderer integration | ✅ Closed — main CI verified |
 | 4 | Controlled degradation | ✅ Closed — PR #14 merged + main CI verified |
-| 5-A | Dataset contract + independent manifest validator | 🔄 PR package ready — final-head CI pending |
+| 5-A | Dataset contract + independent manifest validator | ✅ PR package ready — exact-current-head CI must be green for merge |
 | 5 | Dataset validation | 🔄 In progress through Stage 5-A |
 | 6 | Synthetic Dataset v1 | 🔒 Not started |
 | 7 | Baseline ST-OMR training | 🔒 Not started |
@@ -49,7 +49,7 @@ Stage 6 Synthetic Dataset v1, model training, real-data work, and ScoreMosaic in
 ## Completed evidence through Stage 4
 
 - Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`.
-- Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8b8f4ee5cbd50960a7a75049f0`.
+- Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8f4ee5cbd50960a7a75049f0`.
 - Stage 2-D merged through PR #10 at main commit `4f36da277540d5a1b7a074215f2def968db73739`.
 - Stage 3 merged through PR #11 at main commit `3b1e94cea8ac3a26a5df1e2038acc4331a24d371`.
 - CI baseline merged through PR #12 at main commit `5abbc9859a4a69bf9a17936bc41e722256f87472`; post-merge run `31647615123` succeeded.
@@ -104,9 +104,12 @@ Explicitly out of scope:
 
 ## Stage 5-A verification evidence
 
-First hosted PR verification completed successfully on implementation/documentation head `9c290ee2bac5c45e357a98072ec7e2c05cf9b33b` in GitHub Actions run `31671458220`.
+GitHub-hosted PR verification has already passed on two successive package heads:
 
-That fresh Ubuntu 24.04 / Python 3.13 run verified:
+- implementation/documentation head `9c290ee2bac5c45e357a98072ec7e2c05cf9b33b` — run `31671458220` — SUCCESS;
+- evidence-update head `c2dc88072b4fba24ab170088f33e550a2644d1ad` — run `31671544975` — SUCCESS.
+
+The fresh Ubuntu 24.04 / Python 3.13 runs verified:
 
 - dependency installation and existing exact runtime pins;
 - `pip check` with no broken requirements;
@@ -115,11 +118,11 @@ That fresh Ubuntu 24.04 / Python 3.13 run verified:
 - complete repository regression: **295/295 tests passed**;
 - Python `compileall` validation.
 
-Because this status/evidence commit changes the PR head, run `31671458220` is recorded as strong prior-head evidence only. The merge gate still requires a fresh GitHub-hosted CI success on the exact **final** PR head after this commit.
+This final status wording creates one last PR head. The authoritative merge evidence is therefore the GitHub-hosted CI check attached to the exact current PR head, not either older run listed above. No further source/document change should be made after that current-head check is green unless the check is repeated again.
 
 A complete independent local repository regression is not claimed for Stage 5-A; GitHub-hosted fresh-environment CI is the authoritative full-suite evidence for this package.
 
-## Required final gate
+## Required merge gate
 
 ```text
 Focused Stage 5-A tests
@@ -132,7 +135,7 @@ Python compile validation
         ↓
 Diff/scope review
         ↓
-GitHub-hosted CI on exact final PR head
+GitHub-hosted CI on exact current PR head
         ↓
 CI VERIFIED — PR HEAD
         ↓
@@ -141,7 +144,7 @@ Separate merge approval
 Post-merge GitHub-hosted CI on exact main
 ```
 
-No CI result from an older commit may substitute for final-head verification.
+No CI result from an older commit may substitute for current-head verification.
 
 ## CI baseline
 
@@ -151,4 +154,4 @@ Stage 5-A adds no new runtime dependency and does not change the CI workflow.
 
 ## Next gate
 
-Verify GitHub-hosted CI on the exact final PR #15 head created by this evidence update. If green, Stage 5-A becomes `CI VERIFIED — PR HEAD`, but merge still requires separate explicit approval. Stage 6 must remain locked until Stage 5-A is merged, post-merge `main` CI passes, and Stage 5 closure is explicitly assessed.
+Confirm GitHub-hosted CI is green on the exact current PR #15 head. If green, Stage 5-A is `CI VERIFIED — PR HEAD`, but merge still requires separate explicit approval. Stage 6 must remain locked until Stage 5-A is merged, post-merge `main` CI passes, and Stage 5 closure is explicitly assessed.
