@@ -271,7 +271,7 @@ Stage 7-C Bounded baseline training run + evidence
 Stage 9 sealed-test benchmark gate
 ```
 
-Stage 7-A is the current bounded package. It changes contracts/documentation only and runs no training.
+Stage 7-A is closed and exact-main CI verified. Stage 7-B is the next package but has not started.
 
 ### Training input
 
@@ -313,7 +313,9 @@ Stage 5-A merged through PR #15 at exact `main` commit `d677f3d27ac710c56c5ce677
 
 Stage 6 final PR head `cfd0ac780595a38e0fe041d2d70293b39f96fcf3` passed GitHub Actions run #17 (`31673631608`) with **309/309 tests**, pinned runtime verification, real Stage 1→6 integration/rebuild/persistence tests, `pip check`, and compile validation. PR #17 then merged at exact `main` commit `7c3c736e6d3755d1bd098e2874d73ce5ed41e39f`; post-merge run #18 (`31674014666`) passed on that exact commit. Stage 6 closure documentation merged through PR #18 at exact `main` commit `046c9a4e7e41e94b0b4465a2610f30361055a3ed`; post-merge run #20 (`31674836433`) also passed.
 
-The integrated implementation through Stage 6 is therefore `CI VERIFIED`. Stage 7-A is not complete until its documentation/contract diff is reviewed, exact final PR-head GitHub CI succeeds, merge receives separate explicit approval, and post-merge exact-main CI succeeds.
+Stage 7-A PR merge candidate from source head `0eca1d881c494c763692aa72b1092d741c32be83` against exact base `046c9a4e7e41e94b0b4465a2610f30361055a3ed` passed GitHub Actions run #21 (`31675330236`) with **309/309 tests**, pinned runtime verification, `pip check`, and compile validation. PR #19 then merged at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) passed on that exact commit.
+
+The integrated repository through the Stage 7-A contract boundary is therefore `CI VERIFIED`. Stage 7-B remains not started and requires its own bounded implementation package, review, CI evidence, and separate merge approval.
 
 ## Stage roadmap
 
@@ -329,8 +331,8 @@ Stage 4   Controlled degradation                        ✅
 Stage 5-A Dataset contract + manifest validator         ✅
 Stage 5   Dataset validation                            ✅ CLOSED — CI VERIFIED
 Stage 6   Synthetic Dataset v1                          ✅ CLOSED — CI VERIFIED
-Stage 7-A Baseline training contract freeze             🔄 ACTIVE
-Stage 7-B Tokenizer/data/model/trainer implementation   🔒
+Stage 7-A Baseline training contract freeze             ✅ CLOSED — CI VERIFIED
+Stage 7-B Tokenizer/data/model/trainer implementation   ⏭ NEXT — NOT STARTED
 Stage 7-C Bounded baseline training run + evidence      🔒
 Stage 8   Real-data fine-tuning                         🔒
 Stage 9   Benchmark and candidate decision              🔒
