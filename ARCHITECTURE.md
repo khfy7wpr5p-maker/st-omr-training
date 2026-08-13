@@ -69,7 +69,7 @@ ScoreMosaic
 10. Stage 7 may train only from Stage 5/6 validated synthetic artifacts and must re-check persisted hashes before use.
 11. Stage 7 may update parameters only from the `train` split and may select checkpoints only from `validation`; the Stage 6 `test` split remains sealed until Stage 9.
 12. Training datasets and large model artifacts are not normal Git repository content.
-13. Real data must remain distinct from synthetic data and pass the closed Stage 8-0 rights/provenance/permission/pairing/admission/leakage contract plus the Stage 8-1 exact-byte handoff before any later Stage 8 train/validation loader may trust it.
+13. Real data must remain distinct from synthetic data and pass the closed Stage 8-0 rights/provenance/permission/pairing/admission/leakage contract plus the closed Stage 8-1 exact-byte handoff before any later Stage 8 train/validation loader may trust it.
 14. ScoreMosaic uploads and teacher corrections are not automatic training data; no online/automatic learning path is permitted.
 15. ST-OMR candidates never enter ScoreMosaic automatically. Integration is a later, independent decision after sealed held-out evaluation and regression evidence.
 
@@ -339,18 +339,18 @@ Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact ve
 
 ## Stage 8 real-data and fine-tuning boundary
 
-Stage 8-0 is governed by [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md) and is closed/main-CI verified. Stage 8-1 is governed by [STAGE8_1_INTAKE_CONTRACT.md](STAGE8_1_INTAKE_CONTRACT.md) and is the only active package.
+Stage 8-0 is governed by [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md) and is closed/main-CI verified. Stage 8-1 is governed by [STAGE8_1_INTAKE_CONTRACT.md](STAGE8_1_INTAKE_CONTRACT.md) and is also closed/main-CI verified. Stage 8-2 and later stages remain locked.
 
 ```text
 Stage 7-C accepted baseline evidence
         ↓
-Stage 8-0 rights/provenance/pairing contract       CLOSED
+Stage 8-0 rights/provenance/pairing contract       CLOSED — CI VERIFIED
         ↓
 quarantine/admission metadata validator
         ↓
 family/hash/semantic split-leakage veto
         ↓
-Stage 8-1 bytes-only quarantine validator         ACTIVE PACKAGE
+Stage 8-1 bytes-only quarantine validator         CLOSED — CI VERIFIED
         ↓
 exact source/image/MusicXML hash binding
         ↓
@@ -371,15 +371,17 @@ Stage 8-3 real train/validation experiments        LOCKED
 Stage 9 sealed benchmark                           LOCKED
 ```
 
-Stage 8-0 freezes two later experiment candidates: (A) fine-tuning from the exact Stage 7-C checkpoint identified by its accepted checkpoint/model-state hashes, and (B) the same frozen architecture initialized from scratch. The Stage 7-C Actions artifact is only a temporary location and is scheduled to expire on 2026-09-12. Stage 8-1 does not access or relocate it. If exact Candidate A bytes are unavailable or fail hash/state verification in a later authorized package, Candidate A is blocked rather than silently substituted.
+Stage 8-0 freezes two later experiment candidates: (A) fine-tuning from the exact Stage 7-C checkpoint identified by its accepted checkpoint/model-state hashes, and (B) the same frozen architecture initialized from scratch. The Stage 7-C Actions artifact is only a temporary location and is scheduled to expire on 2026-09-12. Stage 8-1 did not access or relocate it. If exact Candidate A bytes are unavailable or fail hash/state verification in a later authorized package, Candidate A is blocked rather than silently substituted.
 
-Real sample identity is independent of split/review state. Stage 8-0 rejects exact duplicate and family/source/target/semantic aliases. Stage 8-1 independently rebinds the exact source, training-image, and MusicXML bytes to those hashes and recomputes the supported-V1 semantic fingerprint before a later loader may trust the sample. It additionally flags deterministic dHash64 near-duplicate candidates; a cross-family candidate is a fail-closed handoff veto pending family/leakage review.
+Real sample identity is independent of split/review state. Stage 8-0 rejects exact duplicate and family/source/target/semantic aliases. Stage 8-1 independently rebinds exact source, training-image, and MusicXML bytes to those hashes and recomputes the supported-V1 semantic fingerprint before a later loader may trust the sample. The final validator checks encoded-size bounds before image/MusicXML digest work, checks expected digests before parsing/decode, and independently revalidates receipt policy/tokenizer/self-hash identity.
 
-A Stage 8-1 receipt is deterministic hash-only validation evidence, not a digital signature and not a replacement for rights/pairing approval. Byte validation happens while the candidate is quarantined. Only a valid Stage 8-0 admitted train/validation manifest plus exactly matching Stage 8-1 receipts may cross the future development handoff.
+Stage 8-1 additionally flags deterministic dHash64 near-duplicate candidates using bounded radius-4 candidate indexing; a cross-family candidate is a fail-closed handoff veto pending family/leakage review. The heuristic is not proof of musical identity and does not claim complete duplicate recall.
+
+A Stage 8-1 receipt is deterministic hash-only validation evidence, not a digital signature and not a replacement for rights/pairing approval. Byte validation happens while the candidate is quarantined. Only a valid Stage 8-0 admitted train/validation manifest plus exactly matching Stage 8-1 receipts may cross a future development handoff.
 
 User-derived material still requires separate explicit training permission and privacy review. ScoreMosaic uploads and teacher corrections cannot bypass quarantine, and no runtime action may trigger model updates.
 
-Both the Stage 6 synthetic test split and the later Stage 8 real test split remain sealed until Stage 9. The Stage 8 development manifest carries no test records, only the opaque sealed-test manifest commitment. Stage 8-1 rejects a test record before supplied bytes are inspected and does not create, enumerate, validate, or open real test material.
+Both the Stage 6 synthetic test split and the later Stage 8 real test split remain sealed until Stage 9. The Stage 8 development manifest carries no test records, only the opaque sealed-test manifest commitment. `STAGE8_TEST_SEALING_BOUNDARY.md` freezes a future contract-only sealing boundary; Stage 8-1 contains no test writer/loader/validator and did not create, enumerate, validate, or open real test material.
 
 ## Verification boundary
 
@@ -401,6 +403,8 @@ Stage 7-C source head `7a993304218fa19609ea512665148dac3eea503a` passed run #67 
 
 Stage 8-0 merged through PR #25 at exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`; post-merge run #75 (`31698691405`) passed pinned runtime verification, `pip check`, the complete repository test suite, and `compileall`. Closure synchronization merged through PR #26 to exact `main` commit `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; post-merge run #77 (`31699497562`) passed. The integrated repository through Stage 8-0 is therefore `CI VERIFIED`.
 
+Stage 8-1 final source head `ed4113a25f6e12055b9277f959a4580259d37d40` merged through PR #29 to exact `main` commit `d551cb27e0244477379100c45e06193ea7ca0cf8`. Post-merge run #92 (`31704137450`) passed exact pinned runtime verification, `pip check`, **394/394 tests**, including the pre-hash payload-size regressions, and `compileall`. The integrated implementation through Stage 8-1 is therefore `CI VERIFIED`.
+
 ## Stage roadmap
 
 ```text
@@ -419,9 +423,9 @@ Stage 7-A Baseline training contract freeze             ✅ CLOSED — CI VERIFI
 Stage 7-B Tokenizer/data/model/trainer implementation   ✅ CLOSED — CI VERIFIED
 Stage 7-C Bounded baseline training run + evidence      ✅ CLOSED — CI VERIFIED
 Stage 8-0 Real data & fine-tuning contract freeze       ✅ CLOSED — CI VERIFIED
-Stage 8-1 Quarantine/intake + byte validation           🔄 ACTIVE PACKAGE
-Stage 8-2 Paired experiment run profile                 🔒
-Stage 8-3 Real train/validation experiments             🔒
+Stage 8-1 Quarantine/intake + byte validation           ✅ CLOSED — CI VERIFIED
+Stage 8-2 Paired experiment run profile                 🔒 NOT STARTED
+Stage 8-3 Real train/validation experiments             🔒 NOT STARTED
 Stage 9   Benchmark and candidate decision              🔒 TEST SEALED
 Stage 10  ScoreMosaic candidate integration             🔒
 ```

@@ -6,7 +6,7 @@ This file is the current stage-status source for this repository.
 
 The repository is public and GitHub Actions CI is active.
 
-Stages 0 through 6, all Stage 7 packages, and Stage 8-0 are complete on `main`.
+Stages 0 through 6, all Stage 7 packages, Stage 8-0, and Stage 8-1 are complete on `main`.
 
 Stage 7-A — Baseline Training Contract Freeze — merged through PR #19 at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) succeeded. Stage 7-A closure/status synchronization then merged through PR #20 at exact `main` commit `6a13760d9d17130ea86636f4828ff1bff035f30d`; post-merge run #24 (`31676871798`) also succeeded.
 
@@ -16,9 +16,11 @@ Stage 7-C — Bounded Baseline Training Run + Evidence — merged through PR #23
 
 Stage 8-0 — Real Data & Fine-Tuning Contract Freeze — merged through PR #25 to exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`; post-merge run #75 (`31698691405`) succeeded. Closure synchronization merged through PR #26 to exact `main` commit `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; post-merge run #77 (`31699497562`) succeeded. Stage 8-0 is `CLOSED — MAIN CI VERIFIED`.
 
-Stage 8-1 — Quarantine / Intake + Byte-Level Validation — is the only active package. It is limited to a bytes-only quarantine validator, exact source/image/MusicXML hash binding, strict grayscale-PNG verification, the existing supported-V1 MusicXML/token semantic gate, deterministic hash-only byte-validation receipts, perceptual near-duplicate review, synthetic-fixture tests, and documentation. It does not authorize real-data ingestion/persistence, checkpoint access, training/fine-tuning, test access, Stage 8-2/8-3, Stage 9/10, or ScoreMosaic integration.
+Stage 8-1 — Quarantine / Intake + Byte-Level Validation — merged through PR #29 from final source head `ed4113a25f6e12055b9277f959a4580259d37d40` to exact `main` commit `d551cb27e0244477379100c45e06193ea7ca0cf8`. Post-merge exact-main run #92 (`31704137450`) succeeded with pinned dependency checks, `pip check`, **394/394 tests**, and `compileall`. The implementation boundary is therefore `CLOSED — MAIN CI VERIFIED`; this PR only synchronizes the durable documentation state.
 
-The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. Stage 8-1 does not load, move, copy, publish, or preserve it. The accepted Stage 7-C model remains non-production: exact sequence accuracy is 0% and token error rate is approximately 80.5%.
+Stage 8-1 added only bytes-in validation and hash-only evidence surfaces for quarantined train/validation candidates. It did not ingest/persist real data, access/move/copy/publish/preserve a checkpoint, run training/fine-tuning, create/open/enumerate a held-out test, start Stage 8-2/8-3/9/10, or integrate with ScoreMosaic.
+
+The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. The accepted Stage 7-C model remains non-production: exact sequence accuracy is 0% and token error rate is approximately 80.5%.
 
 ## Stage status
 
@@ -36,8 +38,9 @@ The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled t
 | 7-B | Tokenizer/data/model/trainer smoke implementation | ✅ Closed — main CI verified |
 | 7-C | Bounded baseline training run + evidence | ✅ Closed — main CI verified |
 | 8-0 | Real data & fine-tuning contract freeze | ✅ Closed — main CI verified |
-| 8-1 | Quarantine/intake + byte-level validation | 🔄 Active package — synthetic fixtures only |
-| 8-2+ | Experiment profile / train-validation execution | 🔒 Not started |
+| 8-1 | Quarantine/intake + byte-level validation | ✅ Closed — main CI verified |
+| 8-2 | Paired experiment run profile freeze | 🔒 Not started |
+| 8-3 | Real train/validation experiments | 🔒 Not started |
 | 9 | Benchmark and candidate decision | 🔒 Not started — test sealed |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
 
@@ -59,6 +62,7 @@ The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled t
 - Stage 7-C closure synchronization merged through PR #24 to `e56fad04e43bc6302a8cda60c6f382e83a23d734`; run #70 (`31693998756`) succeeded.
 - Stage 8-0 PR #25 merged to `86487a4c3c41264b02bd159cd647a1318d9b9b88`; run #75 (`31698691405`) succeeded with pinned runtime verification, `pip check`, the complete repository test suite, and `compileall`.
 - Stage 8-0 closure synchronization PR #26 merged to `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; run #77 (`31699497562`) succeeded.
+- Stage 8-1 PR #29 merged from exact source head `ed4113a25f6e12055b9277f959a4580259d37d40` to exact `main` commit `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) succeeded with exact pinned runtime verification, `pip check`, **394/394 tests**, including the pre-hash image/MusicXML size-guard regressions, and `compileall`.
 
 The `CI VERIFIED` statement applies only to exact GitHub commits or GitHub-generated PR merge candidates that GitHub-hosted CI exercised.
 
@@ -74,22 +78,24 @@ Contract: [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md)
 
 Stage 8-0 froze metadata-level rights/provenance/permission/privacy, quarantine/admission, image–MusicXML pairing, immutable identity, exact duplicate/leakage vetoes, train/validation-only development access, sealed-test isolation, Candidate A/B experiment definitions, and ScoreMosaic/teacher-correction isolation. It did not ingest files, load a checkpoint, or run training.
 
-## Stage 8-1 active boundary
+## Stage 8-1 closed capability boundary
 
 Contract: [STAGE8_1_INTAKE_CONTRACT.md](STAGE8_1_INTAKE_CONTRACT.md)
 
-Stage 8-1 may implement only:
+Stage 8-1 froze and verified:
 
 - in-memory byte validation of quarantined train/validation candidates;
-- exact source-document, training-image, and MusicXML SHA-256 binding;
-- bounded full-decode verification of 8-bit grayscale non-interlaced single-frame PNG training images;
+- an early `test` veto before caller-provided bytes are inspected;
+- pre-hash encoded-size guards and exact source-document, training-image, and MusicXML SHA-256 binding;
+- exact `Pillow==12.3.0` and bounded full-decode verification of 8-bit grayscale non-interlaced single-frame PNG images;
 - existing offline MusicXML 4.0 XSD, ST semantic, supported-V1 projection, and tokenizer/detokenizer gates;
 - deterministic semantic and policy fingerprints;
-- hash-only byte-validation receipts;
-- deterministic perceptual near-duplicate candidate detection as an additional family/leakage veto;
-- a handoff validator requiring both the admitted Stage 8-0 manifest and one matching Stage 8-1 receipt per sample.
+- hash-only validation receipts whose bounds, tokenizer/policy identity, and canonical self-hash are independently revalidated;
+- bounded deterministic dHash64 near-duplicate candidate search with cross-family fail-closed handoff veto;
+- a development handoff requiring both the valid Stage 8-0 admitted manifest and exactly one matching Stage 8-1 receipt per sample;
+- a contract-only future real-test sealing boundary with no test writer, loader, byte validator, or enumeration path.
 
-A test record is rejected before supplied bytes are inspected. The development manifest remains train/validation-only plus the opaque sealed-test-manifest commitment. Stage 8-1 has no persistence writer, network fetcher, upload path, real corpus, checkpoint access, training code, or ScoreMosaic connector.
+Stage 8-1 tests use synthetic/generated fixtures only. It does not prove real-corpus quality, legal rights validity, or production recognition quality.
 
 ## CI baseline
 
@@ -97,14 +103,14 @@ The active `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, a
 
 The isolated official-PyTorch-CPU-index install verifies exact `torch==2.13.0+cpu`. The one-shot PR #23 benchmark/training exception is retired; ordinary CI contains no full training path.
 
-## Required Stage 8-1 gate
+## Stage 8-1 closure gate
 
 ```text
 exact verified Stage 8-0 main baseline
         ↓
 bytes-only quarantine validator
         ↓
-exact source/image/MusicXML hash binding
+pre-hash bounds + exact source/image/MusicXML binding
         ↓
 full grayscale-PNG structural/decode verification
         ↓
@@ -112,25 +118,25 @@ MusicXML supported-V1/token semantic gate
         ↓
 deterministic semantic + policy fingerprints
         ↓
-hash-only byte-validation receipt
+independently revalidated hash-only receipt
         ↓
-perceptual near-duplicate review veto
+bounded perceptual near-duplicate review veto
         ↓
-sealed-test early veto
+sealed-test early veto + future sealing contract
         ↓
 focused positive/negative tests
         ↓
 full regression + pip check + compileall
         ↓
-exact PR-head / merge-candidate GitHub CI
+exact PR GitHub CI
         ↓
-separate explicit merge approval
+merge to main
         ↓
-post-merge exact-main CI
+post-merge exact-main run #92 SUCCESS — 394/394
         ↓
 Stage 8-1 CLOSED
 ```
 
 ## Next gate
 
-Stage 8-1 must close through merge and exact-main CI before any later Stage 8 work. The next planned small gate after closure is **Stage 8-2 — Paired Experiment Run Profile Freeze**: configuration/acceptance contract only, without running fine-tuning and without opening either sealed test split. Stage 8-2, Stage 8-3, Stage 9, and Stage 10 remain locked.
+The next planned small gate is **Stage 8-2 — Paired Experiment Run Profile Freeze**: configuration, reproducibility, resource-budget, evidence, and acceptance contract only. Stage 8-2 has not started and does not authorize fine-tuning or sealed-test access. Stage 8-3, Stage 9, and Stage 10 remain locked.
