@@ -22,6 +22,7 @@ import re
 import struct
 import xml.etree.ElementTree as ET
 from typing import Final
+import zlib
 
 from .real_data_intake import (
     EXPECTED_PILLOW_VERSION,
@@ -34,13 +35,14 @@ from .real_data_intake import (
 STAGE8_PILOT_PREPARATION_VERSION: Final[str] = "st-stage8-pilot-preparation-v1"
 SOURCE_PNG_POLICY_VERSION: Final[str] = "st-stage8-source-png-to-training-png-v1"
 PRIMUS_AUXILIARY_POLICY_VERSION: Final[str] = "st-stage8-primus-auxiliary-triage-v1"
-SUPPORTED_SOURCE_PNG_MODES: Final[tuple[str, ...]] = ("1", "L", "P", "RGB")
+SUPPORTED_SOURCE_PNG_MODES: Final[tuple[str, ...]] = ("1", "L", "P")
 _SUPPORTED_V1_METERS: Final[frozenset[tuple[int, int]]] = frozenset({(2, 4), (3, 4), (4, 4)})
 _SUPPORTED_V1_NOTE_DURS: Final[frozenset[int]] = frozenset({1, 2, 4, 8})
 _SUPPORTED_V1_REST_DURS: Final[frozenset[int]] = frozenset({2, 4, 8})
 _FORBIDDEN_MEI_ELEMENTS: Final[frozenset[str]] = frozenset(
-    {"tie", "slur", "tuplet", "tupletSpan", "multiRest"}
+    {"tie", "slur", "tuplet", "tupletSpan", "multiRest", "mRest", "mSpace", "space"}
 )
+_SUPPORTED_ACCIDENTALS: Final[frozenset[str]] = frozenset({"s", "f", "n"})
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _HEX = frozenset("0123456789abcdef")
 
@@ -101,7 +103,7 @@ def pilot_preparation_policy_fingerprint() -> str:
         "source_png_policy_version": SOURCE_PNG_POLICY_VERSION,
         "primus_auxiliary_policy_version": PRIMUS_AUXILIARY_POLICY_VERSION,
         "pillow_version": EXPECTED_PILLOW_VERSION,
-        "source_contract": "png-only-single-frame-no-transparency",
+        "source_contract": "png-only-single-frame-no-transparency-monochrome-or-palette",
         "supported_source_modes": list(SUPPORTED_SOURCE_PNG_MODES),
         "geometry_policy": "preserve-width-height-no-crop-resize-rotate",
         "grayscale_policy": "Pillow-convert-L",
@@ -145,8 +147,13 @@ def _inspect_training_png_header(data: bytes) -> tuple[int, int]:
     chunk_type = data[12:16]
     if length != 13 or chunk_type != b"IHDR":
         raise Stage8PilotPreparationError("derived PNG does not begin with canonical IHDR")
+    ihdr_payload = data[16:29]
+    expected_crc = struct.unpack(">I", data[29:33])[0]
+    actual_crc = zlib.crc32(chunk_type + ihdr_payload) & 0xFFFFFFFF
+    if actual_crc != expected_crc:
+        raise Stage8PilotPreparationError("derived PNG IHDR CRC is invalid")
     width, height, bit_depth, color_type, compression, filtering, interlace = struct.unpack(
-        ">IIBBBBB", data[16:29]
+        ">IIBBBBB", ihdr_payload
     )
     if width < 1 or height < 1 or width * height > MAX_TRAINING_IMAGE_PIXELS:
         raise Stage8PilotPreparationError("derived training image dimensions are outside bounds")
@@ -406,6 +413,10 @@ def inspect_primus_auxiliary_package(
     reasons: list[str] = []
     if not metadata_coherent:
         reasons.append("mei_semantic_header_mismatch")
+    if not measures:
+        reasons.append("empty_mei_score")
+    if not notes and not rests:
+        reasons.append("empty_mei_event_stream")
     if clef != "G2":
         reasons.append("unsupported_clef")
     if key_fifths != 0:
@@ -422,6 +433,20 @@ def inspect_primus_auxiliary_package(
         reasons.append("unsupported_mei_structure")
     if "dot" in local_names or any(node.attrib.get("dots") not in {None, "", "0"} for node in root.iter()):
         reasons.append("dotted_duration_unsupported")
+
+    for node in root.iter():
+        if _local_name(node.tag) == "accid":
+            value = node.attrib.get("accid") or node.attrib.get("accid.ges")
+            if value is not None and value not in _SUPPORTED_ACCIDENTALS:
+                reasons.append("unsupported_accidental")
+                break
+        for attribute in ("accid", "accid.ges"):
+            value = node.attrib.get(attribute)
+            if value is not None and value not in _SUPPORTED_ACCIDENTALS:
+                reasons.append("unsupported_accidental")
+                break
+        if "unsupported_accidental" in reasons:
+            break
 
     for node in notes:
         try:
