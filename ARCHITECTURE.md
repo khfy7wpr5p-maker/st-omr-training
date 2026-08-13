@@ -103,7 +103,7 @@ Stage 3 pins Verovio 6.2.1, renderer configuration, Leipzig font selection, adap
 
 Stage 4 derives its complete public degradation configuration from explicit integer parameters and, for sampled profiles, an explicit seed without mutable global RNG state. The clean raster, exact degradation configuration, source hashes, dependency/runtime provenance, and final PNG hash are recorded for replay and audit.
 
-Stage 5-A canonical manifest serialization sorts samples by stable identity fields and uses canonical JSON. The same valid logical manifest must therefore produce identical bytes and manifest SHA-256 regardless of the input tuple order. Split assignment is semantic and remains part of the manifest hash.
+Stage 5 canonical manifest serialization sorts samples by stable identity fields and uses canonical JSON. The same valid logical manifest must therefore produce identical bytes and manifest SHA-256 regardless of the input tuple order. Split assignment is semantic and remains part of the manifest hash.
 
 Cross-platform SVG or raster byte identity is not assumed automatically. A different operating system, architecture, renderer resource bundle, Cairo runtime, or relevant image runtime must be separately verified before artifacts from different environments are mixed.
 
@@ -188,14 +188,14 @@ The original canonical symbolic score remains the musical target. Stage 4 create
 
 ## Dataset validation boundary
 
-Stage 5-A is governed by [DATASET_CONTRACT.md](DATASET_CONTRACT.md).
+Stage 5 is governed by [DATASET_CONTRACT.md](DATASET_CONTRACT.md). Its implemented V1 package is Stage 5-A — Dataset Contract + Independent Manifest Validator.
 
-Stage 5-A is implemented before the bulk dataset builder so the later builder cannot define its own acceptance rules. The bounded metadata path is:
+Stage 5 was implemented before the bulk dataset builder so Stage 6 cannot define its own acceptance rules. The bounded metadata path is:
 
 ```text
 Stage 4 DegradedPage + PNG bytes
         ↓
-Independent Stage 5-A PNG/hash/replay-lineage bridge
+Independent Stage 5 PNG/hash/replay-lineage bridge
         ↓
 Immutable DatasetSample
         ↓
@@ -213,19 +213,29 @@ Independent manifest validation
 Canonical manifest JSON + manifest SHA-256
 ```
 
-Stage 5-A V1 is synthetic-only. It supports exactly `train`, `validation`, and `test` and requires every symbolic family to remain in one split. The validator does not trust `family_id` alone: identical MusicXML targets or identical clean SVGs cannot be hidden behind multiple families or allowed to cross splits.
+Stage 5 V1 is synthetic-only. It supports exactly `train`, `validation`, and `test` and requires every symbolic family to remain in one split. The validator does not trust `family_id` alone: identical MusicXML targets or identical clean SVGs cannot be hidden behind multiple families or allowed to cross splits.
 
-The validator independently mirrors the frozen Stage 4 replay fields and recomputes the Stage 4 degradation-config fingerprint and derivative identity. It also computes a Stage 5-A sample identity that is independent of split assignment, preventing a split move from manufacturing a new sample.
+The validator independently mirrors the frozen Stage 4 replay fields and recomputes the Stage 4 degradation-config fingerprint and derivative identity. It also computes a Stage 5 sample identity that is independent of split assignment, preventing a split move from manufacturing a new sample.
 
-The narrow Stage 4 → Stage 5-A bridge verifies actual PNG signature/IHDR/CRC/hash/dimensions before metadata is accepted. Stage 5-A deliberately does not write artifact files, choose final split ratios, define cloud/filesystem storage, or start training.
+The narrow Stage 4 → Stage 5 bridge verifies actual PNG signature/IHDR/CRC/hash/dimensions before metadata is accepted. Stage 5 deliberately does not write bulk artifact files, choose final split ratios, define cloud/filesystem storage, or start training.
+
+## Stage 6 construction boundary
+
+Stage 6 — Synthetic Dataset v1 — is the next architectural layer and is **not started**.
+
+Its future responsibility is to construct a bounded synthetic dataset using validated symbolic families and Stage 4 derivatives, assign families to splits according to an explicit construction policy, and submit the resulting manifest to the already-merged independent Stage 5 validator.
+
+Stage 6 must not bypass Stage 5 validation and must not expand into model training, real/user data ingestion, teacher-correction learning, or ScoreMosaic integration.
 
 ## Verification boundary
 
 GitHub Actions CI is active for the public repository. The baseline uses GitHub-hosted Ubuntu with Python 3.13, pinned runtime dependencies, complete unittest discovery including real-runtime integration tests, and Python compile validation.
 
-Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`. Post-merge GitHub Actions run `31660215130` passed on that exact commit, so the integrated implementation through Stage 4 is CI verified.
+Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`; post-merge GitHub Actions run `31660215130` passed on that exact commit.
 
-Stage 5-A is not complete merely because its implementation exists on a feature branch. It must pass focused corruption/leakage/determinism tests, real Stage 4 integration tests, full regression, exact final PR-head GitHub-hosted CI, separate merge approval, and post-merge CI on the exact resulting `main` commit.
+Stage 5-A final PR head `5165fe6669bce582ccc16d64695d4a7730e29660` passed GitHub Actions run `31671655623` with **295/295 tests**, pinned runtime verification, `pip check`, and compile validation. PR #15 then merged at exact `main` commit `d677f3d27ac710c56c5ce677a46dc62bcf77bd84`, and post-merge GitHub Actions run `31671919885` passed on that exact commit.
+
+The integrated implementation through Stage 5 is therefore `CI VERIFIED`.
 
 ## Stage roadmap
 
@@ -238,9 +248,9 @@ Stage 2-C Offline XSD + independent validator          ✅
 Stage 2-D Supported-V1 semantic round-trip verifier    ✅
 Stage 3   Renderer integration                          ✅
 Stage 4   Controlled degradation                        ✅
-Stage 5-A Dataset contract + manifest validator         🔄 active package
-Stage 5   Dataset validation                            🔄
-Stage 6   Synthetic Dataset v1                          🔒
+Stage 5-A Dataset contract + manifest validator         ✅
+Stage 5   Dataset validation                            ✅ CLOSED — CI VERIFIED
+Stage 6   Synthetic Dataset v1                          ⏭ NEXT — NOT STARTED
 Stage 7   Baseline ST-OMR training                      🔒
 Stage 8   Real-data fine-tuning                         🔒
 Stage 9   Benchmark and candidate decision              🔒
