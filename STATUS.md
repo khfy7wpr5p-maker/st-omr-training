@@ -10,7 +10,7 @@ Stage 0 safety/architecture baseline, Stage 1 ST Music Generator, Stage 2 MusicX
 
 Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`. GitHub-hosted post-merge CI run `31660215130` completed successfully on that exact commit. The integrated implementation through Stage 4 is therefore `CI VERIFIED`.
 
-Stage 5-A — Dataset Contract + Independent Manifest Validator — is the active bounded implementation package on branch `stage-5a-dataset-manifest-validator`.
+Stage 5-A — Dataset Contract + Independent Manifest Validator — is the active bounded implementation package on branch `stage-5a-dataset-manifest-validator` and PR #15.
 
 Stage 6 Synthetic Dataset v1, model training, real-data work, and ScoreMosaic integration remain locked.
 
@@ -38,7 +38,7 @@ Stage 6 Synthetic Dataset v1, model training, real-data work, and ScoreMosaic in
 | 2 | MusicXML pipeline | ✅ Closed — main CI verified |
 | 3 | Renderer integration | ✅ Closed — main CI verified |
 | 4 | Controlled degradation | ✅ Closed — PR #14 merged + main CI verified |
-| 5-A | Dataset contract + independent manifest validator | 🔄 Active package — verification pending |
+| 5-A | Dataset contract + independent manifest validator | 🔄 PR package ready — final-head CI pending |
 | 5 | Dataset validation | 🔄 In progress through Stage 5-A |
 | 6 | Synthetic Dataset v1 | 🔒 Not started |
 | 7 | Baseline ST-OMR training | 🔒 Not started |
@@ -62,6 +62,8 @@ The `CI VERIFIED` statement applies only to exact GitHub commits that GitHub-hos
 
 ## Stage 5-A package
 
+PR: #15 — `Stage 5-A: synthetic dataset manifest validator`
+
 Branch: `stage-5a-dataset-manifest-validator`
 
 Base: `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`
@@ -84,7 +86,7 @@ Implemented package scope:
 - identical MusicXML target alias leakage veto across families/splits;
 - identical clean SVG alias leakage veto across families/splits;
 - bounded PNG/dimension/mode/format metadata checks;
-- narrow Stage 4 `DegradedPage` → Stage 5-A bridge that independently checks actual PNG header/CRC/hash/dimensions before creating sample metadata;
+- narrow Stage 4 `DegradedPage` → Stage 5-A bridge that independently checks actual PNG signature/IHDR/CRC/hash/dimensions before creating sample metadata;
 - deterministic canonical JSON manifest serialization and manifest SHA-256;
 - focused corruption, negative, determinism, leakage, and duplicate tests;
 - real Generator → MusicXML → Verovio → Stage 4 → Stage 5-A integration tests.
@@ -100,11 +102,24 @@ Explicitly out of scope:
 - ScoreMosaic integration;
 - Guitar TAB training.
 
-## Stage 5-A verification state
+## Stage 5-A verification evidence
 
-Current status: `UNVERIFIED` until the package tests and GitHub-hosted CI pass on the exact final branch/PR head.
+First hosted PR verification completed successfully on implementation/documentation head `9c290ee2bac5c45e357a98072ec7e2c05cf9b33b` in GitHub Actions run `31671458220`.
 
-The required gate is:
+That fresh Ubuntu 24.04 / Python 3.13 run verified:
+
+- dependency installation and existing exact runtime pins;
+- `pip check` with no broken requirements;
+- 28 focused Stage 5-A unit/negative/leakage/determinism tests;
+- 3 real Generator → MusicXML → Verovio → Stage 4 → Stage 5-A integration tests;
+- complete repository regression: **295/295 tests passed**;
+- Python `compileall` validation.
+
+Because this status/evidence commit changes the PR head, run `31671458220` is recorded as strong prior-head evidence only. The merge gate still requires a fresh GitHub-hosted CI success on the exact **final** PR head after this commit.
+
+A complete independent local repository regression is not claimed for Stage 5-A; GitHub-hosted fresh-environment CI is the authoritative full-suite evidence for this package.
+
+## Required final gate
 
 ```text
 Focused Stage 5-A tests
@@ -117,7 +132,7 @@ Python compile validation
         ↓
 Diff/scope review
         ↓
-Pull-request GitHub-hosted CI on exact final head
+GitHub-hosted CI on exact final PR head
         ↓
 CI VERIFIED — PR HEAD
         ↓
@@ -126,7 +141,7 @@ Separate merge approval
 Post-merge GitHub-hosted CI on exact main
 ```
 
-No CI result from an older commit may substitute for the final Stage 5-A head.
+No CI result from an older commit may substitute for final-head verification.
 
 ## CI baseline
 
@@ -136,4 +151,4 @@ Stage 5-A adds no new runtime dependency and does not change the CI workflow.
 
 ## Next gate
 
-Complete Stage 5-A verification. If the exact final PR head is green, merge still requires separate explicit approval. Stage 6 must remain locked until Stage 5-A is merged, post-merge `main` CI passes, and Stage 5 closure is explicitly assessed.
+Verify GitHub-hosted CI on the exact final PR #15 head created by this evidence update. If green, Stage 5-A becomes `CI VERIFIED — PR HEAD`, but merge still requires separate explicit approval. Stage 6 must remain locked until Stage 5-A is merged, post-merge `main` CI passes, and Stage 5 closure is explicitly assessed.
