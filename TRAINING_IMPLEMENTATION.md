@@ -131,7 +131,7 @@ Frozen Stage 7-B defaults:
 - scheduler: none;
 - gradient clipping: max norm 1.0;
 - smoke steps: 2;
-- future Stage 7-C checkpoint-selection rule: minimum validation loss;
+- Stage 7-C checkpoint-selection rule: minimum validation loss;
 - deterministic CPU thread/RNG policy with explicit master seed.
 
 Only `train` batches may call the gradient-update path. Only `validation` batches may call the validation-loss path. Validation is required not to mutate model state.
@@ -201,4 +201,4 @@ CLOSED
 
 Stage 7-B does not perform the real Stage 7-C baseline training run, does not open the sealed test split, does not retain production checkpoints, does not tune against test data, does not ingest real/user/copyright-unclear material, and does not implement Stage 8, Stage 9, Stage 10, Guitar TAB training, cloud training, or ScoreMosaic integration.
 
-Stage 7-C remains a separate not-started package and requires explicit approval before any real baseline training or evidence generation begins.
+Stage 7-C was implemented and accepted separately through PR #23. Its exact run evidence and limitations are recorded in `STAGE7C_EVIDENCE.md`; this Stage 7-B profile remains unchanged and closed.

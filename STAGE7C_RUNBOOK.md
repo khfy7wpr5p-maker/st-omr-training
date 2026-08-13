@@ -1,6 +1,6 @@
 # Stage 7-C Bounded Baseline Run Profile
 
-Status: active bounded Stage 7-C package on `stage-7c-baseline-run`.
+Status: **closed — exact-main CI verified**.
 
 This document defines how the first real synthetic-only ST-OMR baseline run is executed and evidenced. It does not open the Stage 6 test split, ingest real/user material, or authorize Stage 8–10.
 
@@ -9,6 +9,8 @@ This document defines how the first real synthetic-only ST-OMR baseline run is e
 Stage 7-C starts from exact verified `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`, after Stage 7-B closure documentation merged through PR #22 and post-merge GitHub Actions run #33 (`31681668145`) succeeded on that exact SHA.
 
 Stage 7-C reuses the already-frozen Stage 7-A contract and the closed Stage 7-B implementation profile. It does not introduce a second model family, tokenizer, data adapter, optimizer policy, or hidden augmentation path.
+
+The accepted run, hashes, metrics, and interpretation boundary are recorded in `STAGE7C_EVIDENCE.md`. PR #23 merged at exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`; post-merge run #68 (`31692849892`) succeeded on that SHA.
 
 ## Execution surface
 
@@ -122,7 +124,7 @@ Stage 7-C is still a trainability/baseline gate. These metrics do not declare th
 
 GitHub Actions run #64 (`31690139847`) benchmarked and executed exact source `1c1f1796a4bacc5fd11f6fcf4daa6076217ffef9`. The benchmark projected `1413.615194` seconds after the 2× safety factor, below the `14400`-second budget. Training completed all 40 epochs and 1560 steps; validation loss improved from `3.5603423876792655` to `1.0018396258589004` at epoch 36. Unconstrained greedy decoding nevertheless produced no semantically valid prediction among 21 validation samples, so the semantic gate rejected the run.
 
-The failure remained fail-closed: evidence artifact digest `sha256:01bd72ab75d0a44db9ebf9852559a8fd853b619cf96b4bd0bd3b8acec74f99a2` retained `INCOMPLETE` plus checkpoint `sha256:9344cb29ee9ad7c7485af23b767b24071bffd4c1f1f461e0c3751a88927d7a13`, while no `COMPLETE`, metrics, or `VERIFIED` artifact was accepted. The remediation constrains greedy next-token selection to the already-frozen supported-V1 grammar and exact eight-measure profile. It uses neither validation targets nor external labels and leaves training, checkpoint selection, and the sealed test split unchanged. A new exact-head authoritative run must still pass every gate before Stage 7-C can be accepted.
+The failure remained fail-closed: evidence artifact digest `sha256:01bd72ab75d0a44db9ebf9852559a8fd853b619cf96b4bd0bd3b8acec74f99a2` retained `INCOMPLETE` plus checkpoint `sha256:9344cb29ee9ad7c7485af23b767b24071bffd4c1f1f461e0c3751a88927d7a13`, while no `COMPLETE`, metrics, or `VERIFIED` artifact was accepted. The remediation constrained greedy next-token selection to the already-frozen supported-V1 grammar and exact eight-measure profile. It used neither validation targets nor external labels and left training, checkpoint selection, and the sealed test split unchanged. The corrected exact-head run then passed all acceptance gates; see `STAGE7C_EVIDENCE.md`.
 
 ## Artifact safety
 
@@ -130,7 +132,7 @@ Each run receives a deterministic `run_id` from the verified repository SHA, Sta
 
 The run directory must not already exist. A new run starts with an `INCOMPLETE` marker. Silent checkpoint resume is not implemented or permitted. Only after the selected checkpoint and canonical metrics file are successfully written and hash-verified is `COMPLETE` written and `INCOMPLETE` removed.
 
-Checkpoint files use `checkpoint-<sha256>.pt`. Metrics/provenance use `metrics-<sha256>.json`. The authoritative gate adds `VERIFIED-<sha256>.json`. These are derived run artifacts and remain outside normal Git content under the existing `.gitignore` rules. A later small evidence summary may be committed only after the real run is independently verified.
+Checkpoint files use `checkpoint-<sha256>.pt`. Metrics/provenance use `metrics-<sha256>.json`. The authoritative gate adds `VERIFIED-<sha256>.json`. These are derived run artifacts and remain outside normal Git content under the existing `.gitignore` rules. The independently verified small evidence summary is committed as `STAGE7C_EVIDENCE.md`; large model bytes remain outside Git.
 
 ## CI boundary
 
@@ -138,9 +140,9 @@ Ordinary GitHub-hosted CI does not execute the real frozen Stage 7-C baseline ru
 
 PR CI may run only bounded contract/component smoke tests: configuration bounds, frozen dataset-profile identity, frozen run-profile identity, workspace safety, semantic reconstruction, metric accounting, hash-addressed artifact handling, no-resume behavior, source/runtime provenance checks, strict checkpoint reload verification, full repository regression, and compile validation.
 
-Draft PR #23 has one narrow, fail-closed exception approved for the Windows 7 / unavailable local-terminal constraint. The exact PR source head may run `stage7c_benchmark` on the same Ubuntu/pinned-CPU profile. The benchmark builds and loads the complete frozen dataset, measures the heaviest real training and validation groups, executes one forced full-length 1536-token incremental decode, scales those work units to all 40 epochs and validation samples, adds five minutes of fixed overhead, then applies a 2× safety factor. The adjusted estimate must be no more than four hours; otherwise the real job never starts.
+PR #23 historically had one narrow, fail-closed exception approved for the Windows 7 / unavailable local-terminal constraint. The exact PR source head ran `stage7c_benchmark` on the same Ubuntu/pinned-CPU profile. The benchmark built and loaded the complete frozen dataset, measured the heaviest real training and validation groups, executed one forced full-length 1536-token incremental decode, scaled those work units to all 40 epochs and validation samples, added five minutes of fixed overhead, and applied a 2× safety factor. Its adjusted estimate passed the four-hour ceiling.
 
-Only the specially admitted PR #23 commit may start the subsequent authoritative job. It checks out the exact benchmarked source SHA, uses the knobs-free entrypoint, keeps the test split sealed, and uploads the run workspace plus final summary for independent review. This exception does not authorize recurring full training, alternate profiles, real/user data, or any Stage 8–10 work.
+Only the specially admitted PR #23 commit could start the subsequent authoritative job. It checked out the exact benchmarked source SHA, used the knobs-free entrypoint, kept the test split sealed, and uploaded the run workspace plus final summary for independent review. The one-shot jobs are removed from the active workflow at closure, so the exception cannot recur. It never authorized alternate profiles, real/user data, or any Stage 8–10 work.
 
 ## Explicitly locked
 
@@ -158,4 +160,4 @@ Stage 7-C does not:
 - integrate with ScoreMosaic;
 - start Stage 8, Stage 9, or Stage 10.
 
-Merge remains a separate explicit approval gate.
+PR #23 received separate explicit merge approval and is merged. Any later stage or new full training run requires a new bounded scope and separate approval.
