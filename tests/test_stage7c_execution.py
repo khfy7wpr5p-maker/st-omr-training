@@ -109,6 +109,25 @@ class AuthoritativeExecutionTests(unittest.TestCase):
     def tearDownClass(cls) -> None:
         cls._dataset_temp.cleanup()
 
+    def test_non_frozen_dataset_is_rejected_before_training(self) -> None:
+        repository_root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaises(Stage7CExecutionError):
+                run_verified_baseline_training(
+                    self.build,
+                    self.dataset_root,
+                    Path(temp) / "runs",
+                    repository_root,
+                    run_config=BaselineRunConfig(
+                        epochs=1,
+                        batch_size=1,
+                        max_train_samples=1,
+                        max_validation_samples=1,
+                        max_decode_tokens=64,
+                    ),
+                    trainer_config=TrainerConfig(master_seed=91, smoke_steps=1),
+                )
+
     def test_authoritative_gate_writes_verified_marker(self) -> None:
         repository_root = Path(__file__).resolve().parents[1]
         expected_head = verify_repository_checkout(repository_root)
@@ -123,6 +142,10 @@ class AuthoritativeExecutionTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temp:
             with (
+                patch(
+                    "st_omr_training.stage7c_execution.STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT",
+                    self.build.config_fingerprint,
+                ),
                 patch(
                     "st_omr_training.training_run._mean_validation_loss",
                     side_effect=(2.0, 1.0),
