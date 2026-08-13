@@ -18,8 +18,7 @@ from st_omr_training.stage7c_execution import (
     verify_repository_checkout,
     verify_stage7c_runtime,
 )
-from st_omr_training.training_model import TrainerConfig
-from st_omr_training.training_run import BaselineRunConfig, PredictionMetrics
+from st_omr_training.training_run import PredictionMetrics
 
 
 class RepositoryProvenanceTests(unittest.TestCase):
@@ -118,14 +117,6 @@ class AuthoritativeExecutionTests(unittest.TestCase):
                     self.dataset_root,
                     Path(temp) / "runs",
                     repository_root,
-                    run_config=BaselineRunConfig(
-                        epochs=1,
-                        batch_size=1,
-                        max_train_samples=1,
-                        max_validation_samples=1,
-                        max_decode_tokens=64,
-                    ),
-                    trainer_config=TrainerConfig(master_seed=91, smoke_steps=1),
                 )
 
     def test_authoritative_gate_writes_verified_marker(self) -> None:
@@ -140,6 +131,7 @@ class AuthoritativeExecutionTests(unittest.TestCase):
             validation_samples=1,
             valid_semantic_predictions=1,
         )
+        validation_losses = [2.0] + [1.0] * 40
         with tempfile.TemporaryDirectory() as temp:
             with (
                 patch(
@@ -148,7 +140,7 @@ class AuthoritativeExecutionTests(unittest.TestCase):
                 ),
                 patch(
                     "st_omr_training.training_run._mean_validation_loss",
-                    side_effect=(2.0, 1.0),
+                    side_effect=validation_losses,
                 ),
                 patch(
                     "st_omr_training.training_run._evaluate_predictions",
@@ -160,17 +152,10 @@ class AuthoritativeExecutionTests(unittest.TestCase):
                     self.dataset_root,
                     Path(temp) / "runs",
                     repository_root,
-                    run_config=BaselineRunConfig(
-                        epochs=1,
-                        batch_size=1,
-                        max_train_samples=1,
-                        max_validation_samples=1,
-                        max_decode_tokens=64,
-                    ),
-                    trainer_config=TrainerConfig(master_seed=91, smoke_steps=1),
                 )
 
             self.assertEqual(verified.result.repository_sha, expected_head)
+            self.assertEqual(verified.result.best_epoch, 1)
             self.assertTrue(verified.verification_path.is_file())
             self.assertTrue(verified.verification_path.name.startswith("VERIFIED-"))
             self.assertEqual(len(verified.verification_sha256), 64)
