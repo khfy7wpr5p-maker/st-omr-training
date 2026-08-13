@@ -12,7 +12,7 @@ Stage 5-A — Dataset Contract + Independent Manifest Validator — merged throu
 
 Stage 5 closure documentation merged through PR #16 at exact `main` commit `ed343d4984aae4507a2dd3238cfd1a98fb25b4b7`; its post-merge GitHub Actions run `31672540732` completed successfully. The integrated repository through Stage 5 is therefore `CI VERIFIED`.
 
-Stage 6 — Synthetic Dataset v1 — is now the active bounded implementation package on branch `stage-6-synthetic-dataset-v1`.
+Stage 6 — Synthetic Dataset v1 — is the active bounded package on branch `stage-6-synthetic-dataset-v1` and PR #17.
 
 Stage 7 model training, real-data work, and ScoreMosaic integration remain locked.
 
@@ -27,7 +27,7 @@ Stage 7 model training, real-data work, and ScoreMosaic integration remain locke
 | 4 | Controlled degradation | ✅ Closed — main CI verified |
 | 5-A | Dataset contract + independent manifest validator | ✅ Closed — PR #15 merged + main CI verified |
 | 5 | Dataset validation | ✅ Closed — CI VERIFIED |
-| 6 | Synthetic Dataset v1 | 🔄 Active package — verification pending |
+| 6 | Synthetic Dataset v1 | 🔄 PR-ready package — exact-current-head CI pending |
 | 7 | Baseline ST-OMR training | 🔒 Not started |
 | 8 | Real-data fine-tuning | 🔒 Not started |
 | 9 | Benchmark and candidate decision | 🔒 Not started |
@@ -48,7 +48,11 @@ Stage 7 model training, real-data work, and ScoreMosaic integration remain locke
 
 The `CI VERIFIED` statement applies only to exact GitHub commits that GitHub-hosted CI exercised.
 
-## Stage 6 active package
+## Stage 6 package
+
+PR: #17 — `Stage 6: deterministic Synthetic Dataset v1 builder`
+
+Branch: `stage-6-synthetic-dataset-v1`
 
 Base `main`: `ed343d4984aae4507a2dd3238cfd1a98fb25b4b7`
 
@@ -56,7 +60,7 @@ Contract: [DATASET_BUILD_CONTRACT.md](DATASET_BUILD_CONTRACT.md)
 
 Stage 6 responsibility is limited to deterministic construction and safe local persistence of Synthetic Dataset v1 behind the already-merged Stage 5 veto gate.
 
-Current package scope:
+Implemented package scope:
 
 - immutable bounded `SyntheticDatasetConfig`;
 - deterministic family planning across mixed, note-only, rest-only, chord-only, fixed-meter, and no-accidental symbolic profiles;
@@ -64,9 +68,11 @@ Current package scope:
 - split-independent deterministic Stage 4 degradation seeds;
 - full Generator → MusicXML → Verovio → Stage 4 → Stage 5 composition;
 - exact MusicXML and PNG hash-addressed artifact sets;
+- independent Stage 2-C validation for persisted MusicXML targets;
 - independent Stage 5 manifest validation before a build can be accepted;
 - deterministic manifest/config/build identities;
-- no-overwrite atomic local directory persistence with persisted-byte SHA-256 verification;
+- duplicate target and final-PNG vetoes;
+- no-overwrite hash-addressed local directory persistence with temporary staging and persisted-byte SHA-256 verification;
 - small temporary integration fixtures only; bulk dataset artifacts remain outside Git.
 
 Explicitly out of scope:
@@ -78,7 +84,27 @@ Explicitly out of scope:
 - Guitar TAB training;
 - cloud buckets, credentials, signed URLs, or production storage providers.
 
-## Required Stage 6 verification gate
+## Stage 6 hosted verification evidence
+
+The implementation/documentation PR head `84d9e2ed9c7bf413318e1f8bc3164e24770af340` passed GitHub Actions run #16 (`31673445504`) in the fresh Ubuntu 24.04 / Python 3.13 environment.
+
+That run verified:
+
+- CPython 3.13.14;
+- exact `lxml==6.1.1`, `verovio==6.2.1`, `CairoSVG==2.8.2`, and `Pillow==12.3.0` runtime checks;
+- `pip check` with no broken requirements;
+- 11 focused Stage 6 configuration/split/artifact tests;
+- 3 real Stage 1 → Stage 6 build/rebuild/persistence integration tests;
+- same-config manifest, build identity, target, image, and metadata determinism;
+- hash-addressed filesystem persistence and no-overwrite behavior;
+- complete repository regression: **309/309 tests passed**;
+- Python `compileall` validation.
+
+This status/evidence commit changes the PR head. Therefore run `31673445504` is strong prior-head evidence only. The authoritative merge gate is a fresh GitHub-hosted CI success attached to the exact current PR head after this commit. No further source/document commit should be made after that exact-head check is green unless CI is repeated again.
+
+The GitHub runner also reports that the currently pinned checkout/setup-python actions target the deprecated Node.js 20 runtime and are being forced onto Node.js 24. That warning did not fail Stage 6 CI and is not a Stage 6 implementation change; action-runtime maintenance belongs to a separate CI maintenance package.
+
+## Required final Stage 6 gate
 
 ```text
 Focused Stage 6 configuration/split/artifact tests
@@ -95,7 +121,7 @@ Python compile validation
         ↓
 Diff/scope review
         ↓
-GitHub-hosted CI on exact final PR head
+GitHub-hosted CI on exact current PR head
         ↓
 CI VERIFIED — PR HEAD
         ↓
@@ -104,7 +130,7 @@ Separate merge approval
 Post-merge GitHub-hosted CI on exact main
 ```
 
-No older CI run may substitute for the exact final Stage 6 PR head.
+No older CI run may substitute for exact-current-head verification.
 
 ## CI baseline
 
@@ -114,4 +140,4 @@ Stage 6 introduces no new runtime dependency and does not modify the CI workflow
 
 ## Next gate
 
-Complete Stage 6 verification and scope review. If the exact final PR head is green, merge still requires separate explicit approval. Stage 7 must remain locked until Stage 6 is merged and the exact resulting `main` commit passes GitHub-hosted CI.
+Verify GitHub-hosted CI on the exact current PR #17 head created by this evidence update. If green, Stage 6 becomes `CI VERIFIED — PR HEAD`, but merge still requires separate explicit approval. Stage 7 must remain locked until Stage 6 is merged and the exact resulting `main` commit passes GitHub-hosted CI.
