@@ -6,7 +6,7 @@ This file is the current stage-status source for this repository.
 
 The repository is public and GitHub Actions CI is active.
 
-Stages 0 through 6 and all Stage 7 packages are complete on `main`.
+Stages 0 through 6, all Stage 7 packages, and Stage 8-0 are complete on `main`.
 
 Stage 7-A — Baseline Training Contract Freeze — merged through PR #19 at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) succeeded. Stage 7-A closure/status synchronization then merged through PR #20 at exact `main` commit `6a13760d9d17130ea86636f4828ff1bff035f30d`; post-merge run #24 (`31676871798`) also succeeded.
 
@@ -14,9 +14,11 @@ Stage 7-B — Tokenizer/Data/Model/Trainer Implementation — merged through PR 
 
 Stage 7-C — Bounded Baseline Training Run + Evidence — merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. Exact-head run #67 (`31691794239`) passed **361/361 tests**, the guarded benchmark, and the authoritative synthetic-only run. Post-merge exact-main run #68 (`31692849892`) passed **361/361 tests**, exact runtime checks, `pip check`, and `compileall`. Stage 7-C closure synchronization then merged through PR #24 to exact `main` commit `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) succeeded. The accepted evidence is recorded in `STAGE7C_EVIDENCE.md`; Stage 7-C is `CLOSED — MAIN CI VERIFIED`.
 
-Stage 8-0 — Real Data & Fine-Tuning Contract Freeze — is the only active development package. It may define contract metadata, independent metadata validators, negative tests, and documentation only. It does not authorize real-data intake, checkpoint loading, training/fine-tuning, sealed-test access, Stage 9, Stage 10, or ScoreMosaic integration.
+Stage 8-0 — Real Data & Fine-Tuning Contract Freeze — merged through PR #25 to exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`. Post-merge GitHub Actions run #75 (`31698691405`) succeeded on that exact commit with pinned dependency checks, `pip check`, the complete repository test suite, and `compileall`. Stage 8-0 is `CLOSED — MAIN CI VERIFIED`.
 
-The Stage 7-C checkpoint artifact `9177923796` is currently temporary and scheduled to expire on 2026-09-12. Stage 8-0 records its identity but does not move or republish the artifact. The accepted Stage 7-C model remains non-production: exact sequence accuracy is 0% and token error rate is approximately 80.5%.
+Stage 8-0 added only contract metadata, independent metadata validators, negative tests, and documentation. It did not ingest real data, load a checkpoint, run training/fine-tuning, open a sealed test split, start Stage 9/10, or integrate with ScoreMosaic.
+
+The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. Stage 8-0 records its identity but did not move or republish the artifact. The accepted Stage 7-C model remains non-production: exact sequence accuracy is 0% and token error rate is approximately 80.5%.
 
 ## Stage status
 
@@ -33,7 +35,7 @@ The Stage 7-C checkpoint artifact `9177923796` is currently temporary and schedu
 | 7-A | Baseline training contract freeze | ✅ Closed — main CI verified |
 | 7-B | Tokenizer/data/model/trainer smoke implementation | ✅ Closed — main CI verified |
 | 7-C | Bounded baseline training run + evidence | ✅ Closed — main CI verified |
-| 8-0 | Real data & fine-tuning contract freeze | 🔄 Active package — contract/validator only |
+| 8-0 | Real data & fine-tuning contract freeze | ✅ Closed — main CI verified |
 | 8-1+ | Real-data intake / experiment execution | 🔒 Not started |
 | 9 | Benchmark and candidate decision | 🔒 Not started — test sealed |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
@@ -58,6 +60,7 @@ The Stage 7-C checkpoint artifact `9177923796` is currently temporary and schedu
 - Stage 7-C exact source head `7a993304218fa19609ea512665148dac3eea503a` passed run #67 (`31691794239`) with **361/361 tests**, a safe guarded benchmark, and accepted authoritative evidence; PR #23 then squash-merged to exact main commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`.
 - Stage 7-C post-merge run #68 (`31692849892`) succeeded on exact main commit `2c2c478eb361fa90a3bccd819b623680eb12de0b` with **361/361 tests**, exact dependency checks, `pip check`, and `compileall`.
 - Stage 7-C closure synchronization merged through PR #24 at exact main commit `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) succeeded.
+- Stage 8-0 PR #25 merged to exact main commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`; post-merge run #75 (`31698691405`) succeeded with pinned runtime verification, `pip check`, the complete repository test suite, and `compileall`.
 
 The `CI VERIFIED` statement applies only to exact GitHub commits or GitHub-generated PR merge candidates that GitHub-hosted CI exercised.
 
@@ -74,22 +77,22 @@ Stage 7 froze and verified:
 
 The accepted Stage 7-C run completed 40 epochs/1560 steps, improved validation loss from `3.560342441426505` to `0.9992435761603257`, and produced 21/21 semantically valid and MusicXML-regenerable validation predictions. Exact sequence accuracy remained 0% and token error rate remained approximately 80.5%, so no production-candidate claim is made.
 
-## Stage 8-0 active boundary
+## Stage 8-0 closed capability boundary
 
 Contract: [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md)
 
-Stage 8-0 is limited to freezing and enforcing metadata-level rules for:
+Stage 8-0 froze and enforced metadata-level rules for:
 
 - source provenance and training-use rights evidence;
 - explicit training permission and privacy review for user-derived material;
 - quarantine versus admitted state;
 - image/MusicXML pairing evidence and supported-V1 target requirements;
 - immutable content identity, duplicate rejection, and family/source/target/semantic split-leakage vetoes;
-- train/validation-only development access with real test sealed until Stage 9;
+- train/validation-only development access with real test metadata excluded from the development manifest and test sealed until Stage 9;
 - two later experiment candidates: exact Stage 7-C checkpoint fine-tuning versus the same architecture from scratch;
 - ScoreMosaic upload/teacher-correction isolation and prohibition of online/automatic learning.
 
-Stage 8-0 does not ingest data, inspect real file bytes, load a checkpoint, or run training. Byte-level intake/admission and experiment execution require later separately authorized packages.
+Stage 8-0 did not ingest data, inspect real file bytes, load a checkpoint, or run training. Byte-level intake/admission and experiment execution require later separately authorized packages.
 
 ## CI baseline
 
@@ -125,6 +128,8 @@ post-merge exact-main CI
 Stage 8-0 CLOSED
 ```
 
+The Stage 8-0 gate above is complete through exact-main post-merge CI on `86487a4c3c41264b02bd159cd647a1318d9b9b88`.
+
 ## Next gate
 
-Until Stage 8-0 is merged and exact-main CI verified, no Stage 8-1 intake or training work may begin. The next planned small gate after Stage 8-0 closure is **Stage 8-1 — quarantine/intake + byte-level validation**, still without training and without opening either sealed test split. Stage 9 and Stage 10 remain locked.
+Stage 8-0 is closed and main CI verified. The next planned small gate is **Stage 8-1 — quarantine/intake + byte-level validation**, still without training and without opening either sealed test split. Stage 8-1 has not started. Stage 9 and Stage 10 remain locked.

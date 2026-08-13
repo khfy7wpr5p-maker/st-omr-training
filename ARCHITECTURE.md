@@ -335,7 +335,7 @@ Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact ve
 
 ## Stage 8 real-data and fine-tuning boundary
 
-Stage 8-0 is governed by [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md). It is a contract and metadata-validation gate only.
+Stage 8-0 is governed by [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md). It is a closed contract and metadata-validation gate only.
 
 ```text
 Stage 7-C accepted baseline evidence
@@ -381,6 +381,8 @@ Stage 7-B closure documentation squash-merged through PR #22 at exact `main` com
 
 Stage 7-C source head `7a993304218fa19609ea512665148dac3eea503a` passed run #67 (`31691794239`) with **361/361 tests**, the guarded benchmark, and the authoritative run. PR #23 squash-merged at exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`; post-merge run #68 (`31692849892`) passed **361/361 tests** on that commit. Stage 7-C closure synchronization merged through PR #24 at exact `main` commit `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) passed. The integrated repository through Stage 7-C is therefore `CI VERIFIED`.
 
+Stage 8-0 merged through PR #25 at exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`; post-merge run #75 (`31698691405`) passed pinned runtime verification, `pip check`, the complete repository test suite, and `compileall`. The integrated repository through Stage 8-0 is therefore `CI VERIFIED`.
+
 ## Stage roadmap
 
 ```text
@@ -398,7 +400,7 @@ Stage 6   Synthetic Dataset v1                          ✅ CLOSED — CI VERIFI
 Stage 7-A Baseline training contract freeze             ✅ CLOSED — CI VERIFIED
 Stage 7-B Tokenizer/data/model/trainer implementation   ✅ CLOSED — CI VERIFIED
 Stage 7-C Bounded baseline training run + evidence      ✅ CLOSED — CI VERIFIED
-Stage 8-0 Real data & fine-tuning contract freeze       🔄 ACTIVE PACKAGE
+Stage 8-0 Real data & fine-tuning contract freeze       ✅ CLOSED — CI VERIFIED
 Stage 8-1+ Intake / run execution                       🔒
 Stage 9   Benchmark and candidate decision              🔒 TEST SEALED
 Stage 10  ScoreMosaic candidate integration             🔒
