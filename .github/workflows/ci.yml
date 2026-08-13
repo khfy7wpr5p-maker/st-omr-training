@@ -60,3 +60,117 @@ jobs:
 
       - name: Compile Python sources
         run: python -m compileall -q st_omr_training tests
+
+  stage7c-benchmark:
+    name: Stage 7-C guarded runtime benchmark
+    if: >-
+      github.repository == 'khfy7wpr5p-maker/st-omr-training' &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.number == 23
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      enabled: ${{ steps.gate.outputs.enabled }}
+
+    steps:
+      - name: Checkout exact PR source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Admit the one guarded execution commit
+        id: gate
+        shell: bash
+        run: |
+          if [ "$(git log -1 --pretty=%s)" = "run(stage7c): benchmark and train exact head" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Guarded benchmark skipped for this commit."
+          fi
+
+      - name: Set up Python 3.13
+        if: steps.gate.outputs.enabled == 'true'
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install exact dependencies
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu -r requirements-training.txt
+
+      - name: Run conservative Stage 7-C benchmark
+        if: steps.gate.outputs.enabled == 'true'
+        run: |
+          python -m st_omr_training.stage7c_benchmark \
+            --workspace "$RUNNER_TEMP/stage7c-benchmark-workspace" \
+            --output "$RUNNER_TEMP/stage7c-benchmark.json"
+
+      - name: Upload benchmark evidence
+        if: always() && steps.gate.outputs.enabled == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage7c-benchmark-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/stage7c-benchmark.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  stage7c-authoritative-training:
+    name: Stage 7-C one-shot authoritative training
+    needs:
+      - test
+      - stage7c-benchmark
+    if: needs.stage7c-benchmark.outputs.enabled == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 330
+    env:
+      STAGE7C_WORKSPACE: ${{ runner.temp }}/stage7c-authoritative-workspace
+      STAGE7C_SUMMARY: ${{ runner.temp }}/stage7c-authoritative-summary.json
+
+    steps:
+      - name: Checkout exact benchmarked PR source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+          cache: pip
+
+      - name: Install exact dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --index-url https://download.pytorch.org/whl/cpu -r requirements-training.txt
+
+      - name: Verify exact pinned runtime
+        run: |
+          python - <<'PY'
+          from st_omr_training.stage7c_execution import verify_stage7c_runtime
+          print(verify_stage7c_runtime())
+          PY
+          python -m pip check
+
+      - name: Run exact frozen synthetic-only Stage 7-C training
+        run: |
+          python -m st_omr_training.stage7c_cli \
+            --workspace "$STAGE7C_WORKSPACE" \
+            > "$STAGE7C_SUMMARY"
+
+      - name: Upload authoritative run evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stage7c-authoritative-${{ github.event.pull_request.head.sha }}
+          path: |
+            ${{ env.STAGE7C_SUMMARY }}
+            ${{ env.STAGE7C_WORKSPACE }}
+          if-no-files-found: warn
+          retention-days: 30
+          compression-level: 6

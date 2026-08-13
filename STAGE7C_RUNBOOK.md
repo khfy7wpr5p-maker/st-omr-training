@@ -22,6 +22,8 @@ Frozen baseline dataset profile: `st_omr_training/stage7c_dataset.py`.
 
 Authoritative knobs-free entrypoint: `python -m st_omr_training.stage7c_cli --workspace <fresh-directory-outside-repository>`.
 
+Guarded runtime benchmark: `python -m st_omr_training.stage7c_benchmark --workspace <fresh-directory-outside-repository> --output <fresh-json-path>`.
+
 The authoritative entrypoint is the only normal Stage 7-C execution path. It binds execution to the Git repository that contains the running ST-OMR package source, requires the expected `khfy7wpr5p-maker/st-omr-training` GitHub origin, verifies the clean repository and exact runtime, builds and persists the frozen Stage 6 dataset profile, then executes the authoritative training/provenance gate. The workspace must be fresh and outside the Git repository so generated artifacts cannot alter source provenance.
 
 Only `train` and `validation` are requested. `DatasetSplit.TEST` remains sealed until Stage 9.
@@ -126,11 +128,13 @@ Checkpoint files use `checkpoint-<sha256>.pt`. Metrics/provenance use `metrics-<
 
 ## CI boundary
 
-GitHub-hosted CI does not execute the real frozen Stage 7-C baseline run.
+Ordinary GitHub-hosted CI does not execute the real frozen Stage 7-C baseline run.
 
 PR CI may run only bounded contract/component smoke tests: configuration bounds, frozen dataset-profile identity, frozen run-profile identity, workspace safety, semantic reconstruction, metric accounting, hash-addressed artifact handling, no-resume behavior, source/runtime provenance checks, strict checkpoint reload verification, full repository regression, and compile validation.
 
-The real baseline run must execute separately on the exact pinned CPU training runtime through the authoritative entrypoint and provenance gate. Its evidence must then be reviewed before this package can be considered merge-ready.
+Draft PR #23 has one narrow, fail-closed exception approved for the Windows 7 / unavailable local-terminal constraint. The exact PR source head may run `stage7c_benchmark` on the same Ubuntu/pinned-CPU profile. The benchmark builds and loads the complete frozen dataset, measures the heaviest real training and validation groups, executes one forced full-length 1536-token incremental decode, scales those work units to all 40 epochs and validation samples, adds five minutes of fixed overhead, then applies a 2× safety factor. The adjusted estimate must be no more than four hours; otherwise the real job never starts.
+
+Only the specially admitted PR #23 commit may start the subsequent authoritative job. It checks out the exact benchmarked source SHA, uses the knobs-free entrypoint, keeps the test split sealed, and uploads the run workspace plus final summary for independent review. This exception does not authorize recurring full training, alternate profiles, real/user data, or any Stage 8–10 work.
 
 ## Explicitly locked
 

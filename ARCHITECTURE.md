@@ -271,7 +271,7 @@ Stage 7-C Bounded baseline training run + evidence
 Stage 9 sealed-test benchmark gate
 ```
 
-Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the active bounded package on `stage-7c-baseline-run` / draft PR #23. Its implementation and bounded CI evidence are under development; the separate real baseline run has not yet produced accepted evidence.
+Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the active bounded package on `stage-7c-baseline-run` / draft PR #23. Its orchestrator, incremental decoder, heartbeat surface, evidence gate, and bounded regressions are implemented; benchmark and authoritative run evidence remain the active gates.
 
 ### Training input
 
@@ -322,7 +322,7 @@ Stage 7-C records validation loss, token error rate, exact sequence accuracy, de
 
 Every real Stage 7-C run records repository SHA, dataset build identity, manifest SHA, run/tokenizer/preprocess/model/trainer fingerprints, dependency/runtime/device identity, seeds, parameter count, epoch/step counts, checkpoint SHA-256, and metrics SHA-256. Checkpoints are hash-addressed derived artifacts and remain outside normal Git content.
 
-Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact verified CPU runtime. GitHub-hosted CI remains limited to bounded smoke/contract testing. Full Stage 7-C training does not run in ordinary repository CI.
+Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact verified CPU runtime. Ordinary GitHub-hosted CI remains limited to bounded smoke/contract testing. Draft PR #23 permits one exact-head exception only after a full-length incremental-decode and representative frozen-workload benchmark passes a conservative 2×/four-hour safety gate.
 
 ## Verification boundary
 

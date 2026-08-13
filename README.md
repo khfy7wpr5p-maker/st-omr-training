@@ -38,7 +38,7 @@ Completed and merged:
 
 Stage 7-B merged through PR #21 at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`. Its closure documentation then squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) succeeded on that exact SHA. The integrated repository through Stage 7-B is therefore **main CI verified**.
 
-Stage 7-C — bounded real baseline training run + evidence — is the **active bounded package** on branch `stage-7c-baseline-run` / draft PR #23. The run orchestrator and bounded CI contract tests are under development. The real Stage 7-C baseline run has not yet produced accepted evidence and does not execute in ordinary GitHub-hosted CI.
+Stage 7-C — bounded real baseline training run + evidence — is the **active bounded package** on branch `stage-7c-baseline-run` / draft PR #23. The run orchestrator, incremental validation decoder, progress/heartbeat surface, authoritative evidence gate, and bounded CI regressions are implemented. A guarded GitHub-hosted benchmark must prove the exact frozen workload fits the conservative runtime budget before the one authorized synthetic-only execution can start. No accepted real-run evidence exists until that job finishes and its artifacts are reviewed.
 
 Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
 
@@ -54,6 +54,6 @@ Stage 7-B uses only the compact frozen semantic target surface defined by Stage 
 
 Stage 7-C reuses the same from-scratch CNN/GRU baseline, tokenizer, trusted data adapter, deterministic preprocessing, optimizer/loss policy, and exact `torch==2.13.0+cpu` runtime. It adds only the bounded real-run orchestration, validation metrics, selected-checkpoint handling, and auditable provenance/evidence surface defined in `STAGE7C_RUNBOOK.md`.
 
-The selected baseline uses no pretrained model, external OCR/OMR teacher, LLM, or network-dependent label source. GitHub-hosted CI remains limited to bounded CPU smoke/contract evidence; the real Stage 7-C baseline run is a separate execution/evidence gate.
+The selected baseline uses no pretrained model, external OCR/OMR teacher, LLM, or network-dependent label source. Ordinary GitHub-hosted CI remains limited to bounded CPU smoke/contract evidence. Draft PR #23 has one narrow exact-head exception: a conservative benchmark may admit one synthetic-only authoritative run; unsafe estimates fail closed before training.
 
 Large datasets, model checkpoints, real user documents, private material, and rights-unclear score collections are not normal Git repository content.
