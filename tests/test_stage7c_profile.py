@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import io
 import tempfile
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 from st_omr_training.dataset_builder import (
     DEFAULT_DEGRADATION_PROFILES,
     DEFAULT_FAMILY_PROFILES,
     synthetic_dataset_config_fingerprint,
 )
-from st_omr_training.stage7c_cli import validate_workspace_path
+from st_omr_training.stage7c_cli import _write_progress, validate_workspace_path
 from st_omr_training.stage7c_dataset import (
     STAGE7C_BASELINE_DATASET_CONFIG,
     STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT,
@@ -78,6 +80,12 @@ class WorkspaceSafetyTests(unittest.TestCase):
             outside.mkdir()
             with self.assertRaises(FileExistsError):
                 validate_workspace_path(outside, repository)
+
+    def test_progress_is_canonical_json_written_to_stderr(self) -> None:
+        stream = io.StringIO()
+        with patch("st_omr_training.stage7c_cli.sys.stderr", stream):
+            _write_progress({"z": 1, "event": "heartbeat"})
+        self.assertEqual(stream.getvalue(), '{"event":"heartbeat","z":1}\n')
 
 
 if __name__ == "__main__":

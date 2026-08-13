@@ -15,7 +15,7 @@ from hashlib import sha256
 import json
 from pathlib import Path
 import shutil
-from typing import Final
+from typing import Callable, Final
 
 from .dataset_manifest import (
     DatasetManifest,
@@ -60,6 +60,16 @@ _ALLOWED_FAMILY_PROFILES = frozenset(DEFAULT_FAMILY_PROFILES)
 _ALLOWED_DEGRADATION_PROFILES = frozenset(DEFAULT_DEGRADATION_PROFILES)
 _MAX_SEED = 2**63 - 1
 _HEX = frozenset("0123456789abcdef")
+DatasetProgressCallback = Callable[[dict[str, object]], None]
+
+
+def _report_dataset_progress(
+    progress: DatasetProgressCallback | None,
+    event: str,
+    **fields: object,
+) -> None:
+    if progress is not None:
+        progress({"event": event, **fields})
 
 
 class DatasetBuildInputError(ValueError):
@@ -430,18 +440,24 @@ def _build_id(*, config_fingerprint: str, manifest_sha256: str) -> str:
     ).hexdigest()
 
 
-def build_synthetic_dataset(config: SyntheticDatasetConfig) -> SyntheticDatasetBuild:
+def build_synthetic_dataset(
+    config: SyntheticDatasetConfig,
+    *,
+    progress: DatasetProgressCallback | None = None,
+) -> SyntheticDatasetBuild:
     """Construct an in-memory Synthetic Dataset v1 and require Stage 5 acceptance."""
 
     if not isinstance(config, SyntheticDatasetConfig):
         raise TypeError("config must be SyntheticDatasetConfig")
+    if progress is not None and not callable(progress):
+        raise TypeError("progress must be callable or None")
 
     plans = plan_synthetic_families(config)
     samples: list[DatasetSample] = []
     targets: dict[str, DatasetTargetArtifact] = {}
     images: dict[str, DatasetImageArtifact] = {}
 
-    for plan in plans:
+    for family_index, plan in enumerate(plans, start=1):
         generator_config = _generator_config_for_profile(plan.profile, config.measure_count)
         score = generate_score(generator_config, plan.seed)
         family_id = score.score_id
@@ -499,6 +515,14 @@ def build_synthetic_dataset(config: SyntheticDatasetConfig) -> SyntheticDatasetB
                 images[degraded.png_sha256] = image_artifact
                 samples.append(sample)
 
+        _report_dataset_progress(
+            progress,
+            "dataset_family_completed",
+            families_completed=family_index,
+            families_total=len(plans),
+            samples_built=len(samples),
+        )
+
     manifest = DatasetManifest(
         dataset_name=config.dataset_name,
         dataset_version=config.dataset_version,
@@ -507,6 +531,12 @@ def build_synthetic_dataset(config: SyntheticDatasetConfig) -> SyntheticDatasetB
     validation = validate_dataset_manifest(manifest)
     if not validation.is_valid:
         raise DatasetBuildValidationError(validation)
+    _report_dataset_progress(
+        progress,
+        "dataset_validation_completed",
+        families_total=len(plans),
+        samples_total=len(samples),
+    )
 
     manifest_hash = dataset_manifest_sha256(manifest)
     config_hash = synthetic_dataset_config_fingerprint(config)
@@ -565,11 +595,18 @@ def _verify_written(path: Path, expected_sha256: str) -> None:
         raise DatasetBuildInputError(f"persisted artifact hash mismatch: {path.name}")
 
 
-def write_synthetic_dataset(build: SyntheticDatasetBuild, output_dir: str | Path) -> Path:
+def write_synthetic_dataset(
+    build: SyntheticDatasetBuild,
+    output_dir: str | Path,
+    *,
+    progress: DatasetProgressCallback | None = None,
+) -> Path:
     """Persist one already-validated build using a hash-addressed, no-overwrite layout."""
 
     if not isinstance(build, SyntheticDatasetBuild):
         raise TypeError("build must be SyntheticDatasetBuild")
+    if progress is not None and not callable(progress):
+        raise TypeError("progress must be callable or None")
     validation = validate_dataset_manifest(build.manifest)
     if not validation.is_valid:
         raise DatasetBuildValidationError(validation)
@@ -610,15 +647,29 @@ def write_synthetic_dataset(build: SyntheticDatasetBuild, output_dir: str | Path
             newline="\n",
         )
 
-        for target in build.targets:
+        for target_index, target in enumerate(build.targets, start=1):
             path = temp / "targets" / f"{target.sha256}.musicxml"
             path.write_bytes(target.musicxml)
             _verify_written(path, target.sha256)
+            if target_index % 8 == 0 or target_index == len(build.targets):
+                _report_dataset_progress(
+                    progress,
+                    "dataset_target_written",
+                    targets_written=target_index,
+                    targets_total=len(build.targets),
+                )
 
-        for image in build.images:
+        for image_index, image in enumerate(build.images, start=1):
             path = temp / "images" / f"{image.sha256}.png"
             path.write_bytes(image.png)
             _verify_written(path, image.sha256)
+            if image_index % 8 == 0 or image_index == len(build.images):
+                _report_dataset_progress(
+                    progress,
+                    "dataset_image_written",
+                    images_written=image_index,
+                    images_total=len(build.images),
+                )
 
         temp.rename(root)
     except Exception:
@@ -626,4 +677,5 @@ def write_synthetic_dataset(build: SyntheticDatasetBuild, output_dir: str | Path
             shutil.rmtree(temp)
         raise
 
+    _report_dataset_progress(progress, "dataset_persisted")
     return root

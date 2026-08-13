@@ -10,7 +10,7 @@ import math
 import platform
 from pathlib import Path
 import sys
-from typing import Final
+from typing import Callable, Final
 
 import torch
 
@@ -65,7 +65,9 @@ BASELINE_RUN_VERSION: Final[str] = "st-omr-baseline-run-v1"
 MAX_BASELINE_EPOCHS: Final[int] = 100
 MAX_RETAINED_CHECKPOINTS: Final[int] = 10
 _MAX_SEED: Final[int] = 2**63 - 1
+_PROGRESS_INTERVAL: Final[int] = 8
 _HEX = frozenset("0123456789abcdef")
+ProgressCallback = Callable[[dict[str, object]], None]
 
 
 class BaselineRunConfigError(ValueError):
@@ -100,6 +102,15 @@ def _canonical_json_bytes(payload: object) -> bytes:
         ensure_ascii=True,
         allow_nan=False,
     ).encode("ascii")
+
+
+def _report_progress(
+    progress: ProgressCallback | None,
+    event: str,
+    **fields: object,
+) -> None:
+    if progress is not None:
+        progress({"event": event, **fields})
 
 
 def _sha256_file(path: Path) -> str:
@@ -258,10 +269,15 @@ def _mean_validation_loss(
     *,
     batch_size: int,
     preprocess_config: InputPreprocessConfig,
+    progress: ProgressCallback | None = None,
+    phase: str = "validation",
+    epoch: int | None = None,
+    epochs_total: int | None = None,
 ) -> float:
     weighted_loss = 0.0
     token_count = 0
-    for group in _batch_groups(samples, batch_size):
+    groups = _batch_groups(samples, batch_size)
+    for batch_index, group in enumerate(groups, start=1):
         batch = make_training_batch(group, preprocess_config)
         value = validation_loss(model, batch)
         count = int((batch.labels != PAD_TOKEN_ID).sum().item())
@@ -269,6 +285,17 @@ def _mean_validation_loss(
             raise BaselineRunError("validation batch contains no unmasked tokens")
         weighted_loss += value * count
         token_count += count
+        if batch_index % _PROGRESS_INTERVAL == 0 or batch_index == len(groups):
+            fields: dict[str, object] = {
+                "phase": phase,
+                "validation_batches_completed": batch_index,
+                "validation_batches_total": len(groups),
+            }
+            if epoch is not None:
+                fields["epoch"] = epoch
+            if epochs_total is not None:
+                fields["epochs_total"] = epochs_total
+            _report_progress(progress, "validation_batch_completed", **fields)
     result = weighted_loss / token_count
     if not math.isfinite(result):
         raise BaselineRunError("validation loss is NaN or Infinity")
@@ -399,6 +426,7 @@ def _evaluate_predictions(
     *,
     preprocess_config: InputPreprocessConfig,
     max_decode_tokens: int,
+    progress: ProgressCallback | None = None,
 ) -> PredictionMetrics:
     total_edits = 0
     total_reference_tokens = 0
@@ -407,44 +435,56 @@ def _evaluate_predictions(
     semantic_valid = 0
     musicxml_valid = 0
 
-    for sample in validation_samples:
-        predicted = _greedy_decode_sample(
-            model,
-            sample,
-            preprocess_config=preprocess_config,
-            max_decode_tokens=max_decode_tokens,
-        )
-        target = sample.target_token_ids
-        predicted_surface = predicted[1:]
-        target_surface = target[1:]
-        total_edits += _levenshtein_distance(predicted_surface, target_surface)
-        total_reference_tokens += len(target_surface)
-        if predicted == target:
-            exact += 1
-
+    for sample_index, sample in enumerate(validation_samples, start=1):
         try:
-            predicted_tokens = decode_token_ids(predicted)
-            projection = detokenize_tokens(predicted_tokens)
-        except TokenizationError:
-            continue
-        detokenized += 1
-
-        try:
-            score = _score_from_projection(
-                projection,
-                score_id=f"stage7c-{sample.sample_id[:16]}",
+            predicted = _greedy_decode_sample(
+                model,
+                sample,
+                preprocess_config=preprocess_config,
+                max_decode_tokens=max_decode_tokens,
             )
-        except (BaselineRunError, TypeError, ValueError):
-            continue
-        semantic_valid += 1
+            target = sample.target_token_ids
+            predicted_surface = predicted[1:]
+            target_surface = target[1:]
+            total_edits += _levenshtein_distance(predicted_surface, target_surface)
+            total_reference_tokens += len(target_surface)
+            if predicted == target:
+                exact += 1
 
-        try:
-            musicxml = write_musicxml(score)
-        except MusicXMLWriteError:
-            continue
-        validation = validate_musicxml(musicxml)
-        if validation.is_valid:
-            musicxml_valid += 1
+            try:
+                predicted_tokens = decode_token_ids(predicted)
+                projection = detokenize_tokens(predicted_tokens)
+            except TokenizationError:
+                continue
+            detokenized += 1
+
+            try:
+                score = _score_from_projection(
+                    projection,
+                    score_id=f"stage7c-{sample.sample_id[:16]}",
+                )
+            except (BaselineRunError, TypeError, ValueError):
+                continue
+            semantic_valid += 1
+
+            try:
+                musicxml = write_musicxml(score)
+            except MusicXMLWriteError:
+                continue
+            validation = validate_musicxml(musicxml)
+            if validation.is_valid:
+                musicxml_valid += 1
+        finally:
+            if (
+                sample_index % _PROGRESS_INTERVAL == 0
+                or sample_index == len(validation_samples)
+            ):
+                _report_progress(
+                    progress,
+                    "prediction_sample_completed",
+                    prediction_samples_completed=sample_index,
+                    prediction_samples_total=len(validation_samples),
+                )
 
     count = len(validation_samples)
     if count <= 0 or total_reference_tokens <= 0:
@@ -506,6 +546,7 @@ def run_baseline_training(
     model_config: BaselineModelConfig = BaselineModelConfig(),
     trainer_config: TrainerConfig = TrainerConfig(),
     preprocess_config: InputPreprocessConfig = InputPreprocessConfig(),
+    progress: ProgressCallback | None = None,
 ) -> BaselineRunResult:
     """Execute one strict Stage 7-C CPU baseline run without opening the test split."""
 
@@ -522,6 +563,8 @@ def run_baseline_training(
         raise TypeError("trainer_config must be TrainerConfig")
     if not isinstance(preprocess_config, InputPreprocessConfig):
         raise TypeError("preprocess_config must be InputPreprocessConfig")
+    if progress is not None and not callable(progress):
+        raise TypeError("progress must be callable or None")
     if (
         model_config.input_height != preprocess_config.target_height
         or model_config.input_width != preprocess_config.target_width
@@ -579,6 +622,17 @@ def run_baseline_training(
             "max_decode_tokens is shorter than an admitted validation target"
         )
 
+    train_groups = _batch_groups(train_samples, run_config.batch_size)
+    training_steps_total = len(train_groups) * run_config.epochs
+    _report_progress(
+        progress,
+        "training_started",
+        epochs_total=run_config.epochs,
+        train_samples_total=len(train_samples),
+        validation_samples_total=len(validation_samples),
+        training_steps_total=training_steps_total,
+    )
+
     model = build_baseline_model(
         model_config,
         seed=trainer_config.master_seed,
@@ -592,11 +646,20 @@ def run_baseline_training(
         fused=False,
     )
 
+    _report_progress(progress, "untrained_validation_started")
     untrained_validation_loss = _mean_validation_loss(
         model,
         validation_samples,
         batch_size=run_config.batch_size,
         preprocess_config=preprocess_config,
+        progress=progress,
+        phase="untrained",
+        epochs_total=run_config.epochs,
+    )
+    _report_progress(
+        progress,
+        "untrained_validation_completed",
+        validation_loss=float(untrained_validation_loss),
     )
     best_validation_loss = math.inf
     best_epoch = 0
@@ -607,23 +670,50 @@ def run_baseline_training(
     epoch_records: list[dict[str, object]] = []
 
     for epoch in range(1, run_config.epochs + 1):
+        _report_progress(
+            progress,
+            "epoch_started",
+            epoch=epoch,
+            epochs_total=run_config.epochs,
+        )
         train_loss_sum = 0.0
         train_step_count = 0
-        for group in _batch_groups(train_samples, run_config.batch_size):
+        for epoch_step, group in enumerate(train_groups, start=1):
             batch = make_training_batch(group, preprocess_config)
             value = train_one_smoke_step(model, batch, optimizer, trainer_config)
             train_loss_sum += value
             train_step_count += 1
             training_steps += 1
+            if epoch_step % _PROGRESS_INTERVAL == 0 or epoch_step == len(train_groups):
+                _report_progress(
+                    progress,
+                    "training_step_completed",
+                    epoch=epoch,
+                    epochs_total=run_config.epochs,
+                    epoch_steps_completed=epoch_step,
+                    epoch_steps_total=len(train_groups),
+                    training_steps=training_steps,
+                    training_steps_total=training_steps_total,
+                )
 
         if train_step_count <= 0:
             raise BaselineRunError("training epoch executed no optimizer steps")
         mean_train_loss = train_loss_sum / train_step_count
+        _report_progress(
+            progress,
+            "epoch_validation_started",
+            epoch=epoch,
+            epochs_total=run_config.epochs,
+        )
         current_validation_loss = _mean_validation_loss(
             model,
             validation_samples,
             batch_size=run_config.batch_size,
             preprocess_config=preprocess_config,
+            progress=progress,
+            phase="epoch",
+            epoch=epoch,
+            epochs_total=run_config.epochs,
         )
         epoch_records.append(
             {
@@ -632,7 +722,8 @@ def run_baseline_training(
                 "validation_loss": current_validation_loss,
             }
         )
-        if current_validation_loss < best_validation_loss:
+        selected_best = current_validation_loss < best_validation_loss
+        if selected_best:
             previous_checkpoint = best_checkpoint
             best_validation_loss = current_validation_loss
             best_epoch = epoch
@@ -648,6 +739,16 @@ def run_baseline_training(
             )
             if previous_checkpoint is not None and previous_checkpoint != best_checkpoint:
                 previous_checkpoint.unlink()
+        _report_progress(
+            progress,
+            "epoch_completed",
+            epoch=epoch,
+            epochs_total=run_config.epochs,
+            mean_train_loss=float(mean_train_loss),
+            validation_loss=float(current_validation_loss),
+            selected_best=selected_best,
+            training_steps=training_steps,
+        )
 
     if best_state is None or best_checkpoint is None:
         raise BaselineRunError("training did not produce a selected checkpoint")
@@ -661,11 +762,23 @@ def run_baseline_training(
     if _sha256_file(best_checkpoint) != best_checkpoint_sha:
         raise BaselineRunError("selected checkpoint changed after hashing")
 
+    _report_progress(
+        progress,
+        "prediction_evaluation_started",
+        prediction_samples_total=len(validation_samples),
+    )
     prediction_metrics = _evaluate_predictions(
         model,
         validation_samples,
         preprocess_config=preprocess_config,
         max_decode_tokens=run_config.max_decode_tokens,
+        progress=progress,
+    )
+    _report_progress(
+        progress,
+        "prediction_evaluation_completed",
+        prediction_samples_total=prediction_metrics.validation_samples,
+        valid_semantic_predictions=prediction_metrics.valid_semantic_predictions,
     )
     if prediction_metrics.valid_semantic_predictions < 1:
         raise BaselineRunError(
@@ -738,6 +851,13 @@ def run_baseline_training(
         encoding="ascii",
     )
     incomplete.unlink()
+    _report_progress(
+        progress,
+        "training_completed",
+        run_id=run_id,
+        best_epoch=best_epoch,
+        training_steps=training_steps,
+    )
     return BaselineRunResult(
         run_id=run_id,
         run_directory=run_directory,

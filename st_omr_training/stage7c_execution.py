@@ -29,7 +29,12 @@ from .training_model import (
     model_state_sha256,
     verify_torch_runtime,
 )
-from .training_run import BaselineRunResult, run_baseline_training
+from .training_run import (
+    BaselineRunResult,
+    ProgressCallback,
+    _report_progress,
+    run_baseline_training,
+)
 
 
 STAGE7C_EXECUTION_GATE_VERSION: Final[str] = "stage7c-authoritative-execution-v1"
@@ -296,6 +301,8 @@ def run_verified_baseline_training(
     dataset_root: str | Path,
     run_root: str | Path,
     repository_root: str | Path,
+    *,
+    progress: ProgressCallback | None = None,
 ) -> VerifiedBaselineRunResult:
     """Run the one frozen Stage 7-C profile with source-bound clean provenance."""
 
@@ -316,6 +323,7 @@ def run_verified_baseline_training(
         model_config=STAGE7C_FROZEN_MODEL_CONFIG,
         trainer_config=STAGE7C_FROZEN_TRAINER_CONFIG,
         preprocess_config=STAGE7C_FROZEN_PREPROCESS_CONFIG,
+        progress=progress,
     )
 
     ending_sha, ending_origin = verify_authoritative_repository(repository_root)
@@ -325,6 +333,7 @@ def run_verified_baseline_training(
     if ending_runtime != runtime_versions:
         raise Stage7CExecutionError("runtime dependency identity changed during Stage 7-C execution")
 
+    _report_progress(progress, "authoritative_verification_started")
     _evidence, reloaded_state_sha = _verify_run_evidence(
         result,
         build,
@@ -375,6 +384,12 @@ def run_verified_baseline_training(
     if final_sha != repository_sha or final_origin != repository_origin:
         verification_path.unlink(missing_ok=True)
         raise Stage7CExecutionError("repository identity changed while final verification was written")
+
+    _report_progress(
+        progress,
+        "authoritative_verification_completed",
+        verification_sha256=verification_sha,
+    )
 
     return VerifiedBaselineRunResult(
         result=result,

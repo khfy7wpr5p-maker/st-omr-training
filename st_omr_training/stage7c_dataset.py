@@ -8,6 +8,7 @@ from typing import Final
 from .dataset_builder import (
     DEFAULT_DEGRADATION_PROFILES,
     DEFAULT_FAMILY_PROFILES,
+    DatasetProgressCallback,
     SyntheticDatasetBuild,
     SyntheticDatasetConfig,
     build_synthetic_dataset,
@@ -35,6 +36,8 @@ STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT: Final[str] = synthetic_dataset_conf
 
 def build_and_persist_stage7c_baseline_dataset(
     dataset_root: str | Path,
+    *,
+    progress: DatasetProgressCallback | None = None,
 ) -> SyntheticDatasetBuild:
     """Build the one frozen Stage 7-C baseline dataset and persist it without overwrite."""
 
@@ -43,8 +46,11 @@ def build_and_persist_stage7c_baseline_dataset(
     root = Path(dataset_root)
     if root.exists():
         raise FileExistsError("Stage 7-C baseline dataset path must be fresh")
-    build = build_synthetic_dataset(STAGE7C_BASELINE_DATASET_CONFIG)
+    build = build_synthetic_dataset(
+        STAGE7C_BASELINE_DATASET_CONFIG,
+        progress=progress,
+    )
     if build.config_fingerprint != STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT:
         raise RuntimeError("Stage 7-C baseline dataset config fingerprint drifted")
-    write_synthetic_dataset(build, root)
+    write_synthetic_dataset(build, root, progress=progress)
     return build

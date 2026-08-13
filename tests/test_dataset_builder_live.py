@@ -30,7 +30,11 @@ class RealSyntheticDatasetPipelineTests(unittest.TestCase):
             family_profiles=("note-only", "rest-only", "chord-only"),
             degradation_profiles=("clean",),
         )
-        cls.first = build_synthetic_dataset(cls.config)
+        cls.build_progress = []
+        cls.first = build_synthetic_dataset(
+            cls.config,
+            progress=cls.build_progress.append,
+        )
         cls.second = build_synthetic_dataset(cls.config)
 
     def test_real_stage1_through_stage6_build_passes_independent_manifest_gate(self):
@@ -50,6 +54,16 @@ class RealSyntheticDatasetPipelineTests(unittest.TestCase):
         self.assertEqual(len(observed[DatasetSplit.TRAIN]), 1)
         self.assertEqual(len(observed[DatasetSplit.VALIDATION]), 1)
         self.assertEqual(len(observed[DatasetSplit.TEST]), 1)
+        self.assertEqual(
+            [event["event"] for event in self.build_progress],
+            [
+                "dataset_family_completed",
+                "dataset_family_completed",
+                "dataset_family_completed",
+                "dataset_validation_completed",
+            ],
+        )
+        self.assertEqual(self.build_progress[-1]["samples_total"], 3)
 
     def test_same_config_rebuild_is_byte_and_identity_deterministic(self):
         self.assertEqual(self.first.config_fingerprint, self.second.config_fingerprint)
@@ -66,7 +80,12 @@ class RealSyntheticDatasetPipelineTests(unittest.TestCase):
     def test_hash_addressed_writer_is_verified_and_never_overwrites(self):
         with tempfile.TemporaryDirectory() as parent:
             root = Path(parent) / "dataset-v1"
-            written = write_synthetic_dataset(self.first, root)
+            progress = []
+            written = write_synthetic_dataset(
+                self.first,
+                root,
+                progress=progress.append,
+            )
             self.assertEqual(written, root)
             self.assertEqual(
                 (root / "manifest.json").read_bytes(),
@@ -87,6 +106,14 @@ class RealSyntheticDatasetPipelineTests(unittest.TestCase):
                     (root / "images" / f"{image.sha256}.png").read_bytes(),
                     image.png,
                 )
+            self.assertEqual(
+                [event["event"] for event in progress],
+                [
+                    "dataset_target_written",
+                    "dataset_image_written",
+                    "dataset_persisted",
+                ],
+            )
             with self.assertRaises(DatasetBuildInputError):
                 write_synthetic_dataset(self.first, root)
 
