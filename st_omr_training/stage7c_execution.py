@@ -163,6 +163,22 @@ class VerifiedBaselineRunResult:
             raise Stage7CExecutionError("verification file hash mismatch")
 
 
+def _model_config_from_evidence(model_payload: dict[str, object]) -> BaselineModelConfig:
+    normalized = dict(model_payload)
+    conv_channels = normalized.get("conv_channels")
+    if not isinstance(conv_channels, list) or len(conv_channels) != 2:
+        raise Stage7CExecutionError(
+            "metrics evidence model conv_channels must be the canonical two-item JSON array"
+        )
+    if any(not isinstance(value, int) or isinstance(value, bool) for value in conv_channels):
+        raise Stage7CExecutionError("metrics evidence model conv_channels contains a non-integer")
+    normalized["conv_channels"] = tuple(conv_channels)
+    try:
+        return BaselineModelConfig(**normalized)
+    except (TypeError, ValueError) as exc:
+        raise Stage7CExecutionError("metrics evidence model configuration was rejected") from exc
+
+
 def _load_and_verify_checkpoint(
     checkpoint_path: Path,
     result: BaselineRunResult,
@@ -174,10 +190,7 @@ def _load_and_verify_checkpoint(
     model_payload = configuration.get("model")
     if not isinstance(model_payload, dict):
         raise Stage7CExecutionError("metrics evidence model configuration is invalid")
-    try:
-        model_config = BaselineModelConfig(**model_payload)
-    except (TypeError, ValueError) as exc:
-        raise Stage7CExecutionError("metrics evidence model configuration was rejected") from exc
+    model_config = _model_config_from_evidence(model_payload)
 
     try:
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
