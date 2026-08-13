@@ -88,6 +88,13 @@ class RuntimeAndModelTests(unittest.TestCase):
             )
         )
 
+        with self.assertRaises(TrainingRuntimeError):
+            model.decode_incremental_step(
+                batch.decoder_input_ids[:, :2],
+                conditioning,
+                hidden,
+            )
+
     def test_nan_input_fails_closed(self) -> None:
         batch = make_batch(DatasetSplit.TRAIN)
         model = build_baseline_model(seed=1)

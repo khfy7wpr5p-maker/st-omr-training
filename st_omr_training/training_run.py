@@ -301,13 +301,19 @@ def _greedy_decode_sample(
     predicted = [BOS_TOKEN_ID]
     model.eval()
     with torch.no_grad():
+        conditioning, hidden = model.begin_incremental_decode(image)
+        current = torch.tensor([[BOS_TOKEN_ID]], dtype=torch.long)
         for _ in range(max_decode_tokens - 1):
-            decoder = torch.tensor([predicted], dtype=torch.long)
-            logits = model(image, decoder)
+            logits, hidden = model.decode_incremental_step(
+                current,
+                conditioning,
+                hidden,
+            )
             next_id = int(torch.argmax(logits[0, -1]).item())
             predicted.append(next_id)
             if next_id == EOS_TOKEN_ID:
                 break
+            current = torch.tensor([[next_id]], dtype=torch.long)
     return tuple(predicted)
 
 

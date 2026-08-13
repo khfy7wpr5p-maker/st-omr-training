@@ -167,9 +167,9 @@ class BaselineSTOMRModel(nn.Module):
         )
         self.output_projection = nn.Linear(config.hidden_dim, VOCABULARY_SIZE)
 
-    def forward(self, images: torch.Tensor, decoder_input_ids: torch.Tensor) -> torch.Tensor:
-        if not isinstance(images, torch.Tensor) or not isinstance(decoder_input_ids, torch.Tensor):
-            raise TrainingRuntimeError("model inputs must be torch tensors")
+    def _validate_images(self, images: object) -> torch.Tensor:
+        if not isinstance(images, torch.Tensor):
+            raise TrainingRuntimeError("model images must be a torch tensor")
         if images.dtype != torch.float32 or images.ndim != 4:
             raise TrainingRuntimeError("images must be float32 [batch, channel, height, width]")
         if (
@@ -178,21 +178,96 @@ class BaselineSTOMRModel(nn.Module):
             or images.shape[3] != self.config.input_width
         ):
             raise TrainingRuntimeError("image tensor shape differs from the frozen model config")
+        assert_finite_tensor("model input images", images)
+        return images
+
+    def _validate_decoder_input_ids(
+        self,
+        decoder_input_ids: object,
+        *,
+        batch_size: int,
+    ) -> torch.Tensor:
+        if not isinstance(decoder_input_ids, torch.Tensor):
+            raise TrainingRuntimeError("decoder input ids must be a torch tensor")
         if decoder_input_ids.dtype != torch.long or decoder_input_ids.ndim != 2:
             raise TrainingRuntimeError("decoder input ids must be rank-2 torch.long")
-        if decoder_input_ids.shape[0] != images.shape[0] or decoder_input_ids.shape[1] < 1:
+        if decoder_input_ids.shape[0] != batch_size or decoder_input_ids.shape[1] < 1:
             raise TrainingRuntimeError("decoder batch shape does not match image batch")
         if bool((decoder_input_ids < 0).any()) or bool((decoder_input_ids >= VOCABULARY_SIZE).any()):
             raise TrainingRuntimeError("decoder input id is outside the frozen vocabulary")
-        assert_finite_tensor("model input images", images)
+        return decoder_input_ids
 
+    def _encode_validated_images(
+        self,
+        images: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         features = self.visual_encoder(images)
         encoded = self.sequence_pool(features).squeeze(2).transpose(1, 2)
         context = encoded.mean(dim=1)
-        hidden0 = torch.tanh(self.context_projection(context)).unsqueeze(0)
-        embedded = self.token_embedding(decoder_input_ids)
+        conditioning = torch.tanh(self.context_projection(context))
+        hidden = conditioning.unsqueeze(0)
+        assert_finite_tensor("model conditioning", conditioning)
+        assert_finite_tensor("model decoder hidden state", hidden)
+        return conditioning, hidden
+
+    def begin_incremental_decode(
+        self,
+        images: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Encode one image batch once and return reusable conditioning plus GRU state."""
+
+        checked_images = self._validate_images(images)
+        return self._encode_validated_images(checked_images)
+
+    def decode_incremental_step(
+        self,
+        decoder_input_ids: torch.Tensor,
+        conditioning: torch.Tensor,
+        hidden: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Decode exactly one token step without recomputing image or token history."""
+
+        if not isinstance(conditioning, torch.Tensor) or not isinstance(hidden, torch.Tensor):
+            raise TrainingRuntimeError("incremental decoder state must contain torch tensors")
+        if (
+            conditioning.dtype != torch.float32
+            or conditioning.ndim != 2
+            or conditioning.shape[1] != self.config.hidden_dim
+        ):
+            raise TrainingRuntimeError("incremental conditioning shape is invalid")
+        if hidden.dtype != torch.float32 or hidden.shape != (
+            1,
+            conditioning.shape[0],
+            self.config.hidden_dim,
+        ):
+            raise TrainingRuntimeError("incremental hidden-state shape is invalid")
+        checked_ids = self._validate_decoder_input_ids(
+            decoder_input_ids,
+            batch_size=conditioning.shape[0],
+        )
+        if checked_ids.shape[1] != 1:
+            raise TrainingRuntimeError("incremental decoding requires exactly one token step")
+        assert_finite_tensor("incremental conditioning", conditioning)
+        assert_finite_tensor("incremental decoder hidden state", hidden)
+
+        embedded = self.token_embedding(checked_ids)
+        conditioned = torch.cat((embedded, conditioning.unsqueeze(1)), dim=-1)
+        decoded, next_hidden = self.decoder(conditioned, hidden)
+        logits = self.output_projection(decoded)
+        assert_finite_tensor("model logits", logits)
+        assert_finite_tensor("incremental decoder hidden state", next_hidden)
+        return logits, next_hidden
+
+    def forward(self, images: torch.Tensor, decoder_input_ids: torch.Tensor) -> torch.Tensor:
+        checked_images = self._validate_images(images)
+        checked_ids = self._validate_decoder_input_ids(
+            decoder_input_ids,
+            batch_size=checked_images.shape[0],
+        )
+        conditioning, hidden0 = self._encode_validated_images(checked_images)
+        embedded = self.token_embedding(checked_ids)
         conditioned = torch.cat(
-            (embedded, hidden0.squeeze(0).unsqueeze(1).expand(-1, embedded.shape[1], -1)),
+            (embedded, conditioning.unsqueeze(1).expand(-1, embedded.shape[1], -1)),
             dim=-1,
         )
         decoded, _hidden = self.decoder(conditioned, hidden0)
