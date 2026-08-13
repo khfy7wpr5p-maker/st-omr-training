@@ -14,6 +14,7 @@ This repository is isolated from the ScoreMosaic production runtime. Its purpose
 - [Synthetic dataset manifest contract](DATASET_CONTRACT.md)
 - [Synthetic Dataset v1 construction contract](DATASET_BUILD_CONTRACT.md)
 - [Baseline ST-OMR training contract](TRAINING_CONTRACT.md)
+- [Stage 7-B training implementation profile](TRAINING_IMPLEMENTATION.md)
 - [Verovio runtime evidence](VEROVIO_RUNTIME_EVIDENCE.md)
 - [Safety and verification rules](SAFETY.md)
 - [Current project status](STATUS.md)
@@ -33,11 +34,11 @@ Completed and merged:
 - Stage 6 — deterministic Synthetic Dataset v1 construction and hash-addressed local persistence;
 - Stage 7-A — Baseline ST-OMR Training Contract Freeze.
 
-Stage 6 merged through PR #17 at `main` commit `7c3c736e6d3755d1bd098e2874d73ce5ed41e39f`, and its post-merge GitHub Actions run #18 (`31674014666`) succeeded. Stage 6 closure documentation then merged through PR #18 at `main` commit `046c9a4e7e41e94b0b4465a2610f30361055a3ed`; post-merge run #20 (`31674836433`) also succeeded.
+Stage 7-A merged through PR #19 at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) succeeded. Its closure/status synchronization then merged through PR #20 at exact `main` commit `6a13760d9d17130ea86636f4828ff1bff035f30d`; post-merge run #24 (`31676871798`) also succeeded. The integrated repository through the Stage 7-A boundary is therefore **CI verified**.
 
-Stage 7-A merged through PR #19 at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) succeeded on that exact commit. The integrated repository through the Stage 7-A contract boundary is therefore **CI verified**.
+Stage 7-B — deterministic tokenizer/data/model/trainer smoke implementation — is the active bounded package on branch `stage-7b-training-smoke`. It selects the exact PyTorch CPU runtime, implements the frozen semantic tokenizer and trusted persisted-data adapter, freezes deterministic no-crop preprocessing, and adds one bounded from-scratch CNN/GRU baseline with train-only CPU smoke updates and validation-only metrics.
 
-Stage 7-B — tokenizer/data/model/trainer implementation — is next but has **not started**. Stage 7-C baseline training remains locked until separately approved. Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration also remain locked.
+Stage 7-B performs **no full baseline training run**. Stage 7-C remains separately locked. Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration also remain locked.
 
 ## Core development rule
 
@@ -47,6 +48,8 @@ All derivatives of one symbolic source remain in one dataset family and one trai
 
 Training may use only Stage 5/6 validated synthetic artifacts. The Stage 6 test split remains sealed throughout Stage 7 and is reserved for the later Stage 9 benchmark decision.
 
-Stage 7-A freezes a compact semantic token target, tokenizer round-trip requirement, from-scratch baseline model boundary, reproducibility controls, resource limits, and validation-only metrics. It adds no tokenizer/model/trainer implementation and performs no real training.
+Stage 7-B uses only the compact frozen semantic target surface defined by Stage 7-A. The data path re-checks persisted Stage 6 hashes and token semantic round trips before a train/validation sample becomes eligible. `DatasetSplit.TEST` is rejected by the Stage 7-B adapter and batch boundary.
+
+The selected baseline is initialized from scratch and uses no pretrained model, external OCR/OMR teacher, LLM, or network-dependent label source. GitHub-hosted CI is limited to bounded CPU smoke evidence; the real Stage 7-C baseline run remains a separate approval gate.
 
 Large datasets, model checkpoints, real user documents, private material, and rights-unclear score collections are not normal Git repository content.

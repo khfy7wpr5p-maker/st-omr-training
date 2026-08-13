@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ST-OMR derived training artifacts
+checkpoints/
+training-runs/
+*.pt
+*.pth
+*.ckpt
