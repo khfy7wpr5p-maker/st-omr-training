@@ -274,11 +274,14 @@ def validate_quarantine_record(record: object, *, path: str = "sample") -> RealD
 
 
 def validate_real_data_sample(record: object, *, path: str = "sample") -> RealDataValidationResult:
-    """Validate one training-eligible Stage 8 real-data metadata record."""
+    """Validate one train/validation-eligible Stage 8 real-data metadata record."""
 
     issues: list[RealDataValidationIssue] = []
     if not isinstance(record, RealDataSample):
         return _sorted_result([_issue("sample.type", path, "sample must be RealDataSample")])
+
+    if record.split is RealDataSplit.TEST:
+        issues.append(_issue("test.sealed", f"{path}.split", "test sample metadata is not Stage 8 development-eligible"))
 
     expected_id = real_data_sample_id(
         family_id=record.family_id,
@@ -335,7 +338,7 @@ def validate_real_data_sample(record: object, *, path: str = "sample") -> RealDa
 
 
 def validate_real_data_manifest(manifest: object) -> RealDataValidationResult:
-    """Validate admitted real-data metadata and veto duplicate/split leakage."""
+    """Validate admitted train/validation metadata and veto duplicate/split leakage."""
 
     issues: list[RealDataValidationIssue] = []
     if not isinstance(manifest, RealDataManifest):
