@@ -257,7 +257,7 @@ Stage 6 does not add training logic, real/user data ingestion, teacher-correctio
 
 ## Stage 7 baseline-training boundary
 
-Stage 7 is governed by [TRAINING_CONTRACT.md](TRAINING_CONTRACT.md). The concrete closed Stage 7-B implementation profile is recorded in [TRAINING_IMPLEMENTATION.md](TRAINING_IMPLEMENTATION.md).
+Stage 7 is governed by [TRAINING_CONTRACT.md](TRAINING_CONTRACT.md). The closed Stage 7-B implementation profile is recorded in [TRAINING_IMPLEMENTATION.md](TRAINING_IMPLEMENTATION.md), and the active Stage 7-C execution profile is recorded in [STAGE7C_RUNBOOK.md](STAGE7C_RUNBOOK.md).
 
 Stage 7 is decomposed so the contract, implementation, and actual baseline run cannot be silently combined:
 
@@ -271,7 +271,7 @@ Stage 7-C Bounded baseline training run + evidence
 Stage 9 sealed-test benchmark gate
 ```
 
-Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the next package but has **not started**.
+Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the active bounded package on `stage-7c-baseline-run` / draft PR #23. Its orchestrator, incremental grammar-constrained decoder, heartbeat surface, evidence gate, and bounded regressions are implemented; corrected authoritative run evidence remains the active gate.
 
 ### Training input
 
@@ -293,17 +293,38 @@ Stage 7-B selects exact `torch==2.13.0+cpu` and implements one from-scratch CNN 
 
 The V1 outer model ceiling remains 25,000,000 trainable parameters and is enforced at construction. Stage 7-B also freezes PAD-masked token cross-entropy, AdamW, no scheduler, gradient clipping, train-only parameter updates, validation-only loss evaluation, deterministic CPU RNG/thread policy, and NaN/Infinity fail-closed checks.
 
+Stage 7-C reuses this exact model/trainer surface. It does not add a second architecture, external teacher, hidden augmentation path, or test-driven optimization path.
+
+### Stage 7-C execution boundary
+
+The first real baseline run is implemented by `st_omr_training/training_run.py` under the tighter execution policy in `STAGE7C_RUNBOOK.md`.
+
+The run:
+
+- uses only Stage 7-B-admitted train and validation samples;
+- keeps fixed deterministic sample ordering;
+- records deterministic untrained validation loss before optimization;
+- selects exactly one checkpoint by minimum validation loss;
+- requires the best trained validation loss to be strictly lower than the untrained baseline;
+- performs bounded incremental greedy validation decoding constrained to the frozen supported-V1 grammar and exact eight-measure profile;
+- reports token error rate, exact sequence accuracy, detokenization success, semantic validity, and MusicXML regeneration validity;
+- requires at least one semantically valid validation prediction;
+- writes hash-addressed checkpoint and canonical metrics/provenance artifacts;
+- uses a fresh run directory with explicit `INCOMPLETE`/`COMPLETE` state and no silent resume.
+
 ### Split and evaluation boundary
 
 Only the `train` split may update parameters. Only `validation` may select checkpoints and supply Stage 7 development metrics. The Stage 6 `test` split remains sealed until Stage 9 and cannot influence Stage 7 architecture, optimization, thresholds, or checkpoint choice.
 
-Stage 7-C must record validation loss, token error rate, exact sequence accuracy, detokenization success, semantic-validity rate, and MusicXML regeneration validity. These metrics establish trainability and evidence only; Stage 9 owns production-candidate thresholds and sealed-test decisions.
+Stage 7-C records validation loss, token error rate, exact sequence accuracy, detokenization success, semantic-validity rate, and MusicXML regeneration validity. These metrics establish trainability and evidence only; Stage 9 owns production-candidate thresholds and sealed-test decisions.
+
+The decoding constraint is an inference-time state machine over the existing 35-token vocabulary. It enforces measure order, meter capacity, event/duration structure, pitch-field order, accidental coherence, chord-pitch uniqueness, the frozen eight-measure count, and terminal `EOS`. It masks invalid next-token logits but does not inspect validation targets, introduce a recognition teacher, change model parameters, or access the sealed test split.
 
 ### Reproducibility and artifact boundary
 
-Every real Stage 7-C run must record repository SHA, dataset build identity, manifest SHA, configuration/tokenizer/model fingerprints, dependency/runtime/device identity, all seeds, parameter count, checkpoint SHA-256, and metrics SHA-256. Checkpoints are hash-addressed derived artifacts and remain outside normal Git content.
+Every real Stage 7-C run records repository SHA, dataset build identity, manifest SHA, run/tokenizer/preprocess/model/trainer fingerprints, dependency/runtime/device identity, seeds, parameter count, epoch/step counts, checkpoint SHA-256, and metrics SHA-256. Checkpoints are hash-addressed derived artifacts and remain outside normal Git content.
 
-Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact verified CPU runtime. GitHub-hosted CI remains limited to bounded smoke training. Full Stage 7-C training does not run in ordinary repository CI.
+Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact verified CPU runtime. Ordinary GitHub-hosted CI remains limited to bounded smoke/contract testing. Draft PR #23 permits one exact-head exception only after a full-length incremental-decode and representative frozen-workload benchmark passes a conservative 2×/four-hour safety gate.
 
 ## Verification boundary
 
@@ -319,7 +340,9 @@ Stage 7-A PR merge candidate from source head `0eca1d881c494c763692aa72b1092d741
 
 Stage 7-B final source head `a8ad8bc9f14953f0ed35ef5a5a8275be69af5ebd` against exact base `6a13760d9d17130ea86636f4828ff1bff035f30d` passed GitHub Actions run #30 (`31679413312`) on GitHub-generated PR merge candidate `3d5ee4e2ca479614e2a3322e0339ca21f25e5cae` with **336/336 tests**, pinned runtime verification including `torch==2.13.0+cpu`, `pip check`, missing-`EOS` regression coverage, deterministic CPU smoke evidence, and compile validation. PR #21 then merged at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`; post-merge GitHub Actions run #31 (`31679810478`) passed on that exact commit with **336/336 tests**.
 
-The integrated repository through the Stage 7-B implementation boundary is therefore `CI VERIFIED`. Stage 7-C remains not started and requires its own bounded training/evidence package and explicit approval.
+Stage 7-B closure documentation squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) passed on that exact SHA. This commit is the verified Stage 7-C base.
+
+The integrated repository through the Stage 7-B implementation and closure-documentation boundary is therefore `CI VERIFIED`. Stage 7-C is active on draft PR #23 but is not merge-ready until both hosted PR verification and the separate real pinned-CPU run evidence are complete.
 
 ## Stage roadmap
 
@@ -337,7 +360,7 @@ Stage 5   Dataset validation                            ✅ CLOSED — CI VERIFI
 Stage 6   Synthetic Dataset v1                          ✅ CLOSED — CI VERIFIED
 Stage 7-A Baseline training contract freeze             ✅ CLOSED — CI VERIFIED
 Stage 7-B Tokenizer/data/model/trainer implementation   ✅ CLOSED — CI VERIFIED
-Stage 7-C Bounded baseline training run + evidence      ⏭ NEXT — NOT STARTED
+Stage 7-C Bounded baseline training run + evidence      🔄 ACTIVE — DRAFT PR #23
 Stage 8   Real-data fine-tuning                         🔒
 Stage 9   Benchmark and candidate decision              🔒
 Stage 10  ScoreMosaic candidate integration             🔒

@@ -62,6 +62,39 @@ class RuntimeAndModelTests(unittest.TestCase):
         self.assertEqual(tuple(logits.shape[:2]), tuple(batch.labels.shape))
         self.assertTrue(bool(torch.isfinite(logits).all()))
 
+    def test_incremental_decode_matches_full_sequence_logits(self) -> None:
+        batch = make_batch(DatasetSplit.TRAIN)
+        model = build_baseline_model(seed=314)
+        model.eval()
+
+        with torch.no_grad():
+            expected = model(batch.images, batch.decoder_input_ids)
+            conditioning, hidden = model.begin_incremental_decode(batch.images)
+            observed_steps = []
+            for index in range(batch.decoder_input_ids.shape[1]):
+                step_logits, hidden = model.decode_incremental_step(
+                    batch.decoder_input_ids[:, index : index + 1],
+                    conditioning,
+                    hidden,
+                )
+                observed_steps.append(step_logits)
+            observed = torch.cat(observed_steps, dim=1)
+
+        torch.testing.assert_close(observed, expected, rtol=1e-6, atol=1e-7)
+        self.assertTrue(
+            torch.equal(
+                torch.argmax(observed, dim=-1),
+                torch.argmax(expected, dim=-1),
+            )
+        )
+
+        with self.assertRaises(TrainingRuntimeError):
+            model.decode_incremental_step(
+                batch.decoder_input_ids[:, :2],
+                conditioning,
+                hidden,
+            )
+
     def test_nan_input_fails_closed(self) -> None:
         batch = make_batch(DatasetSplit.TRAIN)
         model = build_baseline_model(seed=1)
