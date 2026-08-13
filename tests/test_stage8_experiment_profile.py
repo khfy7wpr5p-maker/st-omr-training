@@ -20,6 +20,7 @@ from st_omr_training.real_data_contract import (
 from st_omr_training.stage8_experiment_profile import (
     Stage8Candidate,
     Stage8ExperimentBinding,
+    Stage8ManifestSummary,
     Stage8PairedRunProfile,
     Stage8ProfileError,
     make_stage8_candidate_binding,
@@ -98,6 +99,12 @@ class Stage8PairedProfileTests(unittest.TestCase):
         self.assertEqual(profile.device, "cpu")
         self.assertEqual(profile.cpu_threads, 1)
         self.assertEqual(profile.retained_checkpoints, 1)
+        self.assertEqual(profile.validation_cadence, "every-epoch")
+        self.assertEqual(
+            profile.acceptance_policy,
+            "best-validation-loss-strictly-below-preupdate-v1",
+        )
+        self.assertEqual(profile.numeric_policy, "finite-fail-closed-v1")
 
     def test_profile_drift_fails_closed(self) -> None:
         with self.assertRaises(Stage8ProfileError):
@@ -106,6 +113,12 @@ class Stage8PairedProfileTests(unittest.TestCase):
             Stage8PairedRunProfile(device="cuda")
         with self.assertRaises(Stage8ProfileError):
             Stage8PairedRunProfile(model_config=BaselineModelConfig(hidden_dim=128))
+        with self.assertRaises(Stage8ProfileError):
+            Stage8PairedRunProfile(validation_cadence="final-only")
+        with self.assertRaises(Stage8ProfileError):
+            Stage8PairedRunProfile(acceptance_policy="accept-any-finite-run")
+        with self.assertRaises(Stage8ProfileError):
+            Stage8PairedRunProfile(numeric_policy="allow-nan")
 
     def test_profile_fingerprint_is_deterministic(self) -> None:
         first = stage8_paired_profile_fingerprint()
@@ -126,6 +139,28 @@ class Stage8PairedProfileTests(unittest.TestCase):
             summarize_stage8_pilot_manifest(_manifest(train_count=39, validation_count=10))
         with self.assertRaises(Stage8ProfileError):
             summarize_stage8_pilot_manifest(_manifest(train_count=40, validation_count=11))
+
+    def test_manifest_summary_fails_closed_on_tampered_bounds(self) -> None:
+        with self.assertRaises(Stage8ProfileError):
+            Stage8ManifestSummary(
+                manifest_sha256=_digest("manifest"),
+                train_samples=39,
+                validation_samples=10,
+                train_families=39,
+                validation_families=10,
+            )
+        with self.assertRaises(Stage8ProfileError):
+            Stage8ManifestSummary(
+                manifest_sha256=_digest("manifest"),
+                train_samples=40,
+                validation_samples=10,
+                train_families=41,
+                validation_families=10,
+            )
+
+    def test_manifest_summary_requires_profile_type(self) -> None:
+        with self.assertRaises(TypeError):
+            summarize_stage8_pilot_manifest(_manifest(), profile=object())
 
     def test_receipt_set_is_order_independent_and_exactly_50(self) -> None:
         receipts = tuple(_digest(f"receipt-{index}") for index in range(50))
