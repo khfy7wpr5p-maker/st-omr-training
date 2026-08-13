@@ -257,7 +257,7 @@ Stage 6 does not add training logic, real/user data ingestion, teacher-correctio
 
 ## Stage 7 baseline-training boundary
 
-Stage 7 is governed by [TRAINING_CONTRACT.md](TRAINING_CONTRACT.md).
+Stage 7 is governed by [TRAINING_CONTRACT.md](TRAINING_CONTRACT.md). The concrete closed Stage 7-B implementation profile is recorded in [TRAINING_IMPLEMENTATION.md](TRAINING_IMPLEMENTATION.md).
 
 Stage 7 is decomposed so the contract, implementation, and actual baseline run cannot be silently combined:
 
@@ -271,25 +271,27 @@ Stage 7-C Bounded baseline training run + evidence
 Stage 9 sealed-test benchmark gate
 ```
 
-Stage 7-A is closed and exact-main CI verified. Stage 7-B is the next package but has not started.
+Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the next package but has **not started**.
 
 ### Training input
 
 Stage 7 accepts only exact Stage 6 persisted PNG/MusicXML artifacts whose manifest and hashes pass the existing Stage 5/6 gates. Loose files and bypass inputs are prohibited.
 
-The input tensor is the verified Stage 4 final grayscale PNG. Preprocessing must be deterministic, aspect-ratio preserving, crop-free, and free of hidden/random Stage 7 augmentation. Appearance variability belongs to Stage 4.
+The implemented Stage 7-B adapter revalidates the persisted Stage 6 manifest/build metadata, target/image hashes, PNG structure/dimensions, and semantic target round trip before train/validation admission. The Stage 6 `test` split is rejected at the Stage 7-B data and batch boundaries.
+
+The input tensor is the verified Stage 4 final grayscale PNG. Stage 7-B freezes deterministic 1×64×512 grayscale fit/no-upscale/no-crop/center-white-pad preprocessing. No hidden/random Stage 7 augmentation is used; appearance variability belongs to Stage 4.
 
 ### Training target
 
-The baseline does not learn raw XML text as the primary target. Stage 7-B must produce a finite deterministic semantic `ST-OMR V1 token sequence` from the independently parsed supported-V1 projection. The token vocabulary covers measure boundaries, meter, note/rest/chord type, V1 duration, chord size/member order, step, alter, octave, and display-accidental intent.
+The baseline does not learn raw XML text as the primary target. Stage 7-B implements the finite deterministic 35-token `ST-OMR V1 token sequence` derived from the independently parsed supported-V1 projection. The token vocabulary covers measure boundaries, meter, note/rest/chord type, V1 duration, chord size/member order, step, alter, octave, and display-accidental intent.
 
-Tokenizer output must independently detokenize back to an exactly equal supported-V1 semantic projection before a sample can become training-eligible.
+Tokenizer output independently detokenizes back to an exactly equal supported-V1 semantic projection before a sample can become training-eligible. Accepted semantic sequences must consume a real `EOS`; EOF without `EOS` and tokens after `EOS` fail closed.
 
 ### Model boundary
 
-Stage 7-B may implement one from-scratch visual-encoder/sequence-decoder baseline only. It may not use an ensemble, external pretrained weights, hidden OCR/OMR teacher labels, network-dependent inference, Audiveris/Scan2Notes output, an LLM, or another recognition engine as part of training.
+Stage 7-B selects exact `torch==2.13.0+cpu` and implements one from-scratch CNN visual encoder plus context-conditioned GRU decoder. It uses no ensemble, external pretrained weights, hidden OCR/OMR teacher labels, network-dependent inference, Audiveris/Scan2Notes output, LLM, or another recognition engine as part of training.
 
-The V1 outer model ceiling is 25,000,000 trainable parameters. Concrete framework choice is deliberately not frozen in Stage 7-A; Stage 7-B must separately review current supported runtimes and pin the selected framework before implementation.
+The V1 outer model ceiling remains 25,000,000 trainable parameters and is enforced at construction. Stage 7-B also freezes PAD-masked token cross-entropy, AdamW, no scheduler, gradient clipping, train-only parameter updates, validation-only loss evaluation, deterministic CPU RNG/thread policy, and NaN/Infinity fail-closed checks.
 
 ### Split and evaluation boundary
 
@@ -299,9 +301,9 @@ Stage 7-C must record validation loss, token error rate, exact sequence accuracy
 
 ### Reproducibility and artifact boundary
 
-Every run records repository SHA, dataset build identity, manifest SHA, configuration/tokenizer/model fingerprints, dependency/runtime/device identity, all seeds, parameter count, checkpoint SHA-256, and metrics SHA-256. Checkpoints are hash-addressed derived artifacts and remain outside normal Git content.
+Every real Stage 7-C run must record repository SHA, dataset build identity, manifest SHA, configuration/tokenizer/model fingerprints, dependency/runtime/device identity, all seeds, parameter count, checkpoint SHA-256, and metrics SHA-256. Checkpoints are hash-addressed derived artifacts and remain outside normal Git content.
 
-GitHub-hosted CI is limited to bounded smoke training in Stage 7-B. Full Stage 7-C training does not run in ordinary repository CI.
+Stage 7-B demonstrated same-seed deterministic CPU smoke replay for the exact verified CPU runtime. GitHub-hosted CI remains limited to bounded smoke training. Full Stage 7-C training does not run in ordinary repository CI.
 
 ## Verification boundary
 
@@ -313,9 +315,11 @@ Stage 5-A merged through PR #15 at exact `main` commit `d677f3d27ac710c56c5ce677
 
 Stage 6 final PR head `cfd0ac780595a38e0fe041d2d70293b39f96fcf3` passed GitHub Actions run #17 (`31673631608`) with **309/309 tests**, pinned runtime verification, real Stage 1→6 integration/rebuild/persistence tests, `pip check`, and compile validation. PR #17 then merged at exact `main` commit `7c3c736e6d3755d1bd098e2874d73ce5ed41e39f`; post-merge run #18 (`31674014666`) passed on that exact commit. Stage 6 closure documentation merged through PR #18 at exact `main` commit `046c9a4e7e41e94b0b4465a2610f30361055a3ed`; post-merge run #20 (`31674836433`) also passed.
 
-Stage 7-A PR merge candidate from source head `0eca1d881c494c763692aa72b1092d741c32be83` against exact base `046c9a4e7e41e94b0b4465a2610f30361055a3ed` passed GitHub Actions run #21 (`31675330236`) with **309/309 tests**, pinned runtime verification, `pip check`, and compile validation. PR #19 then merged at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) passed on that exact commit.
+Stage 7-A PR merge candidate from source head `0eca1d881c494c763692aa72b1092d741c32be83` against exact base `046c9a4e7e41e94b0b4465a2610f30361055a3ed` passed GitHub Actions run #21 (`31675330236`) with **309/309 tests**, pinned runtime verification, `pip check`, and compile validation. PR #19 then merged at exact `main` commit `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge GitHub Actions run #22 (`31675913632`) passed on that exact commit. Stage 7-A closure synchronization merged through PR #20 at exact `main` commit `6a13760d9d17130ea86636f4828ff1bff035f30d`; post-merge run #24 (`31676871798`) passed.
 
-The integrated repository through the Stage 7-A contract boundary is therefore `CI VERIFIED`. Stage 7-B remains not started and requires its own bounded implementation package, review, CI evidence, and separate merge approval.
+Stage 7-B final source head `a8ad8bc9f14953f0ed35ef5a5a8275be69af5ebd` against exact base `6a13760d9d17130ea86636f4828ff1bff035f30d` passed GitHub Actions run #30 (`31679413312`) on GitHub-generated PR merge candidate `3d5ee4e2ca479614e2a3322e0339ca21f25e5cae` with **336/336 tests**, pinned runtime verification including `torch==2.13.0+cpu`, `pip check`, missing-`EOS` regression coverage, deterministic CPU smoke evidence, and compile validation. PR #21 then merged at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`; post-merge GitHub Actions run #31 (`31679810478`) passed on that exact commit with **336/336 tests**.
+
+The integrated repository through the Stage 7-B implementation boundary is therefore `CI VERIFIED`. Stage 7-C remains not started and requires its own bounded training/evidence package and explicit approval.
 
 ## Stage roadmap
 
@@ -332,8 +336,8 @@ Stage 5-A Dataset contract + manifest validator         ✅
 Stage 5   Dataset validation                            ✅ CLOSED — CI VERIFIED
 Stage 6   Synthetic Dataset v1                          ✅ CLOSED — CI VERIFIED
 Stage 7-A Baseline training contract freeze             ✅ CLOSED — CI VERIFIED
-Stage 7-B Tokenizer/data/model/trainer implementation   ⏭ NEXT — NOT STARTED
-Stage 7-C Bounded baseline training run + evidence      🔒
+Stage 7-B Tokenizer/data/model/trainer implementation   ✅ CLOSED — CI VERIFIED
+Stage 7-C Bounded baseline training run + evidence      ⏭ NEXT — NOT STARTED
 Stage 8   Real-data fine-tuning                         🔒
 Stage 9   Benchmark and candidate decision              🔒
 Stage 10  ScoreMosaic candidate integration             🔒
