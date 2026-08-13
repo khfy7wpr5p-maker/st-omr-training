@@ -53,6 +53,7 @@ class FrozenTrainingProfileTests(unittest.TestCase):
         self.assertEqual(config.max_train_samples, 1024)
         self.assertEqual(config.max_validation_samples, 256)
         self.assertEqual(config.max_decode_tokens, 1536)
+        self.assertEqual(config.decode_measure_count, 8)
         self.assertEqual(config.retained_checkpoints, 1)
         self.assertEqual(
             STAGE7C_FROZEN_RUN_FINGERPRINT,

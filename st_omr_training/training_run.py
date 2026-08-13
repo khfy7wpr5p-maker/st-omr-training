@@ -22,6 +22,7 @@ from .core import (
     RationalDuration,
     RestEvent,
 )
+from .decoding_constraints import SemanticDecodeConstraint
 from .dataset_builder import SyntheticDatasetBuild
 from .dataset_manifest import DatasetSplit
 from .musicxml_validator import validate_musicxml
@@ -130,6 +131,7 @@ class BaselineRunConfig:
     max_train_samples: int = 1024
     max_validation_samples: int = 256
     max_decode_tokens: int = 512
+    decode_measure_count: int = 8
     retained_checkpoints: int = 1
 
     def __post_init__(self) -> None:
@@ -139,6 +141,7 @@ class BaselineRunConfig:
             ("max_train_samples", self.max_train_samples, 1, 1024),
             ("max_validation_samples", self.max_validation_samples, 1, 1024),
             ("max_decode_tokens", self.max_decode_tokens, 8, 4096),
+            ("decode_measure_count", self.decode_measure_count, 1, 64),
         )
         for name, value, lower, upper in bounds:
             if not _is_plain_int(value) or not lower <= value <= upper:
@@ -323,6 +326,7 @@ def _greedy_decode_sample(
     *,
     preprocess_config: InputPreprocessConfig,
     max_decode_tokens: int,
+    measure_count: int = 8,
 ) -> tuple[int, ...]:
     image = load_image_tensor(sample, preprocess_config).unsqueeze(0).cpu()
     predicted = [BOS_TOKEN_ID]
@@ -330,13 +334,18 @@ def _greedy_decode_sample(
     with torch.no_grad():
         conditioning, hidden = model.begin_incremental_decode(image)
         current = torch.tensor([[BOS_TOKEN_ID]], dtype=torch.long)
+        constraint = SemanticDecodeConstraint(measure_count=measure_count)
         for _ in range(max_decode_tokens - 1):
             logits, hidden = model.decode_incremental_step(
                 current,
                 conditioning,
                 hidden,
             )
-            next_id = int(torch.argmax(logits[0, -1]).item())
+            allowed_ids = constraint.allowed_token_ids()
+            allowed_logits = logits[0, -1, list(allowed_ids)]
+            selected_index = int(torch.argmax(allowed_logits).item())
+            next_id = allowed_ids[selected_index]
+            constraint.advance(next_id)
             predicted.append(next_id)
             if next_id == EOS_TOKEN_ID:
                 break
@@ -426,6 +435,7 @@ def _evaluate_predictions(
     *,
     preprocess_config: InputPreprocessConfig,
     max_decode_tokens: int,
+    measure_count: int = 8,
     progress: ProgressCallback | None = None,
 ) -> PredictionMetrics:
     total_edits = 0
@@ -442,6 +452,7 @@ def _evaluate_predictions(
                 sample,
                 preprocess_config=preprocess_config,
                 max_decode_tokens=max_decode_tokens,
+                measure_count=measure_count,
             )
             target = sample.target_token_ids
             predicted_surface = predicted[1:]
@@ -772,6 +783,7 @@ def run_baseline_training(
         validation_samples,
         preprocess_config=preprocess_config,
         max_decode_tokens=run_config.max_decode_tokens,
+        measure_count=run_config.decode_measure_count,
         progress=progress,
     )
     _report_progress(
