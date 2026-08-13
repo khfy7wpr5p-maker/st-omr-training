@@ -2,7 +2,7 @@
 
 Safe training and synthetic-data laboratory for ST-OMR: canonical music generation, MusicXML serialization and validation, deterministic notation rendering, controlled degradation, dataset validation/construction, training, and evaluation.
 
-This repository is isolated from the ScoreMosaic production runtime. Its purpose is to build traceable synthetic OMR training data, train candidate ST-OMR models, and evaluate them before any later integration decision.
+This repository is isolated from the ScoreMosaic production runtime. Its purpose is to build traceable OMR training data, train candidate ST-OMR models, and evaluate them before any later integration decision.
 
 ## Project documents
 
@@ -17,6 +17,7 @@ This repository is isolated from the ScoreMosaic production runtime. Its purpose
 - [Stage 7-B training implementation profile](TRAINING_IMPLEMENTATION.md)
 - [Stage 7-C bounded run profile](STAGE7C_RUNBOOK.md)
 - [Stage 7-C accepted evidence](STAGE7C_EVIDENCE.md)
+- [Stage 8-0 real-data and fine-tuning contract](STAGE8_REAL_DATA_CONTRACT.md)
 - [Verovio runtime evidence](VEROVIO_RUNTIME_EVIDENCE.md)
 - [Safety and verification rules](SAFETY.md)
 - [Current project status](STATUS.md)
@@ -38,24 +39,22 @@ Completed and merged:
 - Stage 7-B — deterministic tokenizer/data/model/trainer smoke implementation;
 - Stage 7-C — bounded synthetic-only baseline training run and accepted evidence.
 
-Stage 7-B merged through PR #21 at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`. Its closure documentation then squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) succeeded on that exact SHA. The integrated repository through Stage 7-B is therefore **main CI verified**.
+Stage 7-C merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. Its closure synchronization merged through PR #24 to `main` `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) succeeded. Stage 7 is therefore **closed and main CI verified**.
 
-Stage 7-C merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. GitHub Actions run #67 (`31691794239`) passed the source head with **361/361 tests**, the guarded benchmark, and the authoritative 40-epoch synthetic-only run. Post-merge run #68 (`31692849892`) then passed **361/361 tests** on the exact `main` commit. The accepted hashes, metrics, provenance, and limitations are recorded in `STAGE7C_EVIDENCE.md`. Stage 7 is therefore **closed and main CI verified**.
+Stage 8-0 — Real Data & Fine-Tuning Contract Freeze — is the only active development scope in this package. It defines rights/provenance, quarantine/admission, image–MusicXML pairing, duplicate/leakage, sealed-test, experiment-candidate, and ScoreMosaic isolation rules. It does **not** ingest real data or run fine-tuning. Stage 8-1+ execution, Stage 9, and Stage 10 remain locked.
 
-Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
+The Stage 7-C checkpoint artifact `9177923796` is temporary and is scheduled to expire on 2026-09-12. The exact checkpoint identity is the recorded SHA-256, not the artifact location. Stage 8-0 does not move or republish it.
+
+The Stage 7-C model remains a trainability baseline rather than a production candidate: exact sequence accuracy is 0% and token error rate is approximately 80.5% on its validation evidence.
 
 ## Core development rule
 
 Each stage stays isolated behind explicit contracts and validation gates. Symbolic musical ground truth remains authoritative; rendering and visual degradation are derived artifacts and must never silently modify target notation semantics.
 
-All derivatives of one symbolic source remain in one dataset family and one train/validation/test split. Builders never validate themselves by assertion; independent validation remains a veto gate.
+All derivatives of one symbolic or real-source family remain in one dataset family and one train/validation/test split. Builders never validate themselves by assertion; independent validation remains a veto gate.
 
-Training may use only Stage 5/6 validated synthetic artifacts. The Stage 6 test split remains sealed throughout Stage 7 and is reserved for the later Stage 9 benchmark decision.
+Stage 7 training used only Stage 5/6 validated synthetic artifacts. Stage 8 real data, if later admitted, must pass the separate Stage 8-0 contract before any train/validation loader can see it. Both synthetic and real held-out test partitions remain sealed until the Stage 9 benchmark gate.
 
-Stage 7-B uses only the compact frozen semantic target surface defined by Stage 7-A. The data path re-checks persisted Stage 6 hashes and token semantic round trips before a train/validation sample becomes eligible. `DatasetSplit.TEST` is rejected by the Stage 7-B adapter and batch boundary. Accepted semantic token sequences must consume a real `EOS`; EOF without `EOS` fails closed.
-
-Stage 7-C reuses the same from-scratch CNN/GRU baseline, tokenizer, trusted data adapter, deterministic preprocessing, optimizer/loss policy, and exact `torch==2.13.0+cpu` runtime. It adds only the bounded real-run orchestration, grammar-constrained greedy inference, validation metrics, selected-checkpoint handling, and auditable provenance/evidence surface defined in `STAGE7C_RUNBOOK.md`. The inference constraint masks invalid next-token choices; it does not use validation targets, an external teacher, or the sealed test split.
-
-The selected baseline uses no pretrained model, external OCR/OMR teacher, LLM, or network-dependent label source. The one-shot PR #23 benchmark/training exception has been retired from the workflow; ordinary GitHub-hosted CI again contains only the bounded regression/runtime/compile gate.
+ScoreMosaic user uploads and teacher corrections are not automatic training data. User-derived material requires separate explicit training permission and the full quarantine/admission process. There is no online or automatic learning path, and no Stage 8 output may enter ScoreMosaic before Stage 9 candidate-quality evidence and the later Stage 10 integration gate.
 
 Large datasets, model checkpoints, real user documents, private material, and rights-unclear score collections are not normal Git repository content.
