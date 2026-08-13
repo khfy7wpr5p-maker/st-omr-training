@@ -106,6 +106,9 @@ def _canonical_json_bytes(payload: object) -> bytes:
 
 
 def intake_policy_fingerprint() -> str:
+    # Sample-level receipt identity binds byte/semantic/perceptual semantics.
+    # Corpus-level search budgets are fail-closed operational guardrails and do
+    # not change the identity of an already validated sample receipt.
     payload = {
         "intake_version": STAGE8_INTAKE_VERSION,
         "semantic_fingerprint_version": STAGE8_SEMANTIC_FINGERPRINT_VERSION,
@@ -120,8 +123,6 @@ def intake_policy_fingerprint() -> str:
         "perceptual_comparison": "left-greater-than-right",
         "near_duplicate_max_hamming_distance": NEAR_DUPLICATE_MAX_HAMMING_DISTANCE,
         "near_duplicate_segment_widths": list(_DHASH_SEGMENT_WIDTHS),
-        "max_near_duplicate_comparisons": MAX_NEAR_DUPLICATE_COMPARISONS,
-        "max_near_duplicate_results": MAX_NEAR_DUPLICATE_RESULTS,
         "tokenizer_fingerprint": tokenizer_fingerprint(),
     }
     return sha256(_canonical_json_bytes(payload)).hexdigest()
@@ -412,12 +413,7 @@ def _hamming_distance64(left: str, right: str) -> int:
 
 
 def _dhash_segment_keys(value_hex: str) -> tuple[tuple[int, int], ...]:
-    """Return five disjoint dHash chunks used for radius-4 candidate indexing.
-
-    With five chunks, any two 64-bit values at Hamming distance <= 4 must share
-    at least one unchanged chunk (pigeonhole principle). Exact Hamming distance
-    is still checked before a candidate is emitted.
-    """
+    """Return five disjoint dHash chunks used for radius-4 candidate indexing."""
 
     value = int(value_hex, 16)
     remaining = 64
