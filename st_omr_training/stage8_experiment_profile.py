@@ -41,6 +41,9 @@ PILOT_DECODE_MEASURES: Final[int] = 8
 PILOT_RETAINED_CHECKPOINTS: Final[int] = 1
 PILOT_MAX_SECONDS_PER_CANDIDATE: Final[int] = 1800
 PILOT_MAX_TOTAL_SECONDS: Final[int] = 3600
+PILOT_VALIDATION_CADENCE: Final[str] = "every-epoch"
+PILOT_ACCEPTANCE_POLICY: Final[str] = "best-validation-loss-strictly-below-preupdate-v1"
+PILOT_NUMERIC_POLICY: Final[str] = "finite-fail-closed-v1"
 PILOT_METRICS: Final[tuple[str, ...]] = (
     "validation_loss",
     "token_error_rate",
@@ -67,8 +70,20 @@ def _hex64(name: str, value: object) -> str:
     return value
 
 
+def _positive_plain_int(name: str, value: object) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise Stage8ProfileError(f"{name} must be a positive integer")
+    return value
+
+
 def _canonical_json_bytes(payload: object) -> bytes:
-    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("ascii")
+    return json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("ascii")
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +103,9 @@ class Stage8PairedRunProfile:
     split_policy: str = "exact-40-train-10-validation-family-exclusive-v1"
     checkpoint_selection: str = "min_validation_loss"
     data_order: str = "canonical-sample-id-order-v1"
+    validation_cadence: str = PILOT_VALIDATION_CADENCE
+    acceptance_policy: str = PILOT_ACCEPTANCE_POLICY
+    numeric_policy: str = PILOT_NUMERIC_POLICY
     metrics: tuple[str, ...] = PILOT_METRICS
     model_config: BaselineModelConfig = BaselineModelConfig()
     trainer_config: TrainerConfig = TrainerConfig()
@@ -114,14 +132,19 @@ class Stage8PairedRunProfile:
                 raise Stage8ProfileError(f"{name} is frozen to {expected}")
         if self.train_samples + self.validation_samples != self.total_samples:
             raise Stage8ProfileError("train/validation counts must sum to total_samples")
-        if self.device != "cpu":
-            raise Stage8ProfileError("first Stage 8 paired pilot is CPU-only")
-        if self.split_policy != "exact-40-train-10-validation-family-exclusive-v1":
-            raise Stage8ProfileError("split_policy is frozen")
-        if self.checkpoint_selection != "min_validation_loss":
-            raise Stage8ProfileError("checkpoint_selection is frozen")
-        if self.data_order != "canonical-sample-id-order-v1":
-            raise Stage8ProfileError("data_order is frozen")
+        expected_text = {
+            "device": "cpu",
+            "split_policy": "exact-40-train-10-validation-family-exclusive-v1",
+            "checkpoint_selection": "min_validation_loss",
+            "data_order": "canonical-sample-id-order-v1",
+            "validation_cadence": PILOT_VALIDATION_CADENCE,
+            "acceptance_policy": PILOT_ACCEPTANCE_POLICY,
+            "numeric_policy": PILOT_NUMERIC_POLICY,
+            "profile_version": STAGE8_PAIRED_PROFILE_VERSION,
+        }
+        for name, expected in expected_text.items():
+            if getattr(self, name) != expected:
+                raise Stage8ProfileError(f"{name} is frozen to {expected!r}")
         if self.metrics != PILOT_METRICS:
             raise Stage8ProfileError("metric family is frozen")
         if self.model_config != BaselineModelConfig():
@@ -130,8 +153,6 @@ class Stage8PairedRunProfile:
             raise Stage8ProfileError("trainer config must equal the Stage 7-C baseline")
         if self.preprocess_config != InputPreprocessConfig():
             raise Stage8ProfileError("preprocess config must equal the Stage 7-C baseline")
-        if self.profile_version != STAGE8_PAIRED_PROFILE_VERSION:
-            raise Stage8ProfileError("profile_version is frozen")
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,6 +162,17 @@ class Stage8ManifestSummary:
     validation_samples: int
     train_families: int
     validation_families: int
+
+    def __post_init__(self) -> None:
+        _hex64("manifest_sha256", self.manifest_sha256)
+        for name in ("train_samples", "validation_samples", "train_families", "validation_families"):
+            _positive_plain_int(name, getattr(self, name))
+        if self.train_samples != PILOT_TRAIN_SAMPLES:
+            raise Stage8ProfileError("summary train_samples differs from frozen pilot")
+        if self.validation_samples != PILOT_VALIDATION_SAMPLES:
+            raise Stage8ProfileError("summary validation_samples differs from frozen pilot")
+        if self.train_families > self.train_samples or self.validation_families > self.validation_samples:
+            raise Stage8ProfileError("family count cannot exceed sample count")
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,7 +190,12 @@ class Stage8ExperimentBinding:
     def __post_init__(self) -> None:
         if not isinstance(self.candidate, Stage8Candidate):
             raise Stage8ProfileError("candidate must be Stage8Candidate")
-        for name in ("profile_fingerprint", "development_manifest_sha256", "receipt_set_sha256", "sealed_test_manifest_sha256"):
+        for name in (
+            "profile_fingerprint",
+            "development_manifest_sha256",
+            "receipt_set_sha256",
+            "sealed_test_manifest_sha256",
+        ):
             _hex64(name, getattr(self, name))
         if self.test_accessed is not False:
             raise Stage8ProfileError("sealed test access is prohibited")
@@ -173,7 +210,9 @@ class Stage8ExperimentBinding:
             raise Stage8ProfileError("Candidate B must start from deterministic initialization")
 
 
-def stage8_paired_profile_fingerprint(profile: Stage8PairedRunProfile = Stage8PairedRunProfile()) -> str:
+def stage8_paired_profile_fingerprint(
+    profile: Stage8PairedRunProfile = Stage8PairedRunProfile(),
+) -> str:
     if not isinstance(profile, Stage8PairedRunProfile):
         raise TypeError("profile must be Stage8PairedRunProfile")
     payload = {
@@ -193,6 +232,9 @@ def stage8_paired_profile_fingerprint(profile: Stage8PairedRunProfile = Stage8Pa
         "split_policy": profile.split_policy,
         "checkpoint_selection": profile.checkpoint_selection,
         "data_order": profile.data_order,
+        "validation_cadence": profile.validation_cadence,
+        "acceptance_policy": profile.acceptance_policy,
+        "numeric_policy": profile.numeric_policy,
         "metrics": list(profile.metrics),
         "model_fingerprint": model_config_fingerprint(profile.model_config),
         "trainer_fingerprint": trainer_config_fingerprint(profile.trainer_config),
@@ -208,15 +250,20 @@ def stage8_paired_profile_fingerprint(profile: Stage8PairedRunProfile = Stage8Pa
     return sha256(_canonical_json_bytes(payload)).hexdigest()
 
 
-def summarize_stage8_pilot_manifest(manifest: object, profile: Stage8PairedRunProfile = Stage8PairedRunProfile()) -> Stage8ManifestSummary:
+def summarize_stage8_pilot_manifest(
+    manifest: object,
+    profile: Stage8PairedRunProfile = Stage8PairedRunProfile(),
+) -> Stage8ManifestSummary:
+    if not isinstance(profile, Stage8PairedRunProfile):
+        raise TypeError("profile must be Stage8PairedRunProfile")
     if not isinstance(manifest, RealDataManifest):
         raise Stage8ProfileError("manifest must be RealDataManifest")
     result = validate_real_data_manifest(manifest)
     if not result.is_valid:
         first = result.issues[0]
         raise Stage8ProfileError(f"manifest invalid: {first.code} at {first.path}: {first.message}")
-    train = tuple(s for s in manifest.samples if s.split is RealDataSplit.TRAIN)
-    validation = tuple(s for s in manifest.samples if s.split is RealDataSplit.VALIDATION)
+    train = tuple(sample for sample in manifest.samples if sample.split is RealDataSplit.TRAIN)
+    validation = tuple(sample for sample in manifest.samples if sample.split is RealDataSplit.VALIDATION)
     if len(manifest.samples) != profile.total_samples:
         raise Stage8ProfileError("pilot requires exactly 50 admitted development samples")
     if len(train) != profile.train_samples or len(validation) != profile.validation_samples:
@@ -225,8 +272,8 @@ def summarize_stage8_pilot_manifest(manifest: object, profile: Stage8PairedRunPr
         manifest_sha256=real_data_manifest_sha256(manifest),
         train_samples=len(train),
         validation_samples=len(validation),
-        train_families=len({s.family_id for s in train}),
-        validation_families=len({s.family_id for s in validation}),
+        train_families=len({sample.family_id for sample in train}),
+        validation_families=len({sample.family_id for sample in validation}),
     )
 
 
@@ -236,11 +283,23 @@ def stage8_receipt_set_sha256(receipt_sha256s: object) -> str:
     checked = tuple(_hex64("receipt_sha256", item) for item in receipt_sha256s)
     if len(set(checked)) != len(checked):
         raise Stage8ProfileError("receipt set contains duplicate identities")
-    payload = {"version": "st-stage8-receipt-set-v1", "receipt_sha256s": sorted(checked)}
+    payload = {
+        "version": "st-stage8-receipt-set-v1",
+        "receipt_sha256s": sorted(checked),
+    }
     return sha256(_canonical_json_bytes(payload)).hexdigest()
 
 
-def make_stage8_candidate_binding(candidate: Stage8Candidate, *, development_manifest_sha256: str, receipt_set_sha256: str, sealed_test_manifest_sha256: str, profile: Stage8PairedRunProfile = Stage8PairedRunProfile()) -> Stage8ExperimentBinding:
+def make_stage8_candidate_binding(
+    candidate: Stage8Candidate,
+    *,
+    development_manifest_sha256: str,
+    receipt_set_sha256: str,
+    sealed_test_manifest_sha256: str,
+    profile: Stage8PairedRunProfile = Stage8PairedRunProfile(),
+) -> Stage8ExperimentBinding:
+    if not isinstance(profile, Stage8PairedRunProfile):
+        raise TypeError("profile must be Stage8PairedRunProfile")
     if candidate is Stage8Candidate.CHECKPOINT_FINE_TUNE:
         checkpoint = STAGE7C_CHECKPOINT_SHA256
         model_state = STAGE7C_MODEL_STATE_SHA256
@@ -252,15 +311,22 @@ def make_stage8_candidate_binding(candidate: Stage8Candidate, *, development_man
     return Stage8ExperimentBinding(
         candidate=candidate,
         profile_fingerprint=stage8_paired_profile_fingerprint(profile),
-        development_manifest_sha256=_hex64("development_manifest_sha256", development_manifest_sha256),
+        development_manifest_sha256=_hex64(
+            "development_manifest_sha256", development_manifest_sha256
+        ),
         receipt_set_sha256=_hex64("receipt_set_sha256", receipt_set_sha256),
-        sealed_test_manifest_sha256=_hex64("sealed_test_manifest_sha256", sealed_test_manifest_sha256),
+        sealed_test_manifest_sha256=_hex64(
+            "sealed_test_manifest_sha256", sealed_test_manifest_sha256
+        ),
         initialization_checkpoint_sha256=checkpoint,
         initialization_model_state_sha256=model_state,
     )
 
 
-def validate_paired_experiment_bindings(left: object, right: object) -> tuple[Stage8ExperimentBinding, Stage8ExperimentBinding]:
+def validate_paired_experiment_bindings(
+    left: object,
+    right: object,
+) -> tuple[Stage8ExperimentBinding, Stage8ExperimentBinding]:
     if not isinstance(left, Stage8ExperimentBinding) or not isinstance(right, Stage8ExperimentBinding):
         raise Stage8ProfileError("paired bindings must be Stage8ExperimentBinding values")
     by_candidate = {left.candidate: left, right.candidate: right}
@@ -269,7 +335,14 @@ def validate_paired_experiment_bindings(left: object, right: object) -> tuple[St
         raise Stage8ProfileError("paired experiment requires exactly Candidate A and Candidate B")
     candidate_a = by_candidate[Stage8Candidate.CHECKPOINT_FINE_TUNE]
     candidate_b = by_candidate[Stage8Candidate.FROM_SCRATCH]
-    for name in ("profile_fingerprint", "development_manifest_sha256", "receipt_set_sha256", "sealed_test_manifest_sha256", "test_accessed", "online_learning"):
+    for name in (
+        "profile_fingerprint",
+        "development_manifest_sha256",
+        "receipt_set_sha256",
+        "sealed_test_manifest_sha256",
+        "test_accessed",
+        "online_learning",
+    ):
         if getattr(candidate_a, name) != getattr(candidate_b, name):
             raise Stage8ProfileError(f"paired candidates differ at forbidden field {name}")
     return candidate_a, candidate_b
