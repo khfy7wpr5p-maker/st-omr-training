@@ -8,9 +8,9 @@ The repository is public and GitHub Actions CI is active.
 
 Stages 0 through 6, all Stage 7 packages, Stage 8-0, Stage 8-1, and Stage 8-2 are complete on `main`.
 
-Stage 8-2 implementation merged through PR #31 from exact source head `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` commit `ba93736efa1411bf49020e52ddb688d63f7876c1`. Post-merge GitHub Actions run #102 (`31710085383`) succeeded with pinned dependency verification, the complete repository test suite, `pip check`, and `compileall`. Stage 8-2 is therefore **closed and main CI verified**.
+Stage 8-2 implementation merged through PR #31 from exact source head `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` commit `ba93736efa1411bf49020e52ddb688d63f7876c1`. Closure synchronization PR #32 merged to exact `main` `99a32ef917ba4ba5c72ef6a537c24c90a1b0c47f`; exact-main GitHub Actions run #104 (`31712294207`) succeeded. Stage 8-2 is therefore **closed and main CI verified**.
 
-Stage 8-3A — Pilot Data Preparation + Admission — is the next gate but is not started by this closure synchronization. No real data is ingested, no checkpoint is loaded or moved, no training/fine-tuning is executed, and neither sealed test split is opened.
+Stage 8-3A — Pilot Data Preparation + Admission — is the active package. Its first implementation freezes deterministic PNG-source→training-PNG derivation and fail-closed PrIMuS-style auxiliary-package triage. No real file is committed, no model/checkpoint is loaded, no training/fine-tuning is executed, and neither sealed test split is opened.
 
 The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. The accepted Stage 7-C model remains non-production: exact sequence accuracy is 0% and token error rate is approximately 80.5%.
 
@@ -32,7 +32,7 @@ The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled t
 | 8-0 | Real data & fine-tuning contract freeze | ✅ Closed — main CI verified |
 | 8-1 | Quarantine/intake + byte-level validation | ✅ Closed — main CI verified |
 | 8-2 | Paired experiment run profile freeze | ✅ Closed — main CI verified |
-| 8-3A | Pilot source→training-PNG preparation + admission | ⏭ Next — not started |
+| 8-3A | Pilot source→training-PNG preparation + admission | 🔄 Active — no training |
 | 8-3B | Paired real train/validation execution | 🔒 Not started |
 | 9 | Benchmark and candidate decision | 🔒 Not started — test sealed |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
@@ -46,7 +46,8 @@ The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled t
 - Stage 8-0 PR #25 merged to `86487a4c3c41264b02bd159cd647a1318d9b9b88`; run #75 (`31698691405`) succeeded. Closure synchronization PR #26 merged to `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; run #77 (`31699497562`) succeeded.
 - Stage 8-1 PR #29 merged from exact source `ed4113a25f6e12055b9277f959a4580259d37d40` to `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) succeeded with **394/394 tests**, `pip check`, pinned runtime checks, and `compileall`.
 - Stage 8-1 closure synchronization PR #30 merged to exact `main` `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`; post-merge run #94 (`31705382162`) succeeded.
-- Stage 8-2 PR #31 merged from exact source `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` `ba93736efa1411bf49020e52ddb688d63f7876c1`; post-merge run #102 (`31710085383`) succeeded.
+- Stage 8-2 PR #31 merged from exact source `f0ae7ff6d7206789cbe543b75664e557368233b7` to `ba93736efa1411bf49020e52ddb688d63f7876c1`; post-merge run #102 (`31710085383`) succeeded.
+- Stage 8-2 closure synchronization PR #32 merged to exact `main` `99a32ef917ba4ba5c72ef6a537c24c90a1b0c47f`; post-merge run #104 (`31712294207`) succeeded.
 
 The `CI VERIFIED` statement applies only to exact GitHub commits or GitHub-generated PR merge candidates exercised by GitHub-hosted CI.
 
@@ -81,48 +82,29 @@ Stage 8-2 froze:
 
 Stage 8-2 did not authorize or perform real-data IO, source conversion, dataset persistence, checkpoint loading, optimizer steps, sealed-test access, Stage 9/10, or ScoreMosaic integration.
 
-### First-pilot data rule
+## Stage 8-3A active boundary
 
-The pilot requires exactly 50 **admitted** pairs, not merely 50 raw JPEG/PDF + MusicXML files. A pair that fails rights, pairing, semantic, duplicate, leakage, near-duplicate, or byte validation does not count and must be replaced.
+Contract: [STAGE8_3A_PREPARATION_CONTRACT.md](STAGE8_3A_PREPARATION_CONTRACT.md)
 
-Source JPEG/PDF bytes remain unchanged outside Git. The model input remains Stage 8-1-valid grayscale PNG. Stage 8-1 deliberately did not define source-to-PNG normalization, so ad-hoc conversion remains a hard blocker. Stage 8-3A must freeze and verify source→training-PNG derivation before any real training.
+The first Stage 8-3A implementation may only:
 
-### Paired execution profile
+- accept explicitly supplied source-PNG bytes in memory;
+- retain/hash the original source identity without rewriting it;
+- deterministically derive an 8-bit grayscale training PNG with no crop/resize/rotation;
+- verify fixed Pillow/runtime, pixel/byte bounds, no transparency, single-frame input, fixed output encoding, preserved geometry, and the Stage 8-1 grayscale-PNG structure;
+- emit hash-only preparation evidence;
+- triage bounded PrIMuS-style MEI/semantic/agnostic auxiliary packages for parseability, header coherence, and obvious V1 exclusions;
+- use synthetic-only repository tests;
+- keep all real files external.
 
-Both candidates are frozen to the same 40/10 admitted manifest and Stage 8-1 receipt set, 40 epochs, batch size 4, canonical sample-id order, exact Stage 7-C model/trainer/preprocessing surface, AdamW at learning rate 0.001, no scheduler, one retained min-validation-loss checkpoint, 8-measure/1536-token validation decode, CPU/one thread, at most 1800 seconds per candidate and 3600 seconds for the pair.
+MEI/semantic/agnostic/MIDI/PAE data are not automatically MusicXML or admitted labels. A real sample still needs supported-V1 ground-truth MusicXML, rights/provenance/pairing approval, Stage 8-0 admission, Stage 8-1 exact-byte/semantic receipt validation, and family/duplicate/leakage clearance before it counts toward the 50-pair pilot.
 
-The validation metric family remains validation loss, token error rate, exact sequence accuracy, detokenization success, semantic validity, and MusicXML regeneration validity. Stage 9 owns production-quality thresholds.
+The first external smoke packages are usable for format triage but contain features outside the frozen V1 surface, so they are not admitted training samples. Stage 8-3A remains open until exactly 50 pairs pass the complete admission boundary and an exact family-exclusive 40/10 handoff is produced.
 
 ## CI baseline
 
 The active `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, and manual dispatch using GitHub-hosted Ubuntu 24.04 / Python 3.13, read-only repository contents permission, pinned GitHub action commits, exact dependency/runtime checks, `pip check`, complete unittest discovery, and Python compile validation. Ordinary CI contains no full training path.
 
-## Stage 8-2 closure gate
-
-```text
-exact Stage 8-1 closed main baseline
-        ↓
-50 admitted pair / exact 40+10 profile
-        ↓
-A/B same manifest + same receipt set + same run budget
-        ↓
-Candidate A exact Stage 7-C identity / no fallback
-        ↓
-Candidate B deterministic from scratch / no checkpoint
-        ↓
-sealed-test and online-learning vetoes
-        ↓
-focused tests + full regression + pip check + compileall
-        ↓
-exact PR-head GitHub CI
-        ↓
-separate merge approval
-        ↓
-post-merge exact-main CI #102
-        ↓
-Stage 8-2 CLOSED ✅
-```
-
 ## Next gate
 
-Stage 8-2 is closed and exact-main CI verified. The next small gate is **Stage 8-3A — Pilot Data Preparation + Admission**: freeze and verify source-document→training-PNG derivation, run Stage 8-0/8-1 admission on the external pilot material, and produce the exact 40/10 hash-bound handoff. It still performs no model optimization. Stage 8-3B training, Stage 9, and Stage 10 remain locked.
+Stage 8-3A must close through implementation, exact PR-head CI, explicit merge approval, exact-main CI, and the external 50-pair admission/handoff evidence before Stage 8-3B may start. Stage 8-3B training, Stage 9, and Stage 10 remain locked.
