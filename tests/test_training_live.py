@@ -30,7 +30,7 @@ class RealStage7BSmokePipelineTests(unittest.TestCase):
                 seed_start=31_000,
                 split_seed=17,
                 measure_count=1,
-                raster_width=500,
+                raster_width=512,
                 family_profiles=("time-4-4", "note-only", "rest-only"),
                 degradation_profiles=("clean",),
             )
