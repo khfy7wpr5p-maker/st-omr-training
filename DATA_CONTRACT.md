@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the conceptual data contract shared by the ST Music Generator, independent validator, MusicXML writer, renderer boundary, and later degradation/dataset pipeline.
+This document defines the conceptual data contract shared by the ST Music Generator, independent validator, MusicXML writer, renderer boundary, degradation layer, and dataset validation/construction pipeline.
 
 The implementation may evolve, but it must preserve these semantic boundaries unless the contract is explicitly revised.
 
@@ -198,7 +198,7 @@ A future `real_verified` class, if introduced, must remain distinct from synthet
 
 ## Family identity
 
-All rendered or degraded derivatives of the same symbolic source must share one `family_id`.
+All rendered, degraded, and dataset-manifest derivatives of the same symbolic source must share one `family_id`.
 
 Stage 4 V1 example:
 
@@ -211,6 +211,8 @@ family: score-1842
 ```
 
 Dataset splitting must operate on source families, not individual images, so derivatives of one symbolic score cannot leak across train, validation, and test partitions.
+
+Stage 5-A strengthens this rule by independently checking identical MusicXML target hashes and identical clean SVG hashes. A builder may not bypass the family rule simply by assigning different `family_id` values to identical underlying content.
 
 ## Derived artifact provenance
 
@@ -235,6 +237,59 @@ For Stage 3, producer identity includes the pinned renderer/runtime and renderer
 
 Stage 4 V1 additionally preserves the original MusicXML hash, renderer configuration fingerprint, source SVG hash, clean raster hash, exact `DegradationConfig`, degradation configuration fingerprint, final PNG hash, Stage 4 version, direct image-library versions, Cairo runtime version, Python version, and platform system/machine. The exact implemented representation is defined in [DEGRADATION_CONTRACT.md](DEGRADATION_CONTRACT.md).
 
+## Dataset sample metadata
+
+Stage 5-A is governed by [DATASET_CONTRACT.md](DATASET_CONTRACT.md).
+
+One manifest sample preserves the Stage 4 lineage required for independent validation:
+
+```text
+DatasetSample
+├── sample_id
+├── family_id
+├── split
+├── page_number
+├── source_musicxml_sha256
+├── renderer_config_fingerprint
+├── source_svg_sha256
+├── clean_raster_sha256
+├── degradation_config_fingerprint
+├── degradation_config
+├── derivative_id
+├── png_sha256
+├── degradation/runtime provenance
+├── clean dimensions
+├── final dimensions
+├── mode
+└── image_format
+```
+
+Stage 5-A V1 samples are synthetic only. The manifest source class is explicit rather than inferred.
+
+The sample identity does not contain train/validation/test assignment. A split move therefore cannot manufacture a new sample identity. Split assignment remains manifest semantics and participates in the canonical manifest hash.
+
+Stage 5-A independently recomputes the Stage 4 replay-configuration fingerprint and derivative identity before accepting the sample lineage.
+
+## Dataset manifest metadata
+
+The V1 manifest records:
+
+```text
+DatasetManifest
+├── schema_version = st-dataset-manifest-v1
+├── source_class = synthetic
+├── split_policy = family-exclusive-v1
+├── dataset_name
+├── dataset_version
+└── samples[]
+```
+
+The in-memory sample collection is immutable. Canonical serialization sorts logically unordered samples by stable identity fields and uses canonical JSON, so tuple insertion order does not affect the manifest SHA-256.
+
+A training-eligible V1 manifest requires `train`, `validation`, and `test` to be present. Final split percentages/balancing policy are intentionally not defined by Stage 5-A; those belong to the later dataset builder.
+
+Duplicate sample IDs, Stage 4 derivative IDs, and final PNG hashes are rejected rather than counted as extra examples.
+
 ## Hash lineage
 
 Pipeline stages must preserve a traceable hash chain where applicable:
@@ -250,10 +305,14 @@ Clean grayscale raster
     ↓ hash
 Controlled degradation derivative
     ↓ hash
-Dataset sample manifest entry
+Stage 5-A DatasetSample identity
+    ↓
+Canonical DatasetManifest
+    ↓ hash
+Dataset manifest SHA-256
 ```
 
-Hashes support traceability; they do not replace semantic, renderer-safety, degradation-safety, or dataset validation.
+Hashes support traceability; they do not replace semantic, renderer-safety, degradation-safety, dataset leakage, or artifact validation.
 
 ## Canonicalization constraints
 
@@ -262,3 +321,5 @@ Canonicalization may normalize ordering or serialization choices that do not alt
 It must not silently collapse notation-distinct forms such as different enharmonic spellings or explicit accidental-display intent.
 
 Visual degradation is never canonicalization. A degraded image is a derivative of the same symbolic source and must retain lineage back to that source.
+
+Manifest sample ordering is non-semantic and may be canonicalized. Split assignment, family identity, target hashes, replay parameters, and artifact identities are semantic metadata and must not be discarded during canonicalization.
