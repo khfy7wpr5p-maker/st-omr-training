@@ -16,6 +16,7 @@ import struct
 import zlib
 from typing import Final
 
+from .musicxml_validator import MAX_MUSICXML_BYTES
 from .real_data_contract import (
     RealDataContractError,
     RealDataManifest,
@@ -164,6 +165,22 @@ def _validate_source_document_bytes(data: object) -> bytes:
         raise RealDataIntakeError("source document must be non-empty bytes")
     if len(data) > MAX_SOURCE_DOCUMENT_BYTES:
         raise RealDataIntakeError("source document exceeds the Stage 8-1 byte limit")
+    return data
+
+
+def _validate_training_image_bytes(data: object) -> bytes:
+    if not isinstance(data, bytes) or not data:
+        raise RealDataIntakeError("training image must be non-empty bytes")
+    if len(data) > MAX_TRAINING_IMAGE_BYTES:
+        raise RealDataIntakeError("training image exceeds the Stage 8-1 byte limit")
+    return data
+
+
+def _validate_musicxml_bytes(data: object) -> bytes:
+    if not isinstance(data, bytes) or not data:
+        raise RealDataIntakeError("MusicXML must be non-empty bytes")
+    if len(data) > MAX_MUSICXML_BYTES:
+        raise RealDataIntakeError("MusicXML exceeds the Stage 8-1 byte limit")
     return data
 
 
@@ -357,18 +374,16 @@ def validate_quarantined_sample_bytes(
     if sha256(source).hexdigest() != record.source_document_sha256:
         raise RealDataIntakeError("source_document_sha256 does not match source bytes")
 
-    if not isinstance(training_image_png_bytes, bytes) or not training_image_png_bytes:
-        raise RealDataIntakeError("training image must be non-empty bytes")
-    if sha256(training_image_png_bytes).hexdigest() != record.image_sha256:
+    image_bytes = _validate_training_image_bytes(training_image_png_bytes)
+    if sha256(image_bytes).hexdigest() != record.image_sha256:
         raise RealDataIntakeError("image_sha256 does not match training image bytes")
-    image = _load_verified_grayscale_png(training_image_png_bytes)
+    image = _load_verified_grayscale_png(image_bytes)
 
-    if not isinstance(musicxml_bytes, bytes) or not musicxml_bytes:
-        raise RealDataIntakeError("MusicXML must be non-empty bytes")
-    if sha256(musicxml_bytes).hexdigest() != record.musicxml_sha256:
+    xml = _validate_musicxml_bytes(musicxml_bytes)
+    if sha256(xml).hexdigest() != record.musicxml_sha256:
         raise RealDataIntakeError("musicxml_sha256 does not match MusicXML bytes")
     try:
-        tokenized = tokenize_musicxml(musicxml_bytes)
+        tokenized = tokenize_musicxml(xml)
     except (TokenizationError, ValueError, TypeError) as exc:
         raise RealDataIntakeError(
             "MusicXML failed XSD/semantic/supported-V1/token round-trip validation"
