@@ -34,9 +34,13 @@ Independent Dataset Validator
         ↓
 Synthetic Dataset
         ↓
-ST-OMR Training
+Stage 7 target tokenizer / semantic round-trip gate
         ↓
-Evaluation / Error Analysis
+Baseline ST-OMR Training
+        ↓
+Validation / Error Analysis
+        ↓
+Stage 9 sealed benchmark
         ↓
 ST-OMR Candidate
         ↓
@@ -56,9 +60,11 @@ ScoreMosaic
 7. Controlled degradation may change visual appearance but must not change symbolic musical ground truth.
 8. Dataset construction may propose samples and split assignments, but the independent dataset validator has veto authority over lineage, duplicates, leakage, and manifest integrity.
 9. All derivatives of one symbolic family must remain in one train/validation/test split. Exact target or clean-render aliases may not be hidden behind different family IDs to bypass this rule.
-10. Training datasets and large model artifacts are not normal Git repository content.
-11. Real data, if introduced later, must remain distinct from synthetic data and pass separate rights, provenance, privacy where relevant, and quality gates.
-12. ST-OMR candidates never enter ScoreMosaic automatically. Integration is a later, independent decision after held-out evaluation and regression evidence.
+10. Stage 7 may train only from Stage 5/6 validated synthetic artifacts and must re-check persisted hashes before use.
+11. Stage 7 may update parameters only from the `train` split and may select checkpoints only from `validation`; the Stage 6 `test` split remains sealed until Stage 9.
+12. Training datasets and large model artifacts are not normal Git repository content.
+13. Real data, if introduced later, must remain distinct from synthetic data and pass separate rights, provenance, privacy where relevant, and quality gates.
+14. ST-OMR candidates never enter ScoreMosaic automatically. Integration is a later, independent decision after sealed held-out evaluation and regression evidence.
 
 ## Canonicalization rule
 
@@ -103,11 +109,13 @@ Stage 3 pins Verovio 6.2.1, renderer configuration, Leipzig font selection, adap
 
 Stage 4 derives its complete public degradation configuration from explicit integer parameters and, for sampled profiles, an explicit seed without mutable global RNG state. The clean raster, exact degradation configuration, source hashes, dependency/runtime provenance, and final PNG hash are recorded for replay and audit.
 
-Stage 5 canonical manifest serialization sorts samples by stable identity fields and uses canonical JSON. The same valid logical manifest must therefore produce identical bytes and manifest SHA-256 regardless of the input tuple order. Split assignment is semantic and remains part of the manifest hash.
+Stage 5 canonical manifest serialization sorts samples by stable identity fields and uses canonical JSON. The same valid logical manifest therefore produces identical bytes and manifest SHA-256 regardless of input tuple order. Split assignment is semantic and remains part of the manifest hash.
 
 Stage 6 adds a deterministic family plan, split seed, fixed 80/10/10 family-level allocation policy, symbolic coverage-profile cycle, split-independent degradation-seed derivation, build-configuration fingerprint, and build identity. The same Stage 6 configuration must reproduce the same family plan and artifact identities within the same verified runtime boundary.
 
-Cross-platform SVG or raster byte identity is not assumed automatically. A different operating system, architecture, renderer resource bundle, Cairo runtime, or relevant image runtime must be separately verified before artifacts from different environments are mixed.
+Stage 7 adds a deterministic semantic token target, deterministic data ordering for a fixed run configuration, explicit model/training configuration fingerprints, explicit RNG seeds, and checkpoint/metrics SHA-256 provenance. Accelerator bit identity is not assumed automatically; any device/runtime reproducibility claim must be demonstrated for that exact environment, while deterministic CPU smoke evidence remains a separate verification surface.
+
+Cross-platform SVG or raster byte identity is not assumed automatically. A different operating system, architecture, renderer resource bundle, Cairo runtime, image runtime, training framework, or accelerator stack must be separately verified before determinism claims are generalized.
 
 ## MusicXML serialization boundary
 
@@ -143,8 +151,6 @@ Key rules:
 
 Stage 3 is governed by [RENDERER_CONTRACT.md](RENDERER_CONTRACT.md).
 
-The V1 renderer path is:
-
 ```text
 Stage-2-valid MusicXML bytes
         ↓
@@ -162,8 +168,6 @@ The renderer adapter validates MusicXML before invoking Verovio, uses explicit M
 ## Controlled degradation boundary
 
 Stage 4 is governed by [DEGRADATION_CONTRACT.md](DEGRADATION_CONTRACT.md).
-
-The bounded V1 path is:
 
 ```text
 Validated self-contained Stage 3 SVG page
@@ -184,15 +188,13 @@ Exact replay config + source/clean/final hashes + runtime provenance
 
 Stage 4 is separate from both the renderer and the dataset builder. It revalidates Stage 3 SVG/hash lineage, uses a bounded raster width/pixel budget, and performs only conservative V1 transformations: expanded-canvas rotation, Gaussian blur, brightness, contrast, deterministic noise, and optional JPEG round-trip compression. The final artifact remains PNG.
 
-Arbitrary crop, perspective warp, shear, elastic deformation, synthetic occlusion/shadow, staff deletion, symbol deletion, and content-aware erasing are deliberately deferred. Those transforms require stronger score-region/content-preservation evidence before they can become training-data operations.
+Arbitrary crop, perspective warp, shear, elastic deformation, synthetic occlusion/shadow, staff deletion, symbol deletion, and content-aware erasing remain deferred. Those transforms require stronger score-region/content-preservation evidence before they can become training-data operations.
 
 The original canonical symbolic score remains the musical target. Stage 4 creates derived appearance artifacts only and preserves `family_id` across all derivatives.
 
 ## Dataset validation boundary
 
 Stage 5 is governed by [DATASET_CONTRACT.md](DATASET_CONTRACT.md). Its implemented V1 package is Stage 5-A — Dataset Contract + Independent Manifest Validator.
-
-Stage 5 was implemented before the bulk dataset builder so Stage 6 cannot define its own acceptance rules. The bounded metadata path is:
 
 ```text
 Stage 4 DegradedPage + PNG bytes
@@ -223,9 +225,7 @@ The narrow Stage 4 → Stage 5 bridge verifies actual PNG signature/IHDR/CRC/has
 
 ## Stage 6 construction boundary
 
-Stage 6 — Synthetic Dataset v1 — is the active bounded construction layer and is governed by [DATASET_BUILD_CONTRACT.md](DATASET_BUILD_CONTRACT.md).
-
-Its implementation composes only already-validated upstream layers:
+Stage 6 — Synthetic Dataset v1 — is closed and governed by [DATASET_BUILD_CONTRACT.md](DATASET_BUILD_CONTRACT.md).
 
 ```text
 SyntheticDatasetConfig
@@ -255,17 +255,65 @@ Stage 6 refuses identical MusicXML targets across distinct generated families, d
 
 Stage 6 does not add training logic, real/user data ingestion, teacher-correction learning, cloud credentials/storage providers, Guitar TAB training, or ScoreMosaic integration.
 
+## Stage 7 baseline-training boundary
+
+Stage 7 is governed by [TRAINING_CONTRACT.md](TRAINING_CONTRACT.md).
+
+Stage 7 is decomposed so the contract, implementation, and actual baseline run cannot be silently combined:
+
+```text
+Stage 7-A Training Contract Freeze
+        ↓
+Stage 7-B Tokenizer + Data + Model + Trainer smoke implementation
+        ↓
+Stage 7-C Bounded baseline training run + evidence
+        ↓
+Stage 9 sealed-test benchmark gate
+```
+
+Stage 7-A is the current bounded package. It changes contracts/documentation only and runs no training.
+
+### Training input
+
+Stage 7 accepts only exact Stage 6 persisted PNG/MusicXML artifacts whose manifest and hashes pass the existing Stage 5/6 gates. Loose files and bypass inputs are prohibited.
+
+The input tensor is the verified Stage 4 final grayscale PNG. Preprocessing must be deterministic, aspect-ratio preserving, crop-free, and free of hidden/random Stage 7 augmentation. Appearance variability belongs to Stage 4.
+
+### Training target
+
+The baseline does not learn raw XML text as the primary target. Stage 7-B must produce a finite deterministic semantic `ST-OMR V1 token sequence` from the independently parsed supported-V1 projection. The token vocabulary covers measure boundaries, meter, note/rest/chord type, V1 duration, chord size/member order, step, alter, octave, and display-accidental intent.
+
+Tokenizer output must independently detokenize back to an exactly equal supported-V1 semantic projection before a sample can become training-eligible.
+
+### Model boundary
+
+Stage 7-B may implement one from-scratch visual-encoder/sequence-decoder baseline only. It may not use an ensemble, external pretrained weights, hidden OCR/OMR teacher labels, network-dependent inference, Audiveris/Scan2Notes output, an LLM, or another recognition engine as part of training.
+
+The V1 outer model ceiling is 25,000,000 trainable parameters. Concrete framework choice is deliberately not frozen in Stage 7-A; Stage 7-B must separately review current supported runtimes and pin the selected framework before implementation.
+
+### Split and evaluation boundary
+
+Only the `train` split may update parameters. Only `validation` may select checkpoints and supply Stage 7 development metrics. The Stage 6 `test` split remains sealed until Stage 9 and cannot influence Stage 7 architecture, optimization, thresholds, or checkpoint choice.
+
+Stage 7-C must record validation loss, token error rate, exact sequence accuracy, detokenization success, semantic-validity rate, and MusicXML regeneration validity. These metrics establish trainability and evidence only; Stage 9 owns production-candidate thresholds and sealed-test decisions.
+
+### Reproducibility and artifact boundary
+
+Every run records repository SHA, dataset build identity, manifest SHA, configuration/tokenizer/model fingerprints, dependency/runtime/device identity, all seeds, parameter count, checkpoint SHA-256, and metrics SHA-256. Checkpoints are hash-addressed derived artifacts and remain outside normal Git content.
+
+GitHub-hosted CI is limited to bounded smoke training in Stage 7-B. Full Stage 7-C training does not run in ordinary repository CI.
+
 ## Verification boundary
 
 GitHub Actions CI is active for the public repository. The baseline uses GitHub-hosted Ubuntu with Python 3.13, pinned runtime dependencies, complete unittest discovery including real-runtime integration tests, and Python compile validation.
 
 Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`; post-merge GitHub Actions run `31660215130` passed on that exact commit.
 
-Stage 5-A final PR head `5165fe6669bce582ccc16d64695d4a7730e29660` passed GitHub Actions run `31671655623` with **295/295 tests**, pinned runtime verification, `pip check`, and compile validation. PR #15 then merged at exact `main` commit `d677f3d27ac710c56c5ce677a46dc62bcf77bd84`, and post-merge GitHub Actions run `31671919885` passed on that exact commit.
+Stage 5-A merged through PR #15 at exact `main` commit `d677f3d27ac710c56c5ce677a46dc62bcf77bd84`; post-merge GitHub Actions run `31671919885` passed on that exact commit. Stage 5 closure documentation merged through PR #16 at exact `main` commit `ed343d4984aae4507a2dd3238cfd1a98fb25b4b7`; post-merge run `31672540732` passed.
 
-Stage 5 closure documentation merged through PR #16 at exact `main` commit `ed343d4984aae4507a2dd3238cfd1a98fb25b4b7`; post-merge GitHub Actions run `31672540732` passed on that exact commit.
+Stage 6 final PR head `cfd0ac780595a38e0fe041d2d70293b39f96fcf3` passed GitHub Actions run #17 (`31673631608`) with **309/309 tests**, pinned runtime verification, real Stage 1→6 integration/rebuild/persistence tests, `pip check`, and compile validation. PR #17 then merged at exact `main` commit `7c3c736e6d3755d1bd098e2874d73ce5ed41e39f`; post-merge run #18 (`31674014666`) passed on that exact commit. Stage 6 closure documentation merged through PR #18 at exact `main` commit `046c9a4e7e41e94b0b4465a2610f30361055a3ed`; post-merge run #20 (`31674836433`) also passed.
 
-The integrated implementation through Stage 5 is therefore `CI VERIFIED`. Stage 6 is not complete until focused tests, real Stage 1→6 integration, rebuild determinism, persistence verification, full regression, compile validation, exact final PR-head GitHub CI, separate merge approval, and post-merge exact-main CI all pass.
+The integrated implementation through Stage 6 is therefore `CI VERIFIED`. Stage 7-A is not complete until its documentation/contract diff is reviewed, exact final PR-head GitHub CI succeeds, merge receives separate explicit approval, and post-merge exact-main CI succeeds.
 
 ## Stage roadmap
 
@@ -280,8 +328,10 @@ Stage 3   Renderer integration                          ✅
 Stage 4   Controlled degradation                        ✅
 Stage 5-A Dataset contract + manifest validator         ✅
 Stage 5   Dataset validation                            ✅ CLOSED — CI VERIFIED
-Stage 6   Synthetic Dataset v1                          🔄 ACTIVE — VERIFICATION PENDING
-Stage 7   Baseline ST-OMR training                      🔒
+Stage 6   Synthetic Dataset v1                          ✅ CLOSED — CI VERIFIED
+Stage 7-A Baseline training contract freeze             🔄 ACTIVE
+Stage 7-B Tokenizer/data/model/trainer implementation   🔒
+Stage 7-C Bounded baseline training run + evidence      🔒
 Stage 8   Real-data fine-tuning                         🔒
 Stage 9   Benchmark and candidate decision              🔒
 Stage 10  ScoreMosaic candidate integration             🔒
