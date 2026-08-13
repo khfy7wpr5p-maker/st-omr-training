@@ -28,6 +28,8 @@ Synthetic and real data must remain explicitly distinguishable.
 
 Synthetic data may enter training only after generator, musical, MusicXML, renderer/degradation provenance, and dataset validation gates pass.
 
+Stage 5-A V1 manifests are explicitly `synthetic` only. A manifest that claims a real/user source class is rejected.
+
 Real data, if introduced later, requires a separate gate covering rights or permission, provenance, quality, privacy where relevant, and approved training use.
 
 Teacher corrections or user submissions must never become training data automatically.
@@ -56,6 +58,10 @@ Eligible for rendering
 Validated self-contained SVG
    ↓
 Eligible for controlled degradation
+   ↓
+Stage 4 derived PNG + exact lineage
+   ↓
+Independent Stage 5 dataset-manifest validation
 ```
 
 A failure at any validation stage rejects the sample.
@@ -79,6 +85,11 @@ Examples include:
 - MusicXML schema and semantic validity
 - safe renderer output structure
 - Stage 4 source hash, SVG safety, resource, parameter, and output-integrity checks
+- Stage 5-A Stage 4 replay-config fingerprint recomputation
+- Stage 5-A Stage 4 derivative-ID recomputation
+- Stage 5-A sample identity recomputation
+- family/target/clean-SVG split-leakage checks
+- duplicate sample/derivative/image rejection
 
 ## Negative testing
 
@@ -103,6 +114,13 @@ Negative tests should include, as applicable:
 - out-of-range degradation parameters
 - effectively blank/corrupt raster output
 - transformations that fail content-retention/resource gates
+- invalid Stage 5-A split/source/schema vocabulary
+- duplicate sample, derivative, or PNG identities
+- one family appearing in multiple splits
+- identical MusicXML targets crossing families/splits
+- identical clean SVGs crossing families/splits
+- replay-config, derivative-ID, or sample-ID tampering
+- PNG header/hash/dimension mismatch at the Stage 4 → Stage 5-A bridge
 
 ## Determinism
 
@@ -113,6 +131,8 @@ MusicXML determinism is independently verified at the serialization boundary.
 Stage 3 renderer determinism is scoped to the same pinned Verovio package/runtime, renderer configuration, platform/resource bundle, adapter version, and input bytes. The verified environment produced byte-identical SVG output for deterministic repeats, but cross-platform binary identity is not assumed without separate evidence.
 
 Stage 4 uses explicit replay parameters. Seeded V1 profiles derive parameters without mutable global RNG state. Every derivative records the exact configuration and source/clean/final hashes. Byte identity is scoped to the same Stage 4 version, source SVG, direct dependency versions, Cairo runtime, Python/runtime platform, and configuration; cross-platform equality must be separately demonstrated.
+
+Stage 5-A canonical manifest JSON removes insertion-order ambiguity. The same valid logical sample set and split assignments must produce identical canonical bytes and manifest SHA-256 regardless of tuple order. Split assignment remains semantic, so changing a split changes the manifest hash.
 
 ## Stage 4 augmentation safety
 
@@ -135,7 +155,7 @@ Stage 4 rejects unsafe/external SVG resources before CairoSVG is invoked, valida
 
 V1 deliberately does **not** permit arbitrary cropping, perspective warp, shear, elastic deformation, synthetic shadows/occlusion, staff-line deletion, symbol deletion, or content-aware erasing. These operations can remove or relocate musical content and require stronger score-region/content-preservation validation before they can be considered.
 
-Stage 5 Dataset Validation remains an independent acceptance gate. Passing Stage 4 does not make a derivative automatically eligible for training.
+Passing Stage 4 does not make a derivative automatically eligible for training. Stage 5 remains an independent acceptance gate.
 
 ## Dataset leakage prevention
 
@@ -152,11 +172,19 @@ test:  score-A-blur
 
 All score-A derivatives must remain in one split.
 
+Stage 5-A does not trust `family_id` alone. A faulty builder could otherwise relabel identical underlying content as two different families. Therefore identical source MusicXML hashes and identical clean SVG hashes are also checked for family/split aliasing.
+
+The manifest rejects duplicate final PNG hashes globally. Exact duplicate images must not be counted as independent examples or placed into different evaluation partitions.
+
+The sample identity intentionally excludes split assignment. Moving a sample between splits cannot create a fresh sample identity and hide a duplicate.
+
 ## Evaluation integrity
 
 The held-out test or golden set must not be silently recycled into training after model errors are observed.
 
 Training data may grow. Validation data may evolve under explicit versioning. Held-out evaluation data must remain controlled and versioned so benchmark comparisons stay meaningful.
+
+A later dataset builder may propose split ratios or balancing policy, but it must not bypass the family-exclusive Stage 5 validator. Builder output is untrusted until independently validated.
 
 ## Verification gate
 
@@ -205,12 +233,12 @@ A successful CI run must never be inferred from a different commit.
 
 The merged baseline workflow uses GitHub-hosted Ubuntu, Python 3.13, pinned runtime dependencies, full unittest discovery including real-runtime tests, and Python compile validation.
 
-The exact pre-Stage-4 `main` commit `23739ddfab618a0406836e94bb0ced1a124f8886` passed GitHub Actions run `31648164533`. The integrated state through Stage 3 is therefore CI verified.
+Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`. Post-merge GitHub Actions run `31660215130` passed on that exact commit. The integrated implementation through Stage 4 is therefore CI verified.
 
-Stage 4 adds exact direct pins for CairoSVG and Pillow to the branch CI runtime. The final Stage 4 PR head must pass the workflow with those pins and the real Verovio → raster/degradation integration tests before merge may be considered.
+Stage 5-A adds no dependency or workflow change. Its final pull-request head must pass the existing full-suite GitHub-hosted CI, including the real Generator → MusicXML → Verovio → Stage 4 → Stage 5-A integration tests, before merge may be considered.
 
 ## Change-control rule
 
-Development proceeds in small, reversible packages on non-main branches. Documentation, generator work, validation work, renderer integration, controlled degradation, dataset creation, model training, and ScoreMosaic integration must not be mixed into one uncontrolled change.
+Development proceeds in small, reversible packages on non-main branches. Documentation, generator work, validation work, renderer integration, controlled degradation, dataset validation, dataset creation, model training, and ScoreMosaic integration must not be mixed into one uncontrolled change.
 
 A later ST-OMR model candidate must pass held-out benchmark, real-score evaluation when available, chord/polyphony-focused evaluation, regression testing, and comparison against relevant existing OMR baselines before any ScoreMosaic integration decision.

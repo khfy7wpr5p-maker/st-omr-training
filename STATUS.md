@@ -4,11 +4,15 @@ This file is the current stage-status source for this repository.
 
 ## Current repository phase
 
-The repository is public. Stage 0 safety/architecture baseline, Stage 1 ST Music Generator, Stage 2 MusicXML Pipeline, and Stage 3 Renderer Integration are complete on `main`.
+The repository is public and GitHub Actions CI is active.
 
-The exact pre-Stage-4 `main` commit `23739ddfab618a0406836e94bb0ced1a124f8886` completed GitHub-hosted CI successfully in run `31648164533`. The integrated state through Stage 3 is therefore `CI VERIFIED`.
+Stage 0 safety/architecture baseline, Stage 1 ST Music Generator, Stage 2 MusicXML Pipeline, Stage 3 Renderer Integration, and Stage 4 Controlled Degradation are complete on `main`.
 
-Stage 4 Controlled Degradation is the active bounded implementation package on branch `stage-4-controlled-degradation`. PR #14 is open. Stage 5 Dataset Validation has not started and remains locked.
+Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`. GitHub-hosted post-merge CI run `31660215130` completed successfully on that exact commit. The integrated implementation through Stage 4 is therefore `CI VERIFIED`.
+
+Stage 5-A — Dataset Contract + Independent Manifest Validator — is the active bounded implementation package on branch `stage-5a-dataset-manifest-validator` and PR #15.
+
+Stage 6 Synthetic Dataset v1, model training, real-data work, and ScoreMosaic integration remain locked.
 
 ## Stage status
 
@@ -26,88 +30,128 @@ Stage 4 Controlled Degradation is the active bounded implementation package on b
 | 1-B | Independent V1 validator | ✅ Complete |
 | 1-C | Score structure model and validator | ✅ Complete |
 | 1-D | Deterministic ST Music Generator v1 | ✅ Complete |
-| 1 | ST Music Generator | ✅ Closed — integrated main CI verified |
+| 1 | ST Music Generator | ✅ Closed — main CI verified |
 | 2-A | MusicXML contract freeze | ✅ Complete |
 | 2-B | Deterministic MusicXML 4.0 writer | ✅ Complete |
 | 2-C | Offline XSD + independent MusicXML validator | ✅ Complete |
 | 2-D | Supported-V1 semantic round-trip verifier | ✅ Complete |
-| 2 | MusicXML pipeline | ✅ Closed — integrated main CI verified |
-| 3 | Renderer integration | ✅ Closed — integrated main CI verified |
-| 4 | Controlled degradation | ✅ PR package ready — final-head CI required for merge |
-| 5 | Dataset validation | 🔒 Not started |
+| 2 | MusicXML pipeline | ✅ Closed — main CI verified |
+| 3 | Renderer integration | ✅ Closed — main CI verified |
+| 4 | Controlled degradation | ✅ Closed — PR #14 merged + main CI verified |
+| 5-A | Dataset contract + independent manifest validator | ✅ PR package ready — exact-current-head CI must be green for merge |
+| 5 | Dataset validation | 🔄 In progress through Stage 5-A |
 | 6 | Synthetic Dataset v1 | 🔒 Not started |
 | 7 | Baseline ST-OMR training | 🔒 Not started |
 | 8 | Real-data fine-tuning | 🔒 Not started |
 | 9 | Benchmark and candidate decision | 🔒 Not started |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
 
-## Completed evidence through Stage 3
+## Completed evidence through Stage 4
 
 - Stage 2-B merged through PR #8 at main commit `1940d43b3986e5fe359aa79b86cc2af26e96fe98`.
-- Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8b8f4ee5cbd50960a7a75049f0`.
+- Stage 2-C merged through PR #9 at main commit `81cbfdb2958b8b8f4ee5cbd50960a7a75049f0`.
 - Stage 2-D merged through PR #10 at main commit `4f36da277540d5a1b7a074215f2def968db73739`.
 - Stage 3 merged through PR #11 at main commit `3b1e94cea8ac3a26a5df1e2038acc4331a24d371`.
-- CI baseline merged through PR #12 at main commit `5abbc9859a4a69bf9a17936bc41e722256f87472` and post-merge run `31647615123` succeeded.
-- Current-state documentation synchronized through PR #13 at main commit `23739ddfab618a0406836e94bb0ced1a124f8886` and post-merge run `31648164533` succeeded.
+- CI baseline merged through PR #12 at main commit `5abbc9859a4a69bf9a17936bc41e722256f87472`; post-merge run `31647615123` succeeded.
+- Current-state documentation synchronized through PR #13 at main commit `23739ddfab618a0406836e94bb0ced1a124f8886`; post-merge run `31648164533` succeeded.
+- Stage 4 merged through PR #14 at main commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`.
+- Stage 4 final PR head passed GitHub Actions run `31649798684` with 264/264 tests and compile validation.
+- Exact post-merge Stage 4 `main` commit passed GitHub Actions run `31660215130`; all job steps completed successfully.
 
-The `CI VERIFIED` statement applies to the exact integrated `main` content GitHub-hosted CI exercised. Stage 4 requires its own PR-head and later post-merge evidence.
+The `CI VERIFIED` statement applies only to exact GitHub commits that GitHub-hosted CI exercised.
 
-## Stage 4 package
+## Stage 5-A package
 
-PR: #14 — `Stage 4: deterministic controlled degradation`
+PR: #15 — `Stage 5-A: synthetic dataset manifest validator`
 
-Branch: `stage-4-controlled-degradation`
+Branch: `stage-5a-dataset-manifest-validator`
 
-Base: `23739ddfab618a0406836e94bb0ced1a124f8886`
+Base: `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`
 
-Contract: [DEGRADATION_CONTRACT.md](DEGRADATION_CONTRACT.md)
+Contract: [DATASET_CONTRACT.md](DATASET_CONTRACT.md)
 
-Implemented V1 scope:
+Stage 5-A responsibility is limited to defining and independently validating synthetic dataset manifest metadata. It does not bulk-generate dataset files.
 
-- Stage 3 self-contained SVG page + explicit family/hash lineage input;
-- independent SVG/hash/resource preflight before rasterization;
-- direct runtime pins `CairoSVG==2.8.2` and `Pillow==12.3.0`;
-- clean deterministic grayscale PNG rasterization with bounded width and pixel budget;
-- conservative deterministic transforms: expanded-canvas rotation, Gaussian blur, brightness, contrast, deterministic grayscale noise, and optional JPEG round-trip compression;
-- integer public configuration and deterministic `clean`, `light`, and `medium` seeded profiles;
-- exact source SVG, clean raster, configuration, final PNG, runtime/platform, and family provenance;
-- fail-closed blank/dark/resource/ink-retention checks;
-- real Verovio → Stage 4 integration tests.
+Implemented package scope:
 
-Explicitly deferred from Stage 4 V1:
+- immutable `DatasetSplit`, `DatasetDegradationConfig`, `DatasetSample`, and `DatasetManifest` models;
+- exact V1 `train`, `validation`, and `test` split vocabulary;
+- synthetic-only source-class gate;
+- family-exclusive split policy;
+- independent Stage 4 replay-config fingerprint recomputation;
+- independent Stage 4 derivative-ID recomputation;
+- deterministic Stage 5-A sample identity independent of split assignment;
+- duplicate `sample_id`, `derivative_id`, and PNG hash vetoes;
+- `family_id` split-leakage veto;
+- identical MusicXML target alias leakage veto across families/splits;
+- identical clean SVG alias leakage veto across families/splits;
+- bounded PNG/dimension/mode/format metadata checks;
+- narrow Stage 4 `DegradedPage` → Stage 5-A bridge that independently checks actual PNG signature/IHDR/CRC/hash/dimensions before creating sample metadata;
+- deterministic canonical JSON manifest serialization and manifest SHA-256;
+- focused corruption, negative, determinism, leakage, and duplicate tests;
+- real Generator → MusicXML → Verovio → Stage 4 → Stage 5-A integration tests.
 
-- arbitrary crop;
-- perspective warp;
-- shear or elastic deformation;
-- synthetic shadows/occlusion;
-- staff/symbol deletion or content-aware erasing;
-- dataset manifests/splitting/storage;
-- model training;
+Explicitly out of scope:
+
+- bulk synthetic dataset creation;
+- final split ratios, balancing, curriculum, or sampling strategy;
+- dataset image storage/filesystem/cloud provider design;
+- model loaders/training/checkpoints;
 - real/user score ingestion;
-- ScoreMosaic integration.
+- teacher-correction learning;
+- ScoreMosaic integration;
+- Guitar TAB training.
 
-## Stage 4 verification evidence
+## Stage 5-A verification evidence
 
-Local focused/prototype evidence before hosted verification:
+GitHub-hosted PR verification has already passed on two successive package heads:
 
-- focused Stage 4 unit suite: 25 tests passed on the branch-equivalent implementation during development;
-- all six Stage 2 golden MusicXML fixtures crossed real Verovio 6.2.1 → Stage 4 medium degradation locally;
-- 30 generated scores crossed MusicXML → real Verovio → medium Stage 4 degradation locally;
-- 50/50 seeded medium derivatives of a real Verovio SVG produced valid distinct outputs;
-- 10/10 deterministic repeats produced byte-identical output locally.
+- implementation/documentation head `9c290ee2bac5c45e357a98072ec7e2c05cf9b33b` — run `31671458220` — SUCCESS;
+- evidence-update head `c2dc88072b4fba24ab170088f33e550a2644d1ad` — run `31671544975` — SUCCESS.
 
-A complete local repository regression is not claimed for this package.
+The fresh Ubuntu 24.04 / Python 3.13 runs verified:
 
-GitHub-hosted PR run `31649588268` succeeded on implementation head `84c76efbc13d6ebb4ad90e33e5af0b9fdfa4bbfe`. A subsequent hosted run `31649679729` also succeeded after the evidence/status update. In the fresh Ubuntu 24.04 / Python 3.13 environment, exact `lxml==6.1.1`, `verovio==6.2.1`, `CairoSVG==2.8.2`, and `Pillow==12.3.0` checks passed; `pip check` reported no broken requirements; the complete suite passed **264/264 tests** including the real Verovio → CairoSVG/Pillow Stage 4 path; and Python compile validation passed.
+- dependency installation and existing exact runtime pins;
+- `pip check` with no broken requirements;
+- 28 focused Stage 5-A unit/negative/leakage/determinism tests;
+- 3 real Generator → MusicXML → Verovio → Stage 4 → Stage 5-A integration tests;
+- complete repository regression: **295/295 tests passed**;
+- Python `compileall` validation.
 
-The merge gate always uses the GitHub-hosted run associated with the **exact current PR head**. A successful run on an earlier head is evidence, but never substitutes for final-head verification.
+This final status wording creates one last PR head. The authoritative merge evidence is therefore the GitHub-hosted CI check attached to the exact current PR head, not either older run listed above. No further source/document change should be made after that current-head check is green unless the check is repeated again.
+
+A complete independent local repository regression is not claimed for Stage 5-A; GitHub-hosted fresh-environment CI is the authoritative full-suite evidence for this package.
+
+## Required merge gate
+
+```text
+Focused Stage 5-A tests
+        ↓
+Real Stage 4 → Stage 5-A integration tests
+        ↓
+Full repository regression
+        ↓
+Python compile validation
+        ↓
+Diff/scope review
+        ↓
+GitHub-hosted CI on exact current PR head
+        ↓
+CI VERIFIED — PR HEAD
+        ↓
+Separate merge approval
+        ↓
+Post-merge GitHub-hosted CI on exact main
+```
+
+No CI result from an older commit may substitute for current-head verification.
 
 ## CI baseline
 
 The active `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, and manual dispatch using GitHub-hosted Ubuntu 24.04 / Python 3.13, read-only repository contents permission, pinned GitHub action commits, dependency installation from `requirements.txt`, pinned runtime checks, `pip check`, complete unittest discovery, and Python compile validation.
 
-The Stage 4 branch extends the pinned runtime check to CairoSVG 2.8.2 and Pillow 12.3.0 so the new image path is exercised in the same full-suite gate.
+Stage 5-A adds no new runtime dependency and does not change the CI workflow.
 
 ## Next gate
 
-Verify GitHub-hosted CI on the exact current PR #14 head. If green, Stage 4 is `CI VERIFIED — PR HEAD` and merge requires separate explicit approval. After merge, the exact resulting `main` commit must also pass GitHub-hosted CI before Stage 4 closes and Stage 5 may begin.
+Confirm GitHub-hosted CI is green on the exact current PR #15 head. If green, Stage 5-A is `CI VERIFIED — PR HEAD`, but merge still requires separate explicit approval. Stage 6 must remain locked until Stage 5-A is merged, post-merge `main` CI passes, and Stage 5 closure is explicitly assessed.
