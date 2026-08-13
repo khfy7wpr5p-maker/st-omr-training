@@ -18,6 +18,8 @@ This repository is isolated from the ScoreMosaic production runtime. Its purpose
 - [Stage 7-C bounded run profile](STAGE7C_RUNBOOK.md)
 - [Stage 7-C accepted evidence](STAGE7C_EVIDENCE.md)
 - [Stage 8-0 real-data and fine-tuning contract](STAGE8_REAL_DATA_CONTRACT.md)
+- [Stage 8-1 quarantine/intake byte-validation contract](STAGE8_1_INTAKE_CONTRACT.md)
+- [Future real-test sealing boundary](STAGE8_TEST_SEALING_BOUNDARY.md)
 - [Verovio runtime evidence](VEROVIO_RUNTIME_EVIDENCE.md)
 - [Safety and verification rules](SAFETY.md)
 - [Current project status](STATUS.md)
@@ -42,11 +44,13 @@ Completed and merged:
 
 Stage 7-C merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. Its closure synchronization merged through PR #24 to `main` `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) succeeded. Stage 7 is therefore **closed and main CI verified**.
 
-Stage 8-0 merged through PR #25 to exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`. Post-merge GitHub Actions run #75 (`31698691405`) succeeded on that exact SHA with pinned-runtime verification, `pip check`, the complete repository test suite, and `compileall`. Stage 8-0 is therefore **closed and main CI verified**.
+Stage 8-0 merged through PR #25 to exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`. Post-merge GitHub Actions run #75 (`31698691405`) succeeded on that exact SHA with pinned-runtime verification, `pip check`, the complete repository test suite, and `compileall`. Its closure synchronization merged through PR #26 to exact `main` `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; post-merge run #77 (`31699497562`) succeeded. Stage 8-0 is therefore **closed and main CI verified**.
 
-Stage 8-1+ real-data intake/execution, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked. Stage 8-0 itself did not ingest real data, load a checkpoint, run fine-tuning, or open either held-out test partition.
+Stage 8-1 — Quarantine / Intake + Byte-Level Validation — is the only active package. It adds bytes-only validation for quarantined train/validation candidates, exact source/image/MusicXML hash binding, strict grayscale-PNG verification, the existing supported-V1 MusicXML/token semantic gate, hash-only validation receipts, and a bounded deterministic perceptual near-duplicate review surface. Repository tests use generated MusicXML and synthetic image fixtures only; Stage 8-1 does not ingest or persist real data.
 
-The Stage 7-C checkpoint artifact `9177923796` is temporary and is scheduled to expire on 2026-09-12. The exact checkpoint identity is the recorded SHA-256, not the artifact location. Stage 8-0 did not move or republish it.
+The future real-test sealing boundary is contract-only. Stage 8-1 contains no test writer/loader/validator and rejects a test record before caller-provided bytes are inspected. Stage 8-2+ experiment execution, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
+
+The Stage 7-C checkpoint artifact `9177923796` is temporary and is scheduled to expire on 2026-09-12. The exact checkpoint identity is the recorded SHA-256, not the artifact location. Stage 8-1 does not load, move, copy, publish, or preserve it.
 
 The Stage 7-C model remains a trainability baseline rather than a production candidate: exact sequence accuracy is 0% and token error rate is approximately 80.5% on its validation evidence.
 
@@ -56,7 +60,7 @@ Each stage stays isolated behind explicit contracts and validation gates. Symbol
 
 All derivatives of one symbolic or real-source family remain in one dataset family and one train/validation/test split. Builders never validate themselves by assertion; independent validation remains a veto gate.
 
-Stage 7 training used only Stage 5/6 validated synthetic artifacts. Any later Stage 8 real data must pass the closed Stage 8-0 contract before a train/validation loader may see it. Both synthetic and real held-out test partitions remain sealed until the Stage 9 benchmark gate.
+Stage 7 training used only Stage 5/6 validated synthetic artifacts. Any later Stage 8 real data must pass the closed Stage 8-0 metadata contract and the Stage 8-1 byte-level handoff before a later train/validation loader may see it. Both synthetic and real held-out test partitions remain sealed until the Stage 9 benchmark gate.
 
 ScoreMosaic user uploads and teacher corrections are not automatic training data. User-derived material requires separate explicit training permission and the full quarantine/admission process. There is no online or automatic learning path, and no Stage 8 output may enter ScoreMosaic before Stage 9 candidate-quality evidence and the later Stage 10 integration gate.
 
