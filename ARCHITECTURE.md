@@ -271,7 +271,7 @@ Stage 7-C Bounded baseline training run + evidence
 Stage 9 sealed-test benchmark gate
 ```
 
-Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the active bounded package on `stage-7c-baseline-run` / draft PR #23. Its orchestrator, incremental decoder, heartbeat surface, evidence gate, and bounded regressions are implemented; benchmark and authoritative run evidence remain the active gates.
+Stage 7-A and Stage 7-B are closed and exact-main CI verified. Stage 7-C is the active bounded package on `stage-7c-baseline-run` / draft PR #23. Its orchestrator, incremental grammar-constrained decoder, heartbeat surface, evidence gate, and bounded regressions are implemented; corrected authoritative run evidence remains the active gate.
 
 ### Training input
 
@@ -306,7 +306,7 @@ The run:
 - records deterministic untrained validation loss before optimization;
 - selects exactly one checkpoint by minimum validation loss;
 - requires the best trained validation loss to be strictly lower than the untrained baseline;
-- performs bounded greedy validation decoding;
+- performs bounded incremental greedy validation decoding constrained to the frozen supported-V1 grammar and exact eight-measure profile;
 - reports token error rate, exact sequence accuracy, detokenization success, semantic validity, and MusicXML regeneration validity;
 - requires at least one semantically valid validation prediction;
 - writes hash-addressed checkpoint and canonical metrics/provenance artifacts;
@@ -317,6 +317,8 @@ The run:
 Only the `train` split may update parameters. Only `validation` may select checkpoints and supply Stage 7 development metrics. The Stage 6 `test` split remains sealed until Stage 9 and cannot influence Stage 7 architecture, optimization, thresholds, or checkpoint choice.
 
 Stage 7-C records validation loss, token error rate, exact sequence accuracy, detokenization success, semantic-validity rate, and MusicXML regeneration validity. These metrics establish trainability and evidence only; Stage 9 owns production-candidate thresholds and sealed-test decisions.
+
+The decoding constraint is an inference-time state machine over the existing 35-token vocabulary. It enforces measure order, meter capacity, event/duration structure, pitch-field order, accidental coherence, chord-pitch uniqueness, the frozen eight-measure count, and terminal `EOS`. It masks invalid next-token logits but does not inspect validation targets, introduce a recognition teacher, change model parameters, or access the sealed test split.
 
 ### Reproducibility and artifact boundary
 

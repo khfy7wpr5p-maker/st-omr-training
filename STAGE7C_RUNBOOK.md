@@ -56,7 +56,7 @@ The real Stage 7-C evidence path accepts no caller-selected training, model, tra
 - batch size 4;
 - at most 1024 train samples;
 - at most 256 validation samples;
-- at most 1536 greedy decode tokens per validation sample;
+- at most 1536 grammar-constrained greedy decode tokens per validation sample;
 - exactly one retained selected checkpoint;
 - the closed Stage 7-B default CNN/GRU model configuration;
 - the closed Stage 7-B deterministic 1×64×512 preprocessing configuration;
@@ -117,6 +117,12 @@ A Stage 7-C run is accepted only when all of the following are true:
 16. the authoritative `VERIFIED-<sha256>.json` marker is present and independently hash-valid.
 
 Stage 7-C is still a trainability/baseline gate. These metrics do not declare the model production-quality. Production candidacy remains Stage 9 after sealed-test evaluation.
+
+## First admitted execution finding
+
+GitHub Actions run #64 (`31690139847`) benchmarked and executed exact source `1c1f1796a4bacc5fd11f6fcf4daa6076217ffef9`. The benchmark projected `1413.615194` seconds after the 2× safety factor, below the `14400`-second budget. Training completed all 40 epochs and 1560 steps; validation loss improved from `3.5603423876792655` to `1.0018396258589004` at epoch 36. Unconstrained greedy decoding nevertheless produced no semantically valid prediction among 21 validation samples, so the semantic gate rejected the run.
+
+The failure remained fail-closed: evidence artifact digest `sha256:01bd72ab75d0a44db9ebf9852559a8fd853b619cf96b4bd0bd3b8acec74f99a2` retained `INCOMPLETE` plus checkpoint `sha256:9344cb29ee9ad7c7485af23b767b24071bffd4c1f1f461e0c3751a88927d7a13`, while no `COMPLETE`, metrics, or `VERIFIED` artifact was accepted. The remediation constrains greedy next-token selection to the already-frozen supported-V1 grammar and exact eight-measure profile. It uses neither validation targets nor external labels and leaves training, checkpoint selection, and the sealed test split unchanged. A new exact-head authoritative run must still pass every gate before Stage 7-C can be accepted.
 
 ## Artifact safety
 

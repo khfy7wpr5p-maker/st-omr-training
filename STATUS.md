@@ -12,7 +12,7 @@ Stage 7-A — Baseline Training Contract Freeze — merged through PR #19 at exa
 
 Stage 7-B — Tokenizer/Data/Model/Trainer Implementation — merged through PR #21 at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`. Post-merge GitHub Actions run #31 (`31679810478`) succeeded on that exact commit with **336/336 tests**, pinned runtime verification, `pip check`, the missing-`EOS` regression, deterministic CPU smoke evidence, and `compileall`. Stage 7-B closure documentation then squash-merged through PR #22 at exact `main` commit `1befaf260023852ef3bee5c8abab016f464557bb`; post-merge GitHub Actions run #33 (`31681668145`) succeeded on that exact SHA. The integrated repository through the Stage 7-B boundary is therefore `CI VERIFIED`.
 
-Stage 7-C — Bounded Baseline Training Run + Evidence — is the **active bounded package** on branch `stage-7c-baseline-run` / draft PR #23. The run orchestrator, incremental validation decoder, progress/heartbeat surface, authoritative evidence gate, bounded contract tests, and execution documentation are implemented. A guarded exact-head benchmark and its fail-closed runtime budget are the active gate; the real run has not produced accepted evidence until its uploaded artifacts pass review.
+Stage 7-C — Bounded Baseline Training Run + Evidence — is the **active bounded package** on branch `stage-7c-baseline-run` / draft PR #23. The run orchestrator, incremental grammar-constrained validation decoder, progress/heartbeat surface, authoritative evidence gate, bounded contract tests, and execution documentation are implemented. The first admitted diagnostic run completed all 40 epochs/1560 steps and improved validation loss from `3.5603423876792655` to `1.0018396258589004`, but correctly failed closed when unconstrained greedy decoding yielded `0/21` semantically valid predictions. No accepted evidence exists until the corrected exact-head rerun and its uploaded artifacts pass review.
 
 Stage 8 real-data fine-tuning, Stage 9 sealed benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
 
@@ -103,13 +103,14 @@ The active Stage 7-C package is limited to:
 - train-only optimization and validation-only checkpoint selection;
 - deterministic bounded epochs/batches and fixed data ordering;
 - strict improvement over deterministic untrained validation loss;
+- incremental greedy decoding constrained only by the frozen supported-V1 grammar and exact eight-measure profile;
 - validation token error rate, exact sequence accuracy, detokenization success, semantic validity, and MusicXML regeneration validity;
 - at least one semantically valid validation prediction;
 - one retained hash-addressed selected checkpoint;
 - canonical SHA-256-addressed metrics/provenance evidence;
 - fresh no-resume run directories with explicit incomplete/complete state.
 
-The real Stage 7-C baseline run remains a separate execution/evidence gate. Ordinary GitHub-hosted CI may exercise only bounded smoke/contract tests and full repository regression. Draft PR #23 has one explicitly bounded exception: an exact-head benchmark with a 2× safety margin must fit within four hours before one synthetic-only authoritative job is admitted.
+The real Stage 7-C baseline run remains a separate execution/evidence gate. Ordinary GitHub-hosted CI may exercise only bounded smoke/contract tests and full repository regression. Draft PR #23 has one explicitly bounded exception: an exact-head benchmark with a 2× safety margin must fit within four hours before one synthetic-only authoritative job is admitted. The diagnostic failure preserved `INCOMPLETE` evidence and did not create `COMPLETE` or `VERIFIED`; its remediation changes inference validity only and does not alter training data, targets, optimization, or the sealed test split.
 
 ## CI baseline
 
