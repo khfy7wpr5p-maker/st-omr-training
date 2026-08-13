@@ -14,6 +14,14 @@ from st_omr_training.stage7c_dataset import (
     STAGE7C_BASELINE_DATASET_CONFIG,
     STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT,
 )
+from st_omr_training.stage7c_profile import (
+    STAGE7C_FROZEN_MODEL_CONFIG,
+    STAGE7C_FROZEN_PREPROCESS_CONFIG,
+    STAGE7C_FROZEN_RUN_CONFIG,
+    STAGE7C_FROZEN_RUN_FINGERPRINT,
+    STAGE7C_FROZEN_TRAINER_CONFIG,
+)
+from st_omr_training.training_run import baseline_run_config_fingerprint
 
 
 class FrozenDatasetProfileTests(unittest.TestCase):
@@ -33,6 +41,27 @@ class FrozenDatasetProfileTests(unittest.TestCase):
             synthetic_dataset_config_fingerprint(config),
         )
         self.assertEqual(len(STAGE7C_BASELINE_DATASET_CONFIG_FINGERPRINT), 64)
+
+
+class FrozenTrainingProfileTests(unittest.TestCase):
+    def test_stage7c_training_profile_is_exact_and_fingerprinted(self) -> None:
+        config = STAGE7C_FROZEN_RUN_CONFIG
+        self.assertEqual(config.epochs, 40)
+        self.assertEqual(config.batch_size, 4)
+        self.assertEqual(config.max_train_samples, 1024)
+        self.assertEqual(config.max_validation_samples, 256)
+        self.assertEqual(config.max_decode_tokens, 1536)
+        self.assertEqual(config.retained_checkpoints, 1)
+        self.assertEqual(
+            STAGE7C_FROZEN_RUN_FINGERPRINT,
+            baseline_run_config_fingerprint(
+                config,
+                STAGE7C_FROZEN_MODEL_CONFIG,
+                STAGE7C_FROZEN_TRAINER_CONFIG,
+                STAGE7C_FROZEN_PREPROCESS_CONFIG,
+            ),
+        )
+        self.assertEqual(len(STAGE7C_FROZEN_RUN_FINGERPRINT), 64)
 
 
 class WorkspaceSafetyTests(unittest.TestCase):
