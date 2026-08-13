@@ -1,6 +1,8 @@
 # ST-OMR Stage 7-B Training Implementation Profile
 
-Status: active bounded Stage 7-B package. This document records the concrete implementation choices permitted by the already-frozen `TRAINING_CONTRACT.md`. It does **not** authorize or execute the Stage 7-C baseline training run.
+Status: **closed — main CI verified**. This document records the concrete implementation choices permitted by the frozen `TRAINING_CONTRACT.md`. It does **not** authorize or execute the Stage 7-C baseline training run.
+
+Stage 7-B merged through PR #21 at exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`. Post-merge GitHub Actions run #31 (`31679810478`) succeeded on that exact commit with **336/336 tests**, exact pinned runtime verification, `pip check`, the missing-`EOS` regression, deterministic CPU smoke evidence, and `compileall`.
 
 ## Framework/runtime selection
 
@@ -16,7 +18,7 @@ The pin is isolated in `requirements-training.txt` and CI installs it from the o
 
 Selection evidence reviewed on 2026-08-13:
 
-- official PyTorch release `v2.13.0` is the current stable release line reviewed for this package;
+- official PyTorch release `v2.13.0` is the stable release line reviewed for this package;
 - the official CPU wheel index publishes a CPython 3.13 / manylinux x86-64 `2.13.0+cpu` wheel;
 - the repository CI runtime remains Ubuntu 24.04 / CPython 3.13.
 
@@ -36,7 +38,9 @@ Tokenization preserves:
 - chord size and member order;
 - pitch step, alter, octave, and visible accidental intent.
 
-A mismatch, malformed sequence, PAD inside a semantic target, under/overfilled measure, invalid pitch/accidental relation, or unsupported token is a hard failure.
+A mismatch, malformed sequence, PAD inside a semantic target, under/overfilled measure, invalid pitch/accidental relation, unsupported token, trailing token after `EOS`, or end-of-file without consuming a real `EOS` is a hard failure.
+
+The missing-`EOS` fail-closed rule was added after automated review identified that a sequence ending immediately after a valid `MEASURE_END` could otherwise be accepted. The regression `test_missing_eos_is_rejected` is part of the final Stage 7-B evidence.
 
 ## Trusted data adapter
 
@@ -147,16 +151,20 @@ CPU smoke construction seeds PyTorch before model initialization, enables determ
 
 This evidence is deliberately limited to the exact verified CPU runtime. It is not a CUDA/ROCm or cross-platform bit-identity claim.
 
-## Stage 7-B verification gate
+## Completed Stage 7-B verification
 
-Required before merge:
+The final Stage 7-B source head was `a8ad8bc9f14953f0ed35ef5a5a8275be69af5ebd` against exact base `6a13760d9d17130ea86636f4828ff1bff035f30d`. GitHub Actions run #30 (`31679413312`) succeeded on GitHub-generated merge candidate `3d5ee4e2ca479614e2a3322e0339ca21f25e5cae`. PR #21 was then separately approved and squash-merged to exact `main` commit `d02dce4ee17dfccf6f05519ab0970fdc188d0147`; post-merge run #31 (`31679810478`) succeeded on that exact `main` SHA.
+
+Completed gate:
 
 ```text
 exact framework/runtime pin
         ↓
 frozen 35-token vocabulary tests
         ↓
-MusicXML → tokens → projection exact round trip
+MusicXML → tokens → projection exact semantic round trip
+        ↓
+mandatory EOS consumption + missing-EOS regression
         ↓
 Stage 5/6 persisted-artifact revalidation
         ↓
@@ -176,17 +184,21 @@ same-seed exact CPU smoke replay
         ↓
 real Stage 6 persisted dataset → Stage 7-B smoke bridge
         ↓
-full repository regression
+full repository regression: 336/336
         ↓
 compile validation
         ↓
-GitHub-hosted CI
+GitHub-hosted PR CI
         ↓
 separate merge approval
         ↓
 post-merge exact-main CI
+        ↓
+CLOSED
 ```
 
 ## Explicitly out of scope
 
 Stage 7-B does not perform the real Stage 7-C baseline training run, does not open the sealed test split, does not retain production checkpoints, does not tune against test data, does not ingest real/user/copyright-unclear material, and does not implement Stage 8, Stage 9, Stage 10, Guitar TAB training, cloud training, or ScoreMosaic integration.
+
+Stage 7-C remains a separate not-started package and requires explicit approval before any real baseline training or evidence generation begins.
