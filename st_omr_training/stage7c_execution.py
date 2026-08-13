@@ -10,10 +10,20 @@ from pathlib import Path
 import subprocess
 from typing import Final
 
+import torch
+
 from .dataset_builder import SyntheticDatasetBuild
 from .training_data import InputPreprocessConfig
-from .training_model import BaselineModelConfig, TrainerConfig, verify_torch_runtime
-from .training_run import BaselineRunConfig, BaselineRunError, BaselineRunResult, run_baseline_training
+from .training_model import (
+    BaselineModelConfig,
+    TrainerConfig,
+    assert_model_finite,
+    build_baseline_model,
+    model_config_fingerprint,
+    model_state_sha256,
+    verify_torch_runtime,
+)
+from .training_run import BaselineRunConfig, BaselineRunResult, run_baseline_training
 
 
 STAGE7C_EXECUTION_GATE_VERSION: Final[str] = "stage7c-authoritative-execution-v1"
@@ -124,28 +134,89 @@ class VerifiedBaselineRunResult:
             raise Stage7CExecutionError("verification file hash mismatch")
 
 
+def _load_and_verify_checkpoint(
+    checkpoint_path: Path,
+    result: BaselineRunResult,
+    evidence: dict[str, object],
+) -> str:
+    configuration = evidence.get("configuration")
+    if not isinstance(configuration, dict):
+        raise Stage7CExecutionError("metrics evidence is missing model configuration")
+    model_payload = configuration.get("model")
+    if not isinstance(model_payload, dict):
+        raise Stage7CExecutionError("metrics evidence model configuration is invalid")
+    try:
+        model_config = BaselineModelConfig(**model_payload)
+    except (TypeError, ValueError) as exc:
+        raise Stage7CExecutionError("metrics evidence model configuration was rejected") from exc
+
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=True)
+    except Exception as exc:
+        raise Stage7CExecutionError("selected checkpoint cannot be safely reloaded") from exc
+    if not isinstance(checkpoint, dict) or set(checkpoint) != {
+        "epoch",
+        "model_fingerprint",
+        "model_state_dict",
+    }:
+        raise Stage7CExecutionError("selected checkpoint has an unexpected structure")
+    if checkpoint.get("epoch") != result.best_epoch:
+        raise Stage7CExecutionError("selected checkpoint epoch differs from run evidence")
+    expected_fingerprint = model_config_fingerprint(model_config)
+    if checkpoint.get("model_fingerprint") != expected_fingerprint:
+        raise Stage7CExecutionError("selected checkpoint model fingerprint mismatch")
+    state_dict = checkpoint.get("model_state_dict")
+    if not isinstance(state_dict, dict):
+        raise Stage7CExecutionError("selected checkpoint model state is invalid")
+
+    model = build_baseline_model(model_config, seed=0)
+    try:
+        model.load_state_dict(state_dict, strict=True)
+    except (RuntimeError, TypeError, ValueError) as exc:
+        raise Stage7CExecutionError("selected checkpoint model state cannot be loaded strictly") from exc
+    assert_model_finite(model)
+    state_sha = model_state_sha256(model)
+
+    checkpoint_evidence = evidence.get("checkpoint")
+    if not isinstance(checkpoint_evidence, dict):
+        raise Stage7CExecutionError("metrics evidence is missing checkpoint provenance")
+    if checkpoint_evidence.get("sha256") != result.checkpoint_sha256:
+        raise Stage7CExecutionError("metrics evidence checkpoint file hash mismatch")
+    if checkpoint_evidence.get("state_sha256") != state_sha:
+        raise Stage7CExecutionError("reloaded checkpoint state hash differs from metrics evidence")
+    if checkpoint_evidence.get("filename") != checkpoint_path.name:
+        raise Stage7CExecutionError("metrics evidence checkpoint filename mismatch")
+    return state_sha
+
+
 def _verify_run_evidence(
     result: BaselineRunResult,
     build: SyntheticDatasetBuild,
     repository_sha: str,
     runtime_versions: dict[str, str],
-) -> dict[str, object]:
+) -> tuple[dict[str, object], str]:
     metrics_path = result.run_directory / f"metrics-{result.metrics_sha256}.json"
     checkpoint_path = result.run_directory / f"checkpoint-{result.checkpoint_sha256}.pt"
     complete_path = result.run_directory / "COMPLETE"
     if not metrics_path.is_file() or not checkpoint_path.is_file() or not complete_path.is_file():
         raise Stage7CExecutionError("completed run is missing required evidence artifacts")
-    if sha256(metrics_path.read_bytes()).hexdigest() != result.metrics_sha256:
+    metrics_bytes = metrics_path.read_bytes()
+    if sha256(metrics_bytes).hexdigest() != result.metrics_sha256:
         raise Stage7CExecutionError("metrics artifact hash mismatch at authoritative gate")
     if sha256(checkpoint_path.read_bytes()).hexdigest() != result.checkpoint_sha256:
         raise Stage7CExecutionError("checkpoint artifact hash mismatch at authoritative gate")
+    expected_complete = f"{result.metrics_sha256}  {metrics_path.name}\n".encode("ascii")
+    if complete_path.read_bytes() != expected_complete:
+        raise Stage7CExecutionError("COMPLETE marker does not exactly bind the metrics artifact")
 
     try:
-        evidence = json.loads(metrics_path.read_text(encoding="ascii"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        evidence = json.loads(metrics_bytes.decode("ascii"))
+    except (UnicodeError, json.JSONDecodeError) as exc:
         raise Stage7CExecutionError("metrics evidence is not valid canonical JSON text") from exc
     if not isinstance(evidence, dict):
         raise Stage7CExecutionError("metrics evidence root must be an object")
+    if _canonical_json_bytes(evidence) != metrics_bytes:
+        raise Stage7CExecutionError("metrics evidence is not canonical JSON")
     if evidence.get("repository_sha") != repository_sha:
         raise Stage7CExecutionError("metrics evidence repository SHA differs from verified checkout")
     dataset = evidence.get("dataset")
@@ -158,7 +229,9 @@ def _verify_run_evidence(
         raise Stage7CExecutionError("metrics evidence runtime provenance mismatch")
     if evidence.get("sealed_test_split_opened") is not False:
         raise Stage7CExecutionError("metrics evidence does not prove the sealed test split stayed closed")
-    return evidence
+
+    state_sha = _load_and_verify_checkpoint(checkpoint_path, result, evidence)
+    return evidence, state_sha
 
 
 def run_verified_baseline_training(
@@ -197,7 +270,12 @@ def run_verified_baseline_training(
     if ending_runtime != runtime_versions:
         raise Stage7CExecutionError("runtime dependency identity changed during Stage 7-C execution")
 
-    _verify_run_evidence(result, build, repository_sha, runtime_versions)
+    _evidence, reloaded_state_sha = _verify_run_evidence(
+        result,
+        build,
+        repository_sha,
+        runtime_versions,
+    )
     verification_payload = {
         "schema_version": "stage7c-authoritative-verification-v1",
         "execution_gate_version": STAGE7C_EXECUTION_GATE_VERSION,
@@ -206,6 +284,7 @@ def run_verified_baseline_training(
         "manifest_sha256": build.manifest_sha256,
         "metrics_sha256": result.metrics_sha256,
         "checkpoint_sha256": result.checkpoint_sha256,
+        "checkpoint_state_sha256": reloaded_state_sha,
         "runtime": runtime_versions,
         "run_result": {
             "run_id": result.run_id,
@@ -216,6 +295,9 @@ def run_verified_baseline_training(
             "prediction_metrics": asdict(result.prediction_metrics),
         },
         "source_clean_before_and_after": True,
+        "checkpoint_reloaded_strictly": True,
+        "metrics_canonical_json_verified": True,
+        "complete_marker_verified": True,
         "sealed_test_split_opened": False,
     }
     verification_bytes = _canonical_json_bytes(verification_payload)
@@ -226,6 +308,11 @@ def run_verified_baseline_training(
     verification_path.write_bytes(verification_bytes)
     if sha256(verification_path.read_bytes()).hexdigest() != verification_sha:
         raise Stage7CExecutionError("authoritative verification marker changed after writing")
+
+    final_sha = verify_repository_checkout(repository_root)
+    if final_sha != repository_sha:
+        verification_path.unlink(missing_ok=True)
+        raise Stage7CExecutionError("repository HEAD changed while final verification was written")
 
     return VerifiedBaselineRunResult(
         result=result,
