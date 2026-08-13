@@ -9,21 +9,23 @@ This package adds a narrow conversion path for supported-V1 auxiliary notation. 
 ## Canonical entrypoints
 
 - `inspect_guarded_primus_auxiliary_package(...)` is the Stage 8-3A auxiliary triage entrypoint.
-- `adapt_guarded_primus_v1_to_musicxml(...)` is the Stage 8-3A auxiliary conversion entrypoint.
-- Lower-level parser functions are implementation details, not admission gates.
+- `prepare_guarded_primus_v1_target(...)` is the Stage 8-3A target-preparation entrypoint.
+- Lower-level parser/adapter/guard functions are implementation details, not admission gates.
 
 ## Frozen conversion surface
 
-The guarded conversion accepts only the existing V1 surface: one staff, treble G2, one voice, key 0, 2/4 or 3/4 or 4/4, supported note/rest durations, supported pitches and the frozen accidental surface. Deferred notation is rejected rather than approximated or dropped.
+The canonical pipeline accepts only the existing V1 surface: one explicit five-line staff, treble G2, one voice, explicit key 0, 2/4 or 3/4 or 4/4, supported note/rest durations, supported pitches and the frozen accidental surface. Deferred notation is rejected rather than approximated or dropped.
 
-MEI and semantic representations must corroborate the same meter, measure structure, event order, event kind, duration and sounding pitch. Visible accidental evidence must also agree with the required per-measure sounding-state transition. Ambiguous, redundant or contradictory accidental evidence is rejected.
+MEI and semantic representations must corroborate the same meter, measure structure, event order, event kind, duration and sounding pitch. Visible accidental evidence must agree with the required per-measure sounding-state transition. Ambiguous, redundant or contradictory accidental evidence is rejected.
 
 The conversion chain is:
 
 ```text
 bounded auxiliary bytes
     ↓
-guarded preflight
+canonical shape + guarded preflight
+    ↓
+visible/sounding accidental corroboration
     ↓
 MEI / semantic corroboration
     ↓
@@ -35,7 +37,7 @@ deterministic MusicXML writer
     ↓
 MusicXML validation + supported-V1 round trip
     ↓
-hash-only guarded conversion evidence
+hash-only pipeline evidence
 ```
 
 A successful conversion is **not Stage 8 admission**. The exact source image, rights/provenance/pairing evidence, deterministic training-PNG preparation, Stage 8-0 admission, Stage 8-1 exact-byte/semantic receipt, duplicate/leakage vetoes and the exact 50-pair 40/10 handoff are still mandatory.
