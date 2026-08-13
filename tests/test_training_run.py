@@ -157,6 +157,7 @@ class Stage7CBoundedOrchestrationTests(unittest.TestCase):
     def test_bounded_run_writes_hash_addressed_checkpoint_and_evidence(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             run_root = Path(temp) / "runs"
+            progress_events: list[dict[str, object]] = []
             metrics = PredictionMetrics(
                 token_error_rate=0.0,
                 exact_sequence_accuracy=1.0,
@@ -189,6 +190,7 @@ class Stage7CBoundedOrchestrationTests(unittest.TestCase):
                         max_decode_tokens=64,
                     ),
                     trainer_config=TrainerConfig(master_seed=77, smoke_steps=1),
+                    progress=progress_events.append,
                 )
 
             self.assertTrue((result.run_directory / "COMPLETE").is_file())
@@ -199,6 +201,26 @@ class Stage7CBoundedOrchestrationTests(unittest.TestCase):
             self.assertEqual(len(evidence), 1)
             self.assertEqual(checkpoints[0].stem.split("-", 1)[1], result.checkpoint_sha256)
             self.assertEqual(evidence[0].stem.split("-", 1)[1], result.metrics_sha256)
+            self.assertEqual(
+                [event["event"] for event in progress_events],
+                [
+                    "training_started",
+                    "untrained_validation_started",
+                    "untrained_validation_completed",
+                    "epoch_started",
+                    "training_step_completed",
+                    "epoch_validation_started",
+                    "epoch_completed",
+                    "prediction_evaluation_started",
+                    "prediction_evaluation_completed",
+                    "training_completed",
+                ],
+            )
+            self.assertEqual(progress_events[0]["epochs_total"], 1)
+            self.assertEqual(progress_events[0]["training_steps_total"], 1)
+            self.assertEqual(progress_events[4]["training_steps"], 1)
+            self.assertEqual(progress_events[6]["selected_best"], True)
+            self.assertEqual(progress_events[-1]["run_id"], result.run_id)
 
             with self.assertRaises(BaselineRunError):
                 run_baseline_training(
