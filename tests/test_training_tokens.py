@@ -100,6 +100,18 @@ class SemanticRoundTripTests(unittest.TestCase):
         with self.assertRaises(TokenizationError):
             detokenize_tokens(tokens)
 
+    def test_missing_eos_is_rejected(self) -> None:
+        tokens = (
+            "BOS",
+            "MEASURE_START",
+            "TS_4_4",
+            "REST",
+            "DUR_WHOLE",
+            "MEASURE_END",
+        )
+        with self.assertRaises(TokenizationError):
+            detokenize_tokens(tokens)
+
     def test_trailing_tokens_after_eos_are_rejected(self) -> None:
         tokens = (
             "BOS",
