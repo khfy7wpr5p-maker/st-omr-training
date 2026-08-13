@@ -27,6 +27,14 @@ from .training_run import BaselineRunConfig, BaselineRunResult, run_baseline_tra
 
 
 STAGE7C_EXECUTION_GATE_VERSION: Final[str] = "stage7c-authoritative-execution-v1"
+EXPECTED_REPOSITORY_FULL_NAME: Final[str] = "khfy7wpr5p-maker/st-omr-training"
+EXPECTED_REPOSITORY_ORIGINS: Final[frozenset[str]] = frozenset(
+    {
+        "https://github.com/khfy7wpr5p-maker/st-omr-training",
+        "https://github.com/khfy7wpr5p-maker/st-omr-training.git",
+        "git@github.com:khfy7wpr5p-maker/st-omr-training.git",
+    }
+)
 REQUIRED_STAGE7C_RUNTIME: Final[dict[str, str]] = {
     "lxml": "6.1.1",
     "verovio": "6.2.1",
@@ -96,6 +104,26 @@ def verify_repository_checkout(repository_root: str | Path) -> str:
     if status:
         raise Stage7CExecutionError("repository checkout is not clean; authoritative run refused")
     return head
+
+
+def verify_authoritative_repository(repository_root: str | Path) -> tuple[str, str]:
+    """Bind evidence to the Git repository that contains this executing package source."""
+
+    if not isinstance(repository_root, (str, Path)):
+        raise TypeError("repository_root must be str or pathlib.Path")
+    root = Path(repository_root).resolve()
+    executing_root = Path(__file__).resolve().parents[1]
+    if root != executing_root:
+        raise Stage7CExecutionError(
+            "authoritative repository root must be the source tree executing Stage 7-C"
+        )
+    head = verify_repository_checkout(root)
+    origin = _run_git(root, "remote", "get-url", "origin")
+    if origin not in EXPECTED_REPOSITORY_ORIGINS:
+        raise Stage7CExecutionError(
+            f"repository origin is not the expected {EXPECTED_REPOSITORY_FULL_NAME} remote"
+        )
+    return head, origin
 
 
 def verify_stage7c_runtime() -> dict[str, str]:
@@ -245,11 +273,11 @@ def run_verified_baseline_training(
     trainer_config: TrainerConfig = TrainerConfig(),
     preprocess_config: InputPreprocessConfig = InputPreprocessConfig(),
 ) -> VerifiedBaselineRunResult:
-    """Run Stage 7-C only after proving clean source/runtime provenance before and after."""
+    """Run Stage 7-C only after proving source-bound clean provenance before and after."""
 
     if not isinstance(build, SyntheticDatasetBuild):
         raise TypeError("build must be SyntheticDatasetBuild")
-    repository_sha = verify_repository_checkout(repository_root)
+    repository_sha, repository_origin = verify_authoritative_repository(repository_root)
     runtime_versions = verify_stage7c_runtime()
 
     result = run_baseline_training(
@@ -263,9 +291,9 @@ def run_verified_baseline_training(
         preprocess_config=preprocess_config,
     )
 
-    ending_sha = verify_repository_checkout(repository_root)
-    if ending_sha != repository_sha:
-        raise Stage7CExecutionError("repository HEAD changed during Stage 7-C execution")
+    ending_sha, ending_origin = verify_authoritative_repository(repository_root)
+    if ending_sha != repository_sha or ending_origin != repository_origin:
+        raise Stage7CExecutionError("repository identity changed during Stage 7-C execution")
     ending_runtime = verify_stage7c_runtime()
     if ending_runtime != runtime_versions:
         raise Stage7CExecutionError("runtime dependency identity changed during Stage 7-C execution")
@@ -279,6 +307,8 @@ def run_verified_baseline_training(
     verification_payload = {
         "schema_version": "stage7c-authoritative-verification-v1",
         "execution_gate_version": STAGE7C_EXECUTION_GATE_VERSION,
+        "repository_full_name": EXPECTED_REPOSITORY_FULL_NAME,
+        "repository_origin": repository_origin,
         "repository_sha": repository_sha,
         "dataset_build_id": build.build_id,
         "manifest_sha256": build.manifest_sha256,
@@ -294,6 +324,7 @@ def run_verified_baseline_training(
             "best_validation_loss": result.best_validation_loss,
             "prediction_metrics": asdict(result.prediction_metrics),
         },
+        "source_tree_bound_to_executing_package": True,
         "source_clean_before_and_after": True,
         "checkpoint_reloaded_strictly": True,
         "metrics_canonical_json_verified": True,
@@ -309,10 +340,10 @@ def run_verified_baseline_training(
     if sha256(verification_path.read_bytes()).hexdigest() != verification_sha:
         raise Stage7CExecutionError("authoritative verification marker changed after writing")
 
-    final_sha = verify_repository_checkout(repository_root)
-    if final_sha != repository_sha:
+    final_sha, final_origin = verify_authoritative_repository(repository_root)
+    if final_sha != repository_sha or final_origin != repository_origin:
         verification_path.unlink(missing_ok=True)
-        raise Stage7CExecutionError("repository HEAD changed while final verification was written")
+        raise Stage7CExecutionError("repository identity changed while final verification was written")
 
     return VerifiedBaselineRunResult(
         result=result,
