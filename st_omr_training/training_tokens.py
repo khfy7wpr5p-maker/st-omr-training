@@ -342,11 +342,13 @@ def detokenize_tokens(tokens: object) -> SemanticScoreProjection:
     index = 0
     _token, index = _require_token(tokens, index, "BOS")
     measures: list[SemanticMeasureProjection] = []
+    saw_eos = False
 
     while index < len(tokens):
         token = tokens[index]
         if token == "EOS":
             index += 1
+            saw_eos = True
             break
 
         _token, index = _require_token(tokens, index, "MEASURE_START")
@@ -412,6 +414,8 @@ def detokenize_tokens(tokens: object) -> SemanticScoreProjection:
             )
         )
 
+    if not saw_eos:
+        raise TokenizationError("semantic target is missing EOS")
     if index != len(tokens):
         raise TokenizationError("tokens appear after EOS")
     if not measures:
