@@ -105,6 +105,8 @@ Stage 4 derives its complete public degradation configuration from explicit inte
 
 Stage 5 canonical manifest serialization sorts samples by stable identity fields and uses canonical JSON. The same valid logical manifest must therefore produce identical bytes and manifest SHA-256 regardless of the input tuple order. Split assignment is semantic and remains part of the manifest hash.
 
+Stage 6 adds a deterministic family plan, split seed, fixed 80/10/10 family-level allocation policy, symbolic coverage-profile cycle, split-independent degradation-seed derivation, build-configuration fingerprint, and build identity. The same Stage 6 configuration must reproduce the same family plan and artifact identities within the same verified runtime boundary.
+
 Cross-platform SVG or raster byte identity is not assumed automatically. A different operating system, architecture, renderer resource bundle, Cairo runtime, or relevant image runtime must be separately verified before artifacts from different environments are mixed.
 
 ## MusicXML serialization boundary
@@ -221,11 +223,37 @@ The narrow Stage 4 → Stage 5 bridge verifies actual PNG signature/IHDR/CRC/has
 
 ## Stage 6 construction boundary
 
-Stage 6 — Synthetic Dataset v1 — is the next architectural layer and is **not started**.
+Stage 6 — Synthetic Dataset v1 — is the active bounded construction layer and is governed by [DATASET_BUILD_CONTRACT.md](DATASET_BUILD_CONTRACT.md).
 
-Its future responsibility is to construct a bounded synthetic dataset using validated symbolic families and Stage 4 derivatives, assign families to splits according to an explicit construction policy, and submit the resulting manifest to the already-merged independent Stage 5 validator.
+Its implementation composes only already-validated upstream layers:
 
-Stage 6 must not bypass Stage 5 validation and must not expand into model training, real/user data ingestion, teacher-correction learning, or ScoreMosaic integration.
+```text
+SyntheticDatasetConfig
+        ↓
+deterministic family plan + 80/10/10 family split assignment
+        ↓
+Stage 1 generator profiles
+        ↓
+Stage 2 MusicXML target bytes
+        ↓
+Stage 3 rendered page(s)
+        ↓
+Stage 4 clean/light/medium derivatives
+        ↓
+Stage 5 DatasetSample bridge
+        ↓
+independent Stage 5 DatasetManifest validator
+        ↓
+SyntheticDatasetBuild
+        ↓
+optional hash-addressed local persistence
+```
+
+The builder uses the canonical generated `score_id` as `family_id`; all pages and derivatives of that family inherit one split. Split ranking is deterministic and occurs before rendering. Degradation seeds depend on family/page/profile and not on split assignment.
+
+Stage 6 refuses identical MusicXML targets across distinct generated families, duplicate final PNG artifacts, artifact/hash mismatch, Stage 5 vetoes, and overwrite of an existing dataset directory. Valid local persistence uses `manifest.json`, `build.json`, SHA-256-named MusicXML targets, and SHA-256-named PNG images. Bulk artifacts remain outside normal Git content.
+
+Stage 6 does not add training logic, real/user data ingestion, teacher-correction learning, cloud credentials/storage providers, Guitar TAB training, or ScoreMosaic integration.
 
 ## Verification boundary
 
@@ -235,7 +263,9 @@ Stage 4 merged through PR #14 at exact `main` commit `f0fd8a732b51b4aa95a66c3a78
 
 Stage 5-A final PR head `5165fe6669bce582ccc16d64695d4a7730e29660` passed GitHub Actions run `31671655623` with **295/295 tests**, pinned runtime verification, `pip check`, and compile validation. PR #15 then merged at exact `main` commit `d677f3d27ac710c56c5ce677a46dc62bcf77bd84`, and post-merge GitHub Actions run `31671919885` passed on that exact commit.
 
-The integrated implementation through Stage 5 is therefore `CI VERIFIED`.
+Stage 5 closure documentation merged through PR #16 at exact `main` commit `ed343d4984aae4507a2dd3238cfd1a98fb25b4b7`; post-merge GitHub Actions run `31672540732` passed on that exact commit.
+
+The integrated implementation through Stage 5 is therefore `CI VERIFIED`. Stage 6 is not complete until focused tests, real Stage 1→6 integration, rebuild determinism, persistence verification, full regression, compile validation, exact final PR-head GitHub CI, separate merge approval, and post-merge exact-main CI all pass.
 
 ## Stage roadmap
 
@@ -250,7 +280,7 @@ Stage 3   Renderer integration                          ✅
 Stage 4   Controlled degradation                        ✅
 Stage 5-A Dataset contract + manifest validator         ✅
 Stage 5   Dataset validation                            ✅ CLOSED — CI VERIFIED
-Stage 6   Synthetic Dataset v1                          ⏭ NEXT — NOT STARTED
+Stage 6   Synthetic Dataset v1                          🔄 ACTIVE — VERIFICATION PENDING
 Stage 7   Baseline ST-OMR training                      🔒
 Stage 8   Real-data fine-tuning                         🔒
 Stage 9   Benchmark and candidate decision              🔒
