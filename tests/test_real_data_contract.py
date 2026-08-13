@@ -226,6 +226,14 @@ class RealDataContractTests(unittest.TestCase):
         result = validate_real_data_manifest(replace(manifest, samples=manifest.samples[:1]))
         self.assertIn("manifest.missing_split", {issue.code for issue in result.issues})
 
+    def test_test_sample_is_not_directly_development_eligible(self) -> None:
+        test_sample = make_sample(
+            family="fam-test", split=RealDataSplit.TEST, page=1,
+            source=h("a"), image=h("b"), target=h("c"), semantic=h("d"),
+        )
+        result = validate_real_data_sample(test_sample)
+        self.assertIn("test.sealed", {issue.code for issue in result.issues})
+
     def test_test_metadata_is_rejected_from_development_manifest(self) -> None:
         manifest = make_manifest()
         test_sample = make_sample(
