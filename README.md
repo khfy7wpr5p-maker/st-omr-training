@@ -26,11 +26,12 @@ Completed and merged:
 - Stage 1 — deterministic ST Music Generator V1;
 - Stage 2 — deterministic MusicXML 4.0 pipeline, offline XSD/semantic validation, and supported-V1 semantic round trip;
 - Stage 3 — deterministic Verovio 6.2.1 SVG renderer adapter;
-- Stage 4 — deterministic, bounded Controlled Degradation V1.
+- Stage 4 — deterministic, bounded Controlled Degradation V1;
+- Stage 5 — synthetic dataset contract and independent manifest validation.
 
-Stage 4 merged through PR #14 at `main` commit `f0fd8a732b51b4aa95a66c3a780d0cefa6661361`. GitHub Actions run `31660215130` completed successfully on that exact merged commit, so the integrated pipeline through Stage 4 is CI verified.
+Stage 5-A merged through PR #15 at `main` commit `d677f3d27ac710c56c5ce677a46dc62bcf77bd84`. GitHub Actions run `31671919885` completed successfully on that exact merged commit, so the integrated pipeline through Stage 5 is **CI verified**.
 
-Stage 5-A — Dataset Contract + Independent Manifest Validator — is the active bounded package on `stage-5a-dataset-manifest-validator`. It defines immutable synthetic sample/manifest metadata, independently recomputes Stage 4 lineage identities, prevents family/target/SVG leakage across splits, rejects duplicates, and provides deterministic canonical manifest serialization. It does **not** build a bulk dataset or train a model.
+Stage 6 — Synthetic Dataset v1 — is the next architectural stage, but it has **not started**. It will be responsible for constructing a bounded synthetic dataset behind the already-merged independent Stage 5 validator. Model training remains a later Stage 7 concern.
 
 ## Core development rule
 
