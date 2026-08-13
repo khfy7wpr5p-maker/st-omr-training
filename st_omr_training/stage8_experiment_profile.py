@@ -158,6 +158,7 @@ class Stage8PairedRunProfile:
 @dataclass(frozen=True, slots=True)
 class Stage8ManifestSummary:
     manifest_sha256: str
+    sealed_test_manifest_sha256: str
     train_samples: int
     validation_samples: int
     train_families: int
@@ -165,6 +166,7 @@ class Stage8ManifestSummary:
 
     def __post_init__(self) -> None:
         _hex64("manifest_sha256", self.manifest_sha256)
+        _hex64("sealed_test_manifest_sha256", self.sealed_test_manifest_sha256)
         for name in ("train_samples", "validation_samples", "train_families", "validation_families"):
             _positive_plain_int(name, getattr(self, name))
         if self.train_samples != PILOT_TRAIN_SAMPLES:
@@ -270,6 +272,7 @@ def summarize_stage8_pilot_manifest(
         raise Stage8ProfileError("pilot requires exactly 40 train and 10 validation samples")
     return Stage8ManifestSummary(
         manifest_sha256=real_data_manifest_sha256(manifest),
+        sealed_test_manifest_sha256=manifest.sealed_test_manifest_sha256,
         train_samples=len(train),
         validation_samples=len(validation),
         train_families=len({sample.family_id for sample in train}),
@@ -293,13 +296,14 @@ def stage8_receipt_set_sha256(receipt_sha256s: object) -> str:
 def make_stage8_candidate_binding(
     candidate: Stage8Candidate,
     *,
-    development_manifest_sha256: str,
+    manifest_summary: Stage8ManifestSummary,
     receipt_set_sha256: str,
-    sealed_test_manifest_sha256: str,
     profile: Stage8PairedRunProfile = Stage8PairedRunProfile(),
 ) -> Stage8ExperimentBinding:
     if not isinstance(profile, Stage8PairedRunProfile):
         raise TypeError("profile must be Stage8PairedRunProfile")
+    if not isinstance(manifest_summary, Stage8ManifestSummary):
+        raise Stage8ProfileError("manifest_summary must be Stage8ManifestSummary")
     if candidate is Stage8Candidate.CHECKPOINT_FINE_TUNE:
         checkpoint = STAGE7C_CHECKPOINT_SHA256
         model_state = STAGE7C_MODEL_STATE_SHA256
@@ -311,13 +315,9 @@ def make_stage8_candidate_binding(
     return Stage8ExperimentBinding(
         candidate=candidate,
         profile_fingerprint=stage8_paired_profile_fingerprint(profile),
-        development_manifest_sha256=_hex64(
-            "development_manifest_sha256", development_manifest_sha256
-        ),
+        development_manifest_sha256=manifest_summary.manifest_sha256,
         receipt_set_sha256=_hex64("receipt_set_sha256", receipt_set_sha256),
-        sealed_test_manifest_sha256=_hex64(
-            "sealed_test_manifest_sha256", sealed_test_manifest_sha256
-        ),
+        sealed_test_manifest_sha256=manifest_summary.sealed_test_manifest_sha256,
         initialization_checkpoint_sha256=checkpoint,
         initialization_model_state_sha256=model_state,
     )
@@ -326,7 +326,10 @@ def make_stage8_candidate_binding(
 def validate_paired_experiment_bindings(
     left: object,
     right: object,
+    profile: Stage8PairedRunProfile = Stage8PairedRunProfile(),
 ) -> tuple[Stage8ExperimentBinding, Stage8ExperimentBinding]:
+    if not isinstance(profile, Stage8PairedRunProfile):
+        raise TypeError("profile must be Stage8PairedRunProfile")
     if not isinstance(left, Stage8ExperimentBinding) or not isinstance(right, Stage8ExperimentBinding):
         raise Stage8ProfileError("paired bindings must be Stage8ExperimentBinding values")
     by_candidate = {left.candidate: left, right.candidate: right}
@@ -335,8 +338,12 @@ def validate_paired_experiment_bindings(
         raise Stage8ProfileError("paired experiment requires exactly Candidate A and Candidate B")
     candidate_a = by_candidate[Stage8Candidate.CHECKPOINT_FINE_TUNE]
     candidate_b = by_candidate[Stage8Candidate.FROM_SCRATCH]
+    expected_profile_fingerprint = stage8_paired_profile_fingerprint(profile)
+    if candidate_a.profile_fingerprint != expected_profile_fingerprint:
+        raise Stage8ProfileError("Candidate A profile fingerprint is not the frozen Stage 8-2 profile")
+    if candidate_b.profile_fingerprint != expected_profile_fingerprint:
+        raise Stage8ProfileError("Candidate B profile fingerprint is not the frozen Stage 8-2 profile")
     for name in (
-        "profile_fingerprint",
         "development_manifest_sha256",
         "receipt_set_sha256",
         "sealed_test_manifest_sha256",
