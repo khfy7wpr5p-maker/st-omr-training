@@ -1,8 +1,8 @@
 # Stage 8-0 — Real Data & Fine-Tuning Contract Freeze
 
-Status: **contract package only — no real-data intake, no training, no test opening**.
+Status: **closed — main CI verified; successor Stage 8-1 is separately gated**.
 
-This contract defines the boundary that must exist before ST-OMR may use any real score image for Stage 8 development. It does not authorize Stage 8-1 intake, fine-tuning, a sealed-test benchmark, model publication, or ScoreMosaic integration.
+This contract defines the boundary that must exist before ST-OMR may use any real score image for Stage 8 development. Stage 8-0 itself did not ingest data, run fine-tuning, open a sealed test, publish a model, or integrate with ScoreMosaic. Stage 8-1 byte-level work is governed separately by `STAGE8_1_INTAKE_CONTRACT.md` and does not weaken this frozen contract.
 
 ## Verified Stage 7-C baseline
 
@@ -23,9 +23,9 @@ The Stage 7-C model is therefore a reproducible trainability baseline, **not a p
 ```text
 Stage 7-C  Synthetic baseline + accepted evidence          CLOSED
         ↓
-Stage 8-0  Real-data and fine-tuning contract freeze      THIS PACKAGE
+Stage 8-0  Real-data and fine-tuning contract freeze      CLOSED — CI VERIFIED
         ↓
-Stage 8-1  Quarantine/intake + byte-level validators      LOCKED
+Stage 8-1  Quarantine/intake + byte-level validators      ACTIVE PACKAGE
         ↓
 Stage 8-2  Frozen paired experiment run profile           LOCKED
         ↓
@@ -36,7 +36,7 @@ Stage 9    Sealed benchmark / candidate decision          LOCKED
 Stage 10   ScoreMosaic integration decision               LOCKED
 ```
 
-The substage names after Stage 8-0 are planning labels only. They do not authorize implementation.
+Stage 8-1 is the only successor currently authorized for implementation, under its separate contract. Stage 8-2 and later names remain planning labels and do not authorize work.
 
 ## Real-data admission principle
 
@@ -57,7 +57,7 @@ Every future train/validation-eligible real sample must have an immutable metada
 
 The Stage 8 development manifest contains **train and validation metadata only** and records only the SHA-256 commitment of the separately sealed real-test manifest. Test sample identities, labels, hashes, or evidence records must not be copied into the development manifest.
 
-The Stage 8-0 validator in `st_omr_training/real_data_contract.py` validates only this metadata boundary. It deliberately performs no file ingestion. Stage 8-1 must separately implement byte-level source, image, MusicXML, and pairing validation before any real sample becomes train/validation accessible.
+The Stage 8-0 validator in `st_omr_training/real_data_contract.py` validates only this metadata boundary. It deliberately performs no file ingestion. Stage 8-1 adds the separately gated byte-level source, image, MusicXML, semantic, and handoff checks required before a later train/validation loader may trust admitted records.
 
 ## Rights, permission, provenance, and privacy
 
@@ -87,7 +87,7 @@ The following are binding:
 
 Real-data labels must stay inside the already-frozen supported-V1 semantic surface unless a later contract explicitly expands that surface.
 
-Before admission, the future Stage 8-1 byte-level gate must prove at minimum:
+Before admission to any later training loader, the Stage 8 byte-level path must prove at minimum:
 
 1. image bytes match the recorded image SHA-256;
 2. MusicXML bytes match the recorded MusicXML SHA-256;
@@ -98,6 +98,8 @@ Before admission, the future Stage 8-1 byte-level gate must prove at minimum:
 7. the resulting semantic fingerprint matches the recorded fingerprint;
 8. unsupported notation, ambiguous page alignment, incomplete labels, or unresolved transcription disagreement stays quarantined.
 
+Stage 8-1 implements the machine-verifiable byte/hash/format/semantic portion of this boundary. Pairing evidence and approval remain independent Stage 8-0 admission requirements; successful byte parsing does not replace human/organizational ground-truth review.
+
 A model prediction, Audiveris/Scan2Notes output, LLM output, OCR/OMR teacher output, or other automated transcription may not be treated as ground truth merely because it parses successfully.
 
 ## Quarantine and admission state
@@ -106,7 +108,7 @@ Real material enters a later Stage 8 intake only as **quarantined**. Quarantine 
 
 A sample becomes admitted only after all required provenance, rights, permission/privacy where applicable, target/pairing, hash, format, and semantic checks pass. Rejected material remains rejected; it must not be silently reclassified or copied under a new identity.
 
-The Stage 8-0 metadata validator distinguishes quarantine records from admitted training-manifest records. A quarantined record is structurally representable but is rejected by the training-eligible manifest validator.
+The Stage 8-0 metadata validator distinguishes quarantine records from admitted training-manifest records. A quarantined record is structurally representable but is rejected by the training-eligible manifest validator. Stage 8-1 byte validation operates on quarantined train/validation candidates and emits hash-only evidence; it does not itself flip admission state.
 
 ## Identity, duplicate, and leakage controls
 
@@ -122,7 +124,7 @@ An admitted real-data manifest must reject at minimum:
 - one exact MusicXML target appearing under multiple families or splits;
 - one exact supported-V1 semantic fingerprint appearing under multiple families or splits.
 
-`family_id` must be assigned at the broadest practical leakage boundary: alternate scans/photos/renders/crops/transcriptions/corrections of the same page or excerpt belong to one family. A later intake package must add perceptual/near-duplicate review; Stage 8-0 exact-hash checks do not claim to solve visual near-duplicate detection.
+`family_id` must be assigned at the broadest practical leakage boundary: alternate scans/photos/renders/crops/transcriptions/corrections of the same page or excerpt belong to one family. Stage 8-1 adds a deterministic perceptual near-duplicate candidate gate on top of these exact-hash rules. The perceptual heuristic is a conservative review/veto surface, not proof of musical identity and not a claim of perfect duplicate recall.
 
 ## Split policy and sealed test
 
@@ -134,7 +136,7 @@ Real data uses exactly three family-exclusive splits, but Stage 8 development mu
 
 The Stage 8 development manifest must contain admitted `train` and `validation` records only plus `sealed_test_manifest_sha256`, an opaque commitment to the separately controlled test manifest. A `test` record appearing in the development manifest is a hard veto. `select_stage8_development_records(...)` also fails closed immediately on `test`.
 
-The existing Stage 6 synthetic test split also remains sealed. Stage 8-0 does not open either test partition, enumerate test contents, or use test records for data selection, hyperparameters, architecture choices, threshold choices, or experiment comparison. Stage 8-1 must define the future one-time test-sealing procedure before any real test material exists; Stage 8-0 does not implement that procedure.
+The existing Stage 6 synthetic test split also remains sealed. Stage 8-0 did not open either test partition, enumerate test contents, or use test records for data selection, hyperparameters, architecture choices, threshold choices, or experiment comparison. Stage 8-1 likewise rejects test records before caller-provided bytes are inspected and defines only the future sealing rules; it does not create, enumerate, validate, or open real test material.
 
 ## Frozen experiment candidates
 
@@ -166,9 +168,9 @@ Neither a lower validation loss nor valid grammar-constrained MusicXML is suffic
 
 This repository may contain source code, contracts, tests using synthetic/hash-only fixtures, and small provenance metadata. It must not contain real/user documents, real score images, real MusicXML corpora, raw permission/license documents containing private information, large datasets, or model checkpoints.
 
-Stage 8-0 does not create storage credentials, a model registry, a cloud bucket, an upload endpoint, a ScoreMosaic connector, or a data-ingestion service.
+Stage 8-0 created no storage credentials, model registry, cloud bucket, upload endpoint, ScoreMosaic connector, or data-ingestion service. Stage 8-1 retains that boundary and adds no persistence or network intake path.
 
-## Required gate before Stage 8-0 closure
+## Stage 8-0 closure evidence
 
 ```text
 exact verified Stage 7-C main baseline
@@ -191,25 +193,15 @@ full repository regression + pip check + compileall
         ↓
 exact PR-head GitHub CI
         ↓
-separate explicit merge approval
+explicit merge approval
         ↓
 post-merge exact-main CI
         ↓
 Stage 8-0 CLOSED
 ```
 
-## Explicitly out of scope
+Stage 8-0 merged through PR #25 to exact `main` `86487a4c3c41264b02bd159cd647a1318d9b9b88`; post-merge run #75 (`31698691405`) succeeded. Closure synchronization merged through PR #26 to `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; post-merge run #77 (`31699497562`) succeeded.
 
-Stage 8-0 does not:
+## Explicitly out of scope for the closed Stage 8-0 package
 
-- ingest any real, user, or teacher-correction data;
-- download or scrape scores;
-- create a real dataset;
-- inspect or open either sealed test split;
-- load the Stage 7-C checkpoint bytes;
-- move, publish, copy, upload, or preserve the Stage 7-C artifact;
-- run training or fine-tuning;
-- change model architecture or tokenizer vocabulary;
-- start Stage 9 or Stage 10;
-- integrate with ScoreMosaic;
-- enable online/automatic learning.
+Stage 8-0 did not ingest real/user/teacher-correction data; download or scrape scores; create a real dataset; inspect either sealed test split; load/move/publish/copy/preserve the Stage 7-C checkpoint; run training/fine-tuning; change model architecture/tokenizer vocabulary; start Stage 9/10; integrate with ScoreMosaic; or enable online/automatic learning. Those prohibitions remain in force unless a later explicitly scoped contract changes a specific boundary.
