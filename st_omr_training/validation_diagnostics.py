@@ -2,8 +2,8 @@
 
 This module never trains a model and never accepts TEST samples. It compares
 already-decoded supported-V1 predictions with frozen validation targets and
-emits deterministic, aggregate-only quality diagnostics suitable for deciding
-what to improve next.
+emits deterministic quality diagnostics suitable for deciding what to improve
+next.
 """
 
 from __future__ import annotations
@@ -322,8 +322,10 @@ def analyze_validation_sample(
         predicted_measure = predicted_measures[index] if index < len(predicted_measures) else None
         if target_measure is None:
             assert predicted_measure is not None
-            extra_events += len(predicted_measure.voices[0].events)
-            predicted_events += len(predicted_measure.voices[0].events)
+            extra_measure_events = len(predicted_measure.voices[0].events)
+            extra_events += extra_measure_events
+            predicted_events += extra_measure_events
+            event_edits += extra_measure_events
             continue
         if predicted_measure is None:
             target_events = target_measure.voices[0].events
