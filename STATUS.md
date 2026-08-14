@@ -4,15 +4,14 @@ This file is the current stage-status source for this repository. Detailed close
 
 ## Current repository phase
 
-Verified baseline before Stage 7-D8 work:
+Verified baseline before Stage 7-D9 work:
 
-- `main`: `8d5e9e32cb9a96de08d81d6f62fbd6deee18df83`
-- PR #44 — Stage 7-D7 StaffSet + StructureSet specialist training: MERGED
-- D7 post-merge main CI: run #175 (`31836565453`) — SUCCESS
-- D7 post-merge regression: 531/531 PASS
-- Stage 7-D0 through Stage 7-D7: CLOSED
+- `main`: `afa5b71d1dd94803a1037322b7dfe3d13135a711`
+- PR #45 — Stage 7-D8 Structure validation diagnostics: MERGED
+- D8 post-merge main CI: run #177 (`31838215784`) — SUCCESS
+- Stage 7-D0 through Stage 7-D8: CLOSED
 
-The current active lane is **Stage 7-D8 — Structure validation diagnostics**. D8 does not train a model. It binds the exact accepted D7 external checkpoint and diagnoses the Structure specialist on VALIDATION only so that weak barline/meter channels are understood before any refinement is selected. TEST remains sealed.
+The current active lane is **Stage 7-D9 — Structure refinement contract**. D9 is declarative only. It freezes the D8-selected internal decomposition and acceptance gates before any new optimizer run. TEST remains sealed.
 
 ## Stage status
 
@@ -30,7 +29,8 @@ The current active lane is **Stage 7-D8 — Structure validation diagnostics**. 
 | 7-D5 | StaffSet + StructureSet deterministic geometry | ✅ Closed |
 | 7-D6 | TRAIN/VALIDATION StaffSet + StructureSet derivatives | ✅ Closed / PR #43 / main CI #171 PASS |
 | 7-D7 | StaffSet + StructureSet specialist training | ✅ Closed / PR #44 / main CI #175 PASS |
-| 7-D8 | Structure validation-only diagnostics | 🔄 Active — optimizer 0 / TEST sealed |
+| 7-D8 | Structure validation-only diagnostics | ✅ Closed / PR #45 / main CI #177 PASS |
+| 7-D9 | Structure refinement architecture/contract | 🔄 Active — no training / TEST sealed |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
 | 8-2 | Paired experiment profile | ✅ Closed / preserved |
@@ -80,15 +80,11 @@ D5 established synthetic spatial GT using pinned Verovio 6.2.1 and deterministic
 
 ## Accepted D6 derivative evidence
 
-D6 materialized only TRAIN and VALIDATION specialist labels:
-
 ```text
 TRAIN       410 families / 1,230 PNG → 1,230 label sidecars
 VALIDATION   51 families /   153 PNG →   153 label sidecars
 TEST         51 families /   153 PNG →     0 specialist labels
 ```
-
-Authoritative D6 identities:
 
 ```text
 derivative build ID      0faafe229f3497b1147cf0f0ac0ce4b7efe6fa31f360a6a33a3b82c986c8c519
@@ -100,11 +96,7 @@ family count                461
 TEST specialist records       0
 ```
 
-No Staff/Structure model was trained in D6.
-
 ## Accepted D7 training evidence
-
-D7 trained two independent dense-geometry specialists using the same accepted D6 development surface. TRAIN alone reached optimizers; VALIDATION remained read-only; TEST remained sealed.
 
 Authoritative external D7 identity:
 
@@ -121,22 +113,16 @@ TEST opened            false
 Staff result:
 
 ```text
-untrained validation loss  1.5256422758102417
 best validation loss       0.11952157418888348
-best epoch                  8
-optimizer steps             1,640
 staff_lines Dice            0.9216719705324906
 staff_region Dice           0.9126690970017359
-state SHA-256               3131548548521229e6acd6fee8cffc66081cb54125645f9eff5a488de7603af8
+optimizer steps             1,640
 ```
 
 Structure result:
 
 ```text
-untrained validation loss  1.7060188742784352
 best validation loss       0.49127569106908947
-best epoch                  8
-optimizer steps             1,640
 system_region Dice          0.93046746804164
 measure_region Dice         0.8445145579484793
 clef_g2 Dice                0.8228637140530807
@@ -144,44 +130,90 @@ barline Dice                0.2667824041384917
 meter_2_4 Dice              0.34398488560691476
 meter_3_4 Dice              0.34151152062874574
 meter_4_4 Dice              0.3092358358777486
-state SHA-256               0d11b2ae414959b678ccc22a6b8cfcc1edc1ecadc3c73ed6ab5a0cda6e593907
+optimizer steps             1,640
 ```
 
-D7 therefore closed as a successful first specialist training stage, but barline/meter channels are explicitly not treated as solved.
+D7 closed as a successful first specialist training stage, but barline/meter were explicitly unresolved.
 
-## Active D8 boundary
+## Accepted D8 diagnostic evidence
 
-D8 is diagnostic only. It must first safely reload the exact accepted D7 checkpoint and reproduce the exact accepted Structure validation loss and seven channel Dice values. Only then may it compute additional VALIDATION diagnostics.
-
-Frozen D8 diagnostic surface:
+D8 reloaded the exact accepted D7 checkpoint, reproduced the accepted Structure validation baseline, and performed only VALIDATION inference.
 
 ```text
-TRAIN tensor records       0
-VALIDATION tensor records 153 / 51 families
-TEST records               0
-optimizer steps            0
-model mutation             false
+D8 repository head       e0e721bf5a6d13025546fdf5eeb755647eef383f
+report SHA-256            46de5f6766f78bb567f70794a364ccd44835d09af94ef29c3f1eab5cd13ce968
+baseline validation loss  0.49127569106908947
+TRAIN tensors             0
+VALIDATION tensors        153 / 51 families
+TEST records              0
+optimizer steps           0
+model mutated             false
+TEST opened               false
 ```
 
-D8 measures every Structure channel with:
+Key D8 results:
 
-- global threshold sweep `0.05 ... 0.95`;
-- exact `0.50` precision/recall/Dice;
-- deterministic best diagnostic threshold;
-- positive-record and positive-pixel prevalence;
-- predicted probability separation on positive vs negative target pixels;
-- 1-pixel and 2-pixel tolerant localization F1 at `0.50` and at the diagnostic best threshold.
+| channel | Dice@0.50 | best threshold | best Dice | threshold gain | tolerant F1 @2px |
+|---|---:|---:|---:|---:|---:|
+| system_region | 0.9304226398 | 0.25 | 0.9339324257 | 0.0035097860 | 0.9898584521 |
+| measure_region | 0.8449312699 | 0.45 | 0.8455369242 | 0.0006056543 | 0.9793445289 |
+| barline | 0.2736204205 | 0.35 | 0.2749698120 | 0.0013493914 | 0.3670878904 |
+| clef_g2 | 0.8286431574 | 0.30 | 0.8298937531 | 0.0012505957 | 0.9441274383 |
+| meter_2_4 | 0.3481060606 | 0.50 | 0.3481060606 | 0.0 | 0.3892495018 |
+| meter_3_4 | 0.3528485803 | 0.70 | 0.3557100829 | 0.0028615027 | 0.4025582667 |
+| meter_4_4 | 0.3103351169 | 0.55 | 0.3109830753 | 0.0006479584 | 0.3547076746 |
 
-The purpose is to distinguish threshold/calibration error, thin-object near-miss localization, and sparse/representation limitations **before** changing loss, target rasterization, crop strategy, channel decomposition, epochs, or architecture.
+D8 rejected a simple threshold/calibration response. The weak channels occupy only about `0.00066–0.00104` of page pixels, and even 2px tolerance leaves them around `0.35–0.40` F1. The accepted interpretation is sparse-object/representation pressure in the shared whole-page Structure segmentation model.
 
-D8 writes only a canonical hash-addressed diagnostic report plus `COMPLETE` outside normal Git. It creates no checkpoint.
+## Active D9 boundary
+
+D9 keeps the external D4 `StructureSet` contract unchanged while freezing this internal decomposition before training:
+
+```text
+accepted D7 Structure core
+  ├─ system_region  -> frozen
+  ├─ measure_region -> frozen
+  └─ clef_g2        -> frozen
+
+barline_refiner
+  └─ high-resolution measure-end ROI -> barline_segment + confidence
+
+meter_refiner
+  └─ measure-start ROI -> none|2/4|3/4|4/4 + meter_bbox + confidence
+
+structure_fusion
+  └─ deterministic fail-closed fusion to unchanged StructureSet outputs
+```
+
+Frozen local ROI policies:
+
+```text
+barline  measure-end   192x128  aspect-preserving fit/pad
+meter    measure-start 192x256  aspect-preserving fit/pad
+```
+
+The accepted D7 Structure core is not retrained in the first refinement run. Only new local refiner weights may later reach an optimizer.
+
+Frozen pre-training validation gates:
+
+```text
+TEST records                                  0
+accepted D7 core mutation                     forbidden
+new trainable parameters                      <= 1,250,000
+barline strict Dice                           >= 0.500
+barline tolerant F1 @2px                      >= 0.700
+meter none|2/4|3/4|4/4 macro F1              >= 0.800
+meter positive localization tolerant F1 @2px  >= 0.600
+```
+
+D9 itself has no model/trainer/checkpoint execution path and authorizes no optimizer run.
 
 ## Safety boundaries
 
 - No direct commits to `main`; changes use branch/PR packages.
 - Large corpus/checkpoint artifacts stay outside normal Git.
-- D8 constructs no optimizer and performs no backward pass.
-- VALIDATION is read-only and cannot mutate model weights.
+- D9 is declarative only and performs no training.
+- VALIDATION remains read-only for future refinement selection.
 - TEST remains sealed until Stage 9.
 - Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain preserved and parked.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
@@ -191,6 +223,6 @@ D8 writes only a canonical hash-addressed diagnostic report plus `COMPLETE` outs
 
 ## Next gate
 
-Close D8 code/review/CI on one exact branch head, then run the authoritative validation-only diagnostic outside Git against the exact accepted D7 artifact bundle. Interpret the D8 report before selecting any Structure refinement. TEST is not opened for that decision.
+Close D9 contract/review/CI on one exact branch head. Only after D9 merge may the next package implement deterministic ROI derivatives and bounded barline/meter training under this frozen contract. TEST must remain sealed.
 
-See `STAGE7D8_STRUCTURE_DIAGNOSTICS.md` for the exact active diagnostic contract.
+See `STAGE7D9_STRUCTURE_REFINEMENT_CONTRACT.md` for the active contract.
