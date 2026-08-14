@@ -23,7 +23,7 @@ from .synthetic_curriculum_acceptance import (
     EXPECTED_TRANSPORT_SHA256,
 )
 
-EXPECTED_ARCHIVE_NAME: Final = "st-omr-synthetic-curriculum-v1-d9320e362f162cd2a.tar.gz"
+EXPECTED_ARCHIVE_NAME: Final = "st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz"
 EXPECTED_ARCHIVE_SIZE_BYTES: Final = 494_006_801
 EXPECTED_DATASET_NAME: Final = "st-omr-synthetic-curriculum-v1"
 EXPECTED_DATASET_VERSION: Final = "v1"
