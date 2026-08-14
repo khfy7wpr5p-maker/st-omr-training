@@ -8,7 +8,7 @@ Stage 7-D1 is the storage-integrity gate between the frozen Synthetic Curriculum
 
 The verifier accepts exactly two external inputs:
 
-1. the frozen transport archive `st-omr-synthetic-curriculum-v1-d9320e362f162cd2a.tar.gz`;
+1. the frozen transport archive `st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz`;
 2. an extracted Stage 6 corpus root containing only:
 
 ```text
@@ -69,7 +69,7 @@ Example execution in a Colab/local workspace after the archive has been copied l
 ```bash
 python -m st_omr_training.synthetic_curriculum_corpus_gate \
   --corpus-root /content/d1/st-omr-synthetic-curriculum-v1 \
-  --archive /content/drive/MyDrive/ST-OMR-SYNTHETIC/d9320e362f162cd2ace2a830a7b93e0c21ceba2d51a4e95ef1c7a9b11a108352/st-omr-synthetic-curriculum-v1-d9320e362f162cd2a.tar.gz \
+  --archive /content/drive/MyDrive/ST-OMR-SYNTHETIC/d9320e362f162cd2ace2a830a7b93e0c21ceba2d51a4e95ef1c7a9b11a108352/st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz \
   --evidence-output /content/st-omr-synthetic-curriculum-v1-d1.evidence.json
 ```
 
