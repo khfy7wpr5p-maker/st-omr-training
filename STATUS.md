@@ -4,7 +4,7 @@ This file is the current stage-status source for this repository. Detailed close
 
 ## Current repository phase
 
-The GitHub repository is private and GitHub Actions CI is active.
+The GitHub repository is public and GitHub Actions CI is active.
 
 Verified baseline before Stage 7-D1 work:
 
