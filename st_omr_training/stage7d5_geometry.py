@@ -257,7 +257,6 @@ class _RawSystem:
     measures: tuple[_RawMeasure, ...]
 
 
-# SVG forward affine: x' = a*x + c*y + e; y' = b*x + d*y + f.
 _Affine = tuple[float, float, float, float, float, float]
 _IDENTITY: Final[_Affine] = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
 
@@ -484,19 +483,23 @@ def _cumulative_transform(
 def _coordinate_root(
     root: ET.Element,
 ) -> tuple[ET.Element, tuple[float, float, float, float]]:
-    """Select the coordinate system that owns Verovio drawing coordinates.
+    """Select the coordinate system that owns pinned Verovio drawing units.
 
-    Pinned Verovio emits drawing paths below ``svg#definition-scale`` whose
-    viewBox is normally 10x the outer page SVG viewBox. BBox rect coordinates
-    and staff/barline paths are expressed in this definition coordinate space.
+    Verovio 6.2.1 creates the nested drawing SVG with
+    ``class="definition-scale"``. Its viewBox is expressed in definition units
+    (normally 10x the outer page viewBox), and the child ``page-margin`` group
+    carries the page-origin translation. The class token is authoritative;
+    using a historical/sample ``id`` silently selects the wrong coordinate
+    space and is therefore forbidden here.
     """
 
     outer_view_box = _parse_view_box(root)
     matches = [
         element
         for element in root.iter()
-        if _local(element.tag) == "svg"
-        and element.attrib.get("id") == "definition-scale"
+        if element is not root
+        and _local(element.tag) == "svg"
+        and "definition-scale" in _class_tokens(element)
     ]
     if not matches:
         return root, outer_view_box
@@ -524,7 +527,9 @@ def _coordinate_root(
     definition_view_box = _parse_view_box(definition)
     outer_aspect = outer_view_box[2] / outer_view_box[3]
     definition_aspect = definition_view_box[2] / definition_view_box[3]
-    if not math.isclose(outer_aspect, definition_aspect, rel_tol=1e-9, abs_tol=1e-12):
+    if not math.isclose(
+        outer_aspect, definition_aspect, rel_tol=1e-9, abs_tol=1e-12
+    ):
         raise Stage7D5GeometryError(
             "definition-scale and outer SVG aspect ratios disagree"
         )
