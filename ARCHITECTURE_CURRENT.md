@@ -1,6 +1,6 @@
 # ST-OMR Training — Current Architecture Overlay
 
-This file records the current active lane without replacing the repository's long-form closed-stage architecture history in `ARCHITECTURE.md`.
+This file records the current active lane without replacing the repository's long-form closed-stage history in `ARCHITECTURE.md`.
 
 ## Active pipeline
 
@@ -23,15 +23,17 @@ Stage 7-D0 canonical export-evidence gate       ✅ CLOSED
         ↓
 Stage 7-D1 archive/corpus byte acceptance       ✅ CLOSED
         ↓
-Stage 7-D2 full synthetic train + validation    ✅ CLOSED
+Stage 7-D2 monolithic train + validation        ✅ CLOSED / diagnostic baseline
         ↓
 Stage 7-D3 validation error diagnostics         ✅ CLOSED
         ↓
 Stage 7-D4 specialist architecture contract     ✅ CLOSED
         ↓
-Stage 7-D5 StaffSet + StructureSet geometry     🔄 ACTIVE
+Stage 7-D5 StaffSet + StructureSet geometry     ✅ CLOSED
         ↓
-TRAIN/VALIDATION specialist derivative gate     🔒 NEXT
+Stage 7-D6 TRAIN/VAL specialist derivatives     🔄 ACTIVE / TEST SEALED
+        ↓
+StaffSet + StructureSet specialist training     🔒
         ↓
 NoteHead / Rest / Accidental specialists        🔒
         ↓
@@ -42,22 +44,20 @@ Deterministic fusion + ContextSet validation    🔒
 Stage 9 sealed test benchmark/candidate gate    🔒 TEST SEALED
 ```
 
-## Accepted D2/D3 evidence
+## Why the architecture changed
 
-D2 completed 40 epochs / 12,320 optimizer steps on 1,230 TRAIN images and selected epoch 20 from 153 VALIDATION images. The accepted checkpoint reduced validation loss but exact-sequence accuracy remained `0.0` and token error rate remained about `0.8474`; it is not a production OMR candidate.
+The accepted D2 monolithic baseline learned enough to produce structurally valid semantic sequences, but recognition remained poor: exact-sequence accuracy `0.0` and TER about `0.8474`. D3 localized broad failures across pitch, duration, event type, chord size and event completeness, while clean/light/medium derivatives were diagnostically identical family-by-family. This rejected “more epochs” as the primary response and selected small musical tasks with specialist models.
 
-D3 then diagnosed the accepted checkpoint on the same 153 validation images with zero optimizer steps, zero TRAIN diagnostic exposure and zero TEST diagnostic exposure. The error map showed broad failure across pitch, rhythm, event type, chord size and event completeness. Clean/light/medium variants were diagnostically identical family-by-family. D3 therefore selected specialist task decomposition rather than further monolithic training.
-
-## Stage 7-D4 specialist architecture
+## Specialist OMR graph
 
 ```text
 PDF / score image
         ↓
-page/system preparation
+page / system preparation
         ↓
-StaffSet / staff_geometry
+StaffSet
         ↓
-StructureSet / systems + measures + barlines + G2 + meter
+StructureSet
         ↓
 ┌───────────────────────────────────────────────┐
 │ NoteHeadSet      note-head center/bbox/fill  │
@@ -86,73 +86,96 @@ Candidate + confidence / veto
 
 ## Ground-truth authority
 
-Synthetic labels are split into two classes:
+Synthetic labels have two authorities:
 
-- **symbolic** labels come from the existing canonical music object;
-- **spatial** labels must come from pinned Verovio renderer geometry and be mapped through the exact raster/degradation geometry transform.
+- **symbolic GT** comes from the deterministic canonical music/MusicXML path;
+- **spatial GT** comes from pinned Verovio geometry and the exact accepted coordinate transform into the final PNG.
 
-MusicXML alone is not a valid source of pixel geometry. If renderer elements cannot be linked reliably to canonical events, that specialist sample fails closed.
+MusicXML alone is not a pixel-geometry source. AI never manufactures GT.
 
-For real images, an admitted image+MusicXML pair is not sufficient for spatial specialist training. Staff lines, measure boxes, note-head centers, accidental boxes, stem/beam geometry and chord spatial grouping require independently human-verified annotation under a later explicit admission contract.
+For real images, a valid image+MusicXML pair is not enough for spatial specialist training. Staff lines, measure regions, note-head centers, accidental boxes, stem/beam geometry and spatial grouping later require independently human-verified annotation plus the existing rights/provenance/privacy admission gate.
 
-## Stage 7-D5 StaffSet + StructureSet geometry
+## Closed D5 spatial boundary
 
-D5 operationalizes the first spatial ground-truth boundary without training a model.
+D5 uses two renders of the same validated MusicXML under the same pinned Verovio 6.2.1 layout:
 
 ```text
-validated canonical MusicXML
-        │
-        ├──────────────► frozen normal Verovio render ─► training PNG
-        │
-        └──────────────► same pinned layout
-                         + invisible bbox instrumentation
-                                  ↓
-                         Verovio definition-scale SVG geometry
-                                  ↓
-                         system / measure / five staff lines
-                         barline / clef / meter geometry
-                                  ↓
-                         canonical measure+meter binding
-                                  ↓
-                         deterministic coordinate replay
-                         ├── SVG ancestor transforms
-                         ├── CairoSVG uniform raster scale
-                         ├── Pillow expand rotation
-                         └── photometric transforms = no geometry change
-                                  ↓
-                         final PNG pixel coordinates
+validated MusicXML
+      ├── normal frozen render ─────────────► training PNG
+      └── same layout + invisible bbox instrumentation
+                                      ↓
+                             Verovio geometry
+                                      ↓
+                      staff/system/measure/barline
+                         visible G2/meter boxes
+                                      ↓
+                      exact coordinate replay
+                  SVG transforms → raster scale
+                    → Pillow expand rotation
+                                      ↓
+                       final PNG pixel geometry
 ```
 
-The secondary geometry render is separately fingerprinted. It adds only pinned Verovio `svgBoundingBoxes` and `svgContentBoundingBoxes`; it does not change the frozen base renderer configuration. Live tests require the normal render and bbox-instrumented render to rasterize to exactly the same clean image bytes.
+The geometry render is separately fingerprinted and does not change the frozen Stage-3 renderer configuration. D5 live tests prove the normal and instrumented renders preserve visible raster output.
 
-Pinned Verovio 6.2.1 expresses drawing paths below a nested SVG with the **class token** `definition-scale`; the page-margin translation and any supported ancestor transform are replayed explicitly. D5 fails closed on missing/ambiguous geometry, non-five-line staffs, hash/provenance mismatch, unsupported transforms, canonical/SVG measure-count disagreement, or coordinate-space drift.
+Pinned Verovio drawing geometry is resolved through the nested `class="definition-scale"` coordinate space and supported ancestor transforms. D5 fails closed on ambiguous/missing geometry, non-five-line staffs, unsupported transforms, hash/provenance mismatch, canonical/SVG disagreement or coordinate drift.
 
-### D5 label surface
+A rotated final PNG can slant a barline, so D5 operationally supersedes D4's scalar `barline_x` with a two-point `barline_segment`.
+
+## Active D6 derivative layer
+
+D6 applies the closed D5 geometry contract to the frozen **development** surface only:
+
+```text
+Frozen source manifest
+        ↓
+read split first
+        ├── TEST → immediate skip
+        ├── TRAIN 1,230 images / 410 families
+        └── VALIDATION 153 images / 51 families
+                    ↓
+            render geometry once per family
+                    ↓
+      replay each derivative's exact PNG transform
+                    ↓
+       canonical hash-addressed label sidecar
+```
+
+D6 output contains no copied PNGs or MusicXML files. Each of the 1,383 development sidecars references its already-frozen PNG by SHA-256 and binds:
+
+- source sample/family/split/page identity;
+- source PNG SHA-256 and dimensions;
+- source MusicXML and normal SVG SHA-256 lineage;
+- renderer/degradation fingerprints;
+- D5 geometry/transform versions;
+- final-PNG StaffSet and StructureSet geometry.
+
+The independent D6 gate reparses persisted JSON and verifies exact development cardinality, family-exclusive split inheritance, canonical bytes, hash/provenance bindings, label-file exactness, five staff lines, system/staff/measure references, supported meter classes and finite in-bounds coordinates.
+
+D1 remains allowed to hash the sealed TEST split only as whole-corpus storage integrity. D6 creates **zero TEST specialist records** and does not derive TEST image/path/geometry/label data after the split boundary.
+
+## StaffSet / StructureSet surface
 
 `StaffSet`:
 
-- graphical staff instance id;
-- owning system id;
-- exactly five staff-line segments;
-- staff-instance bounding box;
-- staff spacing.
+- one or more graphical staff instances belonging to the one V1 logical staff;
+- exactly five staff-line segments per graphical instance;
+- staff bounding box;
+- staff spacing;
+- owning system id.
 
-`StructureSet` pilot:
+`StructureSet`:
 
 - system id + bounding box;
-- measure id + canonical measure number + bounding box;
+- measure id + canonical measure number + content bounding box;
 - trailing barline segment;
-- visible G2 clef bounding box when present;
-- visible meter bounding box when present;
-- canonical meter class `2/4|3/4|4/4`.
-
-D4's scalar `barline_x` is superseded operationally by `barline_segment`. This is a versioned D5 correction rather than a rewrite of the historical D4 fingerprint: rotation in final PNG space can make the barline slanted, so one scalar x-coordinate cannot be authoritative.
-
-The pilot has no dataset split loader. Repository golden fixtures prove geometry extraction only; a later small derivative-builder package will apply the accepted geometry contract to TRAIN and VALIDATION while continuing to skip TEST before label/path derivation.
+- visible G2 clef box when present;
+- visible meter box when present;
+- canonical `2/4|3/4|4/4` meter class.
 
 ## Pitch authority
 
-The learned V1 pitch specialist is spatial only:
+The learned V1 pitch specialist remains spatial only:
 
 ```text
 note-head + staff geometry
@@ -165,39 +188,28 @@ G2 + staff position + accidental state
 canonical pitch
 ```
 
-A learned absolute pitch prediction cannot override the deterministic resolver.
+A learned absolute pitch prediction cannot override this resolver.
 
 ## Fusion authority
 
-V1 fusion is deterministic, not learned. It must enforce at minimum:
+V1 fusion is deterministic. It must enforce at minimum supported G2/key/meter scope, exact measure duration totals, accidental scope, chord size 2–4, common chord onset/duration, explicit low-confidence/conflict handling, existing deterministic MusicXML writing and independent validation/round-trip. Hard-rule violations retain veto authority.
 
-- supported V1 G2/key/meter surface;
-- exact measure duration totals;
-- deterministic accidental scope;
-- chord size 2–4;
-- common chord onset and duration;
-- explicit conflicts/low-confidence regions;
-- veto on unsupported or ambiguous hard-rule violations;
-- existing deterministic MusicXML writer and independent validation/round-trip.
+## V1 / deferred boundary
 
-## V1/deferred boundary
+V1 remains single part, one logical staff, single voice, treble G2, key 0, meters `2/4|3/4|4/4`, whole/half/quarter/eighth notes, half/quarter/eighth rests, 2–4-note chords, and controlled sharp/flat/natural. A rendered page may contain multiple graphical instances of the one logical staff when notation wraps across systems.
 
-V1 remains single part, one logical staff, single voice, treble G2, key 0, meters `2/4|3/4|4/4`, whole/half/quarter/eighth notes, half/quarter/eighth rests, 2–4-note chords, and controlled sharp/flat/natural. A rendered page may contain multiple graphical instances of that one logical staff when the notation wraps across systems.
-
-Still deferred: multiple voices, grand staff, multiple instruments, cross-staff, tuplets, ties, slurs, dotted values, full-measure/multi-measure rests, and non-zero key signatures.
+Still deferred: multiple voices, grand staff, multiple instruments, cross-staff, tuplets, ties, slurs, dotted values, full-measure/multi-measure rests and non-zero key signatures.
 
 ## Split boundary
 
-- Train: 410 families / 1,230 images — specialist development may derive labels only here.
-- Validation: 51 families / 153 images — specialist selection/diagnostics may derive labels here.
-- Test: 51 families / 153 images — sealed until Stage 9; no specialist label derivation during development.
+- TRAIN: 410 families / 1,230 images — D6 may derive specialist labels.
+- VALIDATION: 51 families / 153 images — D6 may derive specialist labels.
+- TEST: 51 families / 153 images — sealed until Stage 9; D6 derives zero specialist labels.
 
-Every specialist derivative inherits its source family's split. D1 whole-corpus hashing remains storage-integrity only and does not open TEST for model development.
-
-D5 itself does not enumerate the frozen corpus and has no split loader. The next derivative-data package must explicitly reject/skip TEST before deriving any TEST path, SVG geometry, label, or image byte for specialist development.
+Every specialist derivative inherits its source family's split. No specialist model training starts until D6's authoritative frozen-corpus build and independent gate are accepted.
 
 ## Real-data lane
 
-The existing Stage 8 rights/provenance/privacy/intake/preparation architecture remains preserved and parked during specialist synthetic architecture work. Existing real image+MusicXML admission does not automatically satisfy specialist spatial-label requirements.
+Stage 8 rights/provenance/privacy/intake/preparation architecture remains preserved and parked while the synthetic specialist lane is established. ScoreMosaic uploads and teacher corrections are not automatic training data. Online/automatic learning remains prohibited.
 
-ScoreMosaic uploads and teacher corrections are not automatic training data. Any future correction must pass explicit permission/licensing/privacy/provenance/quality/split admission before it may become training data. Online/automatic learning remains prohibited.
+See `STAGE7D6_SPECIALIST_DERIVATIVES.md` for the active derivative contract.
