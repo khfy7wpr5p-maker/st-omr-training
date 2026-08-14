@@ -62,7 +62,7 @@ def _payload() -> dict[str, object]:
             "target_count": 512,
             "image_count": 1536,
         },
-        "transport_archive": "st-omr-synthetic-curriculum-v1-d9320e362f162cd2a.tar.gz",
+        "transport_archive": "st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz",
         "transport_sha256": EXPECTED_TRANSPORT_SHA256,
     }
 
