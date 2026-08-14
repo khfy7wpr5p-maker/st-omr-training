@@ -4,15 +4,15 @@ This file is the current stage-status source for this repository. Detailed close
 
 ## Current repository phase
 
-Verified baseline before Stage 7-D7 work:
+Verified baseline before Stage 7-D8 work:
 
-- `main`: `be8177bd294f6554e558f8385d2e00d89bc9dede`
-- PR #43 — Stage 7-D6 StaffSet + StructureSet specialist derivatives: MERGED
-- D6 post-merge main CI: run #171 (`31821595254`) — SUCCESS
-- D6 post-merge regression: 522/522 PASS
-- Stage 7-D0 through Stage 7-D6: CLOSED
+- `main`: `8d5e9e32cb9a96de08d81d6f62fbd6deee18df83`
+- PR #44 — Stage 7-D7 StaffSet + StructureSet specialist training: MERGED
+- D7 post-merge main CI: run #175 (`31836565453`) — SUCCESS
+- D7 post-merge regression: 531/531 PASS
+- Stage 7-D0 through Stage 7-D7: CLOSED
 
-The current active lane is **Stage 7-D7 — StaffSet + StructureSet specialist training**. D7 is the first real specialist-model training stage. It consumes only the accepted D6 TRAIN/VALIDATION derivative set, trains two independent models, keeps VALIDATION read-only, and keeps TEST sealed.
+The current active lane is **Stage 7-D8 — Structure validation diagnostics**. D8 does not train a model. It binds the exact accepted D7 external checkpoint and diagnoses the Structure specialist on VALIDATION only so that weak barline/meter channels are understood before any refinement is selected. TEST remains sealed.
 
 ## Stage status
 
@@ -29,7 +29,8 @@ The current active lane is **Stage 7-D7 — StaffSet + StructureSet specialist t
 | 7-D4 | Specialist OMR architecture + GT/fusion contract | ✅ Closed |
 | 7-D5 | StaffSet + StructureSet deterministic geometry | ✅ Closed |
 | 7-D6 | TRAIN/VALIDATION StaffSet + StructureSet derivatives | ✅ Closed / PR #43 / main CI #171 PASS |
-| 7-D7 | StaffSet + StructureSet specialist training | 🔄 Active — TEST sealed |
+| 7-D7 | StaffSet + StructureSet specialist training | ✅ Closed / PR #44 / main CI #175 PASS |
+| 7-D8 | Structure validation-only diagnostics | 🔄 Active — optimizer 0 / TEST sealed |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
 | 8-2 | Paired experiment profile | ✅ Closed / preserved |
@@ -99,59 +100,87 @@ family count                461
 TEST specialist records       0
 ```
 
-The authoritative external build and second independent persisted-output gate both passed before PR #43 merged. No Staff/Structure model was trained in D6.
+No Staff/Structure model was trained in D6.
 
-## Active D7 boundary
+## Accepted D7 training evidence
 
-D7 trains two task-isolated models:
+D7 trained two independent dense-geometry specialists using the same accepted D6 development surface. TRAIN alone reached optimizers; VALIDATION remained read-only; TEST remained sealed.
 
-### Staff specialist
-
-Dense targets:
-
-- `staff_lines`
-- `staff_region`
-
-### Structure specialist
-
-Dense targets:
-
-- `system_region`
-- `measure_region`
-- `barline`
-- `clef_g2`
-- `meter_2_4`
-- `meter_3_4`
-- `meter_4_4`
-
-Both consume resized/inverted `96 × 512` grayscale images and deterministic rasterizations of the accepted D6 final-PNG geometry. They do not share weights or optimizers.
-
-Frozen D7 profile:
+Authoritative external D7 identity:
 
 ```text
-TRAIN samples       1,230 / optimizer allowed
-VALIDATION samples    153 / read-only
-TEST records             0 / forbidden
-batch size                6
-epochs                     8 per specialist
-optimizer              AdamW
-learning rate          0.0007
-weight decay           0.0001
-grad clip              1.0
-objective              BCE-with-logits + soft Dice
-checkpoint selection   minimum validation loss per specialist
-runtime                pinned deterministic CPU PyTorch
+run ID                 4ce2903206c7965471bb9569d379d8d9d1022d9248d80886638acfe0bd822598
+D7 repository head     25bdf2b3146faba54a93c00f05537f522c75b532
+profile fingerprint    7b7fbc79c748da0f1195bc9273fe012e0b1128b3a1e491bb484653d47cb5201a
+checkpoint SHA-256     5f009ca8ba68d38497a7dd25590d4dd98c537f20c5d5525bf66e288afbf417dc
+metrics SHA-256        43cd98a75c2db740b4af6ee3c8826122fa387347820d2e7d2c639ac2fe30f792
+verification SHA-256   cdc0733af1bd6c7336f5bd2a0cb12fcae269120d8b5a9a564f08db860ee21a0a
+TEST opened            false
 ```
 
-D7 reruns the independent D6 verifier before loading training records and requires the exact accepted D6 manifest/build/artifact identities. A TEST record fails immediately after reading only `split`, before D7 image/label path derivation.
+Staff result:
 
-Each authoritative D7 run stays outside normal Git and writes hash-addressed checkpoint, metrics, verification and COMPLETE artifacts. Staff and Structure checkpoint states must reload safely with `torch.load(..., weights_only=True)` and reproduce their exact model-state hashes.
+```text
+untrained validation loss  1.5256422758102417
+best validation loss       0.11952157418888348
+best epoch                  8
+optimizer steps             1,640
+staff_lines Dice            0.9216719705324906
+staff_region Dice           0.9126690970017359
+state SHA-256               3131548548521229e6acd6fee8cffc66081cb54125645f9eff5a488de7603af8
+```
+
+Structure result:
+
+```text
+untrained validation loss  1.7060188742784352
+best validation loss       0.49127569106908947
+best epoch                  8
+optimizer steps             1,640
+system_region Dice          0.93046746804164
+measure_region Dice         0.8445145579484793
+clef_g2 Dice                0.8228637140530807
+barline Dice                0.2667824041384917
+meter_2_4 Dice              0.34398488560691476
+meter_3_4 Dice              0.34151152062874574
+meter_4_4 Dice              0.3092358358777486
+state SHA-256               0d11b2ae414959b678ccc22a6b8cfcc1edc1ecadc3c73ed6ab5a0cda6e593907
+```
+
+D7 therefore closed as a successful first specialist training stage, but barline/meter channels are explicitly not treated as solved.
+
+## Active D8 boundary
+
+D8 is diagnostic only. It must first safely reload the exact accepted D7 checkpoint and reproduce the exact accepted Structure validation loss and seven channel Dice values. Only then may it compute additional VALIDATION diagnostics.
+
+Frozen D8 diagnostic surface:
+
+```text
+TRAIN tensor records       0
+VALIDATION tensor records 153 / 51 families
+TEST records               0
+optimizer steps            0
+model mutation             false
+```
+
+D8 measures every Structure channel with:
+
+- global threshold sweep `0.05 ... 0.95`;
+- exact `0.50` precision/recall/Dice;
+- deterministic best diagnostic threshold;
+- positive-record and positive-pixel prevalence;
+- predicted probability separation on positive vs negative target pixels;
+- 1-pixel and 2-pixel tolerant localization F1 at `0.50` and at the diagnostic best threshold.
+
+The purpose is to distinguish threshold/calibration error, thin-object near-miss localization, and sparse/representation limitations **before** changing loss, target rasterization, crop strategy, channel decomposition, epochs, or architecture.
+
+D8 writes only a canonical hash-addressed diagnostic report plus `COMPLETE` outside normal Git. It creates no checkpoint.
 
 ## Safety boundaries
 
 - No direct commits to `main`; changes use branch/PR packages.
 - Large corpus/checkpoint artifacts stay outside normal Git.
-- TRAIN only can execute optimizer steps in D7.
+- D8 constructs no optimizer and performs no backward pass.
 - VALIDATION is read-only and cannot mutate model weights.
 - TEST remains sealed until Stage 9.
 - Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain preserved and parked.
@@ -162,6 +191,6 @@ Each authoritative D7 run stays outside normal Git and writes hash-addressed che
 
 ## Next gate
 
-Close D7 code/review/CI on one exact branch head, then run the authoritative Staff/Structure training outside Git against the accepted D6 derivatives. D7 closes only after checkpoint, metrics and verification hashes are independently accepted. TEST is not opened to decide whether the Staff/Structure specialists are good enough to continue.
+Close D8 code/review/CI on one exact branch head, then run the authoritative validation-only diagnostic outside Git against the exact accepted D7 artifact bundle. Interpret the D8 report before selecting any Structure refinement. TEST is not opened for that decision.
 
-See `STAGE7D7_STAFF_STRUCTURE_TRAINING.md` for the exact active training contract.
+See `STAGE7D8_STRUCTURE_DIAGNOSTICS.md` for the exact active diagnostic contract.
