@@ -88,9 +88,10 @@ class Stage7D2ExecutionTests(unittest.TestCase):
                 }
             )
         for _index in range(153):
-            # Deliberately malformed TEST metadata. If D2 derives a path/hash from
-            # TEST before skipping it, this fixture fails immediately.
-            samples.append({"split": "test", "png_sha256": object()})
+            # Deliberately invalid hash metadata that remains valid JSON. If D2
+            # validates/derives TEST artifact identity before skipping TEST, this
+            # fixture fails at the loader boundary.
+            samples.append({"split": "test", "png_sha256": "not-a-sha"})
 
         manifest = {"samples": samples}
         manifest_bytes = canonical(manifest)
