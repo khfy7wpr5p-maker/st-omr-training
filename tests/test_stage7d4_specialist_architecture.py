@@ -40,8 +40,9 @@ class Stage7D4SpecialistArchitectureTests(unittest.TestCase):
 
     def test_v1_music_scope_and_deferred_surface_do_not_expand(self) -> None:
         self.assertEqual(contract.V1_MUSIC_POLICY["parts"], 1)
-        self.assertEqual(contract.V1_MUSIC_POLICY["staves"], 1)
+        self.assertEqual(contract.V1_MUSIC_POLICY["logical_staves_per_part"], 1)
         self.assertEqual(contract.V1_MUSIC_POLICY["voices"], 1)
+        self.assertEqual(contract.V1_MUSIC_POLICY["rendered_staff_instances_per_page"], "one_or_more")
         self.assertEqual(contract.V1_MUSIC_POLICY["clef"], "G2")
         self.assertEqual(contract.V1_MUSIC_POLICY["key_fifths"], 0)
         self.assertEqual(contract.V1_MUSIC_POLICY["meters"], ("2/4", "3/4", "4/4"))
@@ -56,6 +57,15 @@ class Stage7D4SpecialistArchitectureTests(unittest.TestCase):
             "nonzero_key_signatures",
         ):
             self.assertIn(deferred, contract.DEFERRED_SPECIALIST_SURFACE)
+
+    def test_staffset_distinguishes_logical_staff_from_graphical_instances(self) -> None:
+        staff_set = next(item for item in contract.V1_SPECIALIST_DATASETS if item.set_name == "StaffSet")
+        self.assertIn("staff_instance_id", staff_set.labels)
+        self.assertIn("staff_instance_bbox", staff_set.labels)
+        staff_task = next(task for task in contract.V1_SPECIALIST_TASKS if task.task_id == "staff_geometry")
+        self.assertIn("staff_instances", staff_task.outputs)
+        self.assertIn("one logical V1 staff", staff_task.responsibility)
+        self.assertIn("one or more rendered systems", staff_task.responsibility)
 
     def test_ground_truth_has_no_learned_or_ai_source(self) -> None:
         self.assertNotIn("ai", contract.ALLOWED_GT_SOURCES)
@@ -82,6 +92,17 @@ class Stage7D4SpecialistArchitectureTests(unittest.TestCase):
                 real_ground_truth=(contract.GT_ADMITTED_REAL_MUSICXML,),
                 geometry_required=True,
             )
+
+    def test_geometry_transform_policy_is_explicit_and_fail_closed(self) -> None:
+        policy = contract.GEOMETRY_LABEL_POLICY
+        self.assertEqual(policy["synthetic_source_space"], "pinned_verovio_svg")
+        self.assertEqual(policy["training_coordinate_space"], "final_png_pixels")
+        self.assertTrue(policy["canonical_event_link_required_where_applicable"])
+        self.assertEqual(policy["unlinked_or_ambiguous_renderer_element"], "reject_specialist_sample")
+        self.assertEqual(policy["rotation_mapping"], "replay_exact_pillow_rotate_expand_true_geometry")
+        self.assertFalse(policy["photometric_transforms_change_geometry"])
+        self.assertFalse(policy["jpeg_roundtrip_changes_geometry"])
+        self.assertTrue(policy["geometry_transform_must_be_fingerprinted"])
 
     def test_pitch_specialist_predicts_staff_position_not_absolute_pitch(self) -> None:
         pitch_task = next(task for task in contract.V1_SPECIALIST_TASKS if task.task_id == "staff_position")
@@ -123,6 +144,15 @@ class Stage7D4SpecialistArchitectureTests(unittest.TestCase):
             },
         )
 
+    def test_trainable_specialists_expose_confidence(self) -> None:
+        for task in contract.V1_SPECIALIST_TASKS:
+            if task.trainable:
+                self.assertTrue(task.confidence_required)
+                self.assertIn("confidence", task.outputs)
+
+        with self.assertRaises(ValueError):
+            replace(contract.V1_SPECIALIST_TASKS[0], outputs=("staff_instances",))
+
     def test_test_split_and_teacher_data_remain_sealed(self) -> None:
         self.assertFalse(contract.SPLIT_POLICY["test_model_development_access"])
         self.assertFalse(contract.SPLIT_POLICY["test_specialist_dataset_derivation_during_development"])
@@ -144,6 +174,7 @@ class Stage7D4SpecialistArchitectureTests(unittest.TestCase):
         self.assertTrue(contract.is_sha256_hex(first))
         self.assertEqual(first_payload["schema"], contract.STAGE7D4_CONTRACT_SCHEMA)
         self.assertEqual(first_payload["version"], contract.STAGE7D4_ARCHITECTURE_VERSION)
+        self.assertEqual(first_payload["geometry_label_policy"], contract.GEOMETRY_LABEL_POLICY)
 
     def test_task_contract_rejects_duplicate_edges_and_empty_io(self) -> None:
         base = contract.V1_SPECIALIST_TASKS[1]
