@@ -38,7 +38,7 @@ page/system preparation
 ┌───────────────────────────────────────────────────┐
 │ VISUAL SPECIALISTS                                │
 │                                                   │
-│ StaffSet      → staff geometry                    │
+│ StaffSet      → graphical staff instances         │
 │ StructureSet  → system/measure/barline/G2/meter  │
 │ NoteHeadSet   → note-head center/bbox/fill       │
 │ RestSet       → supported rest glyph/duration    │
@@ -68,12 +68,28 @@ Existing independent MusicXML validation + round-trip
 Candidate + confidence / veto
 ```
 
+## Logical staff versus graphical staff instances
+
+V1 contains **one logical staff per part**, but a rendered page may contain that same logical staff more than once because notation can wrap into multiple systems. Therefore StaffSet does not assume one staff rectangle per page.
+
+```text
+one logical V1 staff
+        ↓
+render layout
+        ↓
+one or more graphical staff instances
+        ↓
+StructureSet groups instances into systems/measures
+```
+
+Every graphical staff instance must have its own bounded identity, bbox, five line geometries, spacing, and coordinate lineage.
+
 ## Important pitch boundary
 
 The V1 **Pitch specialist does not authoritatively predict C4/D5/etc.** Its learned responsibility is spatial:
 
 ```text
-note-head center + five staff lines
+note-head center + owning staff instance
         ↓
 staff_position specialist
         ↓
@@ -124,9 +140,21 @@ exact raster scale / rotation-expand transform
 PNG-space labels
 ```
 
-If a rendered glyph cannot be linked reliably to its canonical event, the specialist training sample is rejected. No heuristic or learned model may fabricate the missing label.
+If a rendered glyph cannot be linked reliably to its canonical event where an event link is required, the specialist training sample is rejected. No heuristic or learned model may fabricate the missing label.
 
 Photometric degradation (blur, brightness, contrast, noise, JPEG round-trip) does not change geometry. Rotation with expansion does change coordinates and therefore must have an explicit replayable geometry transform bound to the derivative identity.
+
+### Machine-readable geometry policy
+
+The D4 contract freezes these geometry rules:
+
+- synthetic source coordinate space: pinned Verovio SVG;
+- training coordinate space: final PNG pixels;
+- clean raster mapping must use the exact SVG viewBox → CairoSVG raster dimensions;
+- rotation must replay the exact Pillow `rotate(..., expand=True)` geometry;
+- blur/brightness/contrast/noise/JPEG do not rewrite coordinates;
+- every geometry transform must be fingerprinted;
+- ambiguous or unlinked required renderer geometry rejects that specialist sample.
 
 ### Real specialist sets
 
@@ -135,7 +163,7 @@ An admitted real image + MusicXML pair is **not sufficient by itself** for spati
 Current Stage 8 admission controls remain necessary but do not automatically create:
 
 - staff-line coordinates;
-- measure boxes;
+- system/measure boxes;
 - note-head boxes/centers;
 - accidental boxes;
 - stem/beam geometry;
@@ -147,11 +175,12 @@ Those labels require a later explicit annotation/admission contract before real 
 
 ### StaffSet
 
-Purpose: staff/system geometry foundation.
+Purpose: graphical staff geometry foundation for the one logical V1 staff across one or more rendered systems.
 
-V1 labels:
+V1 labels per graphical staff instance:
 
-- staff bounding box;
+- staff instance identity;
+- staff instance bounding box;
 - five staff lines;
 - staff spacing.
 
@@ -161,8 +190,8 @@ Purpose: page/system/measure segmentation and supported notation header structur
 
 V1 labels:
 
-- system bounding box;
-- measure bounding boxes;
+- system identity and bounding box;
+- measure identity and bounding box;
 - barline positions;
 - G2 clef bounding box/presence;
 - meter bounding box and class (`2/4`, `3/4`, `4/4`).
@@ -215,7 +244,7 @@ The specialist detects a glyph; deterministic association and accidental-scope v
 
 ### PitchSet
 
-Purpose: note-head-to-staff spatial position.
+Purpose: note-head-to-owning-staff spatial position.
 
 V1 labels:
 
@@ -274,7 +303,7 @@ The machine-readable contract performs an explicit cycle check.
 Supported in this architecture contract:
 
 - one part;
-- one staff;
+- one **logical** staff per part, with one or more graphical staff instances across rendered systems;
 - one voice;
 - treble clef G2;
 - key signature 0;
@@ -348,6 +377,7 @@ D4 adds only:
 
 - this architecture document;
 - a machine-readable frozen specialist contract;
+- D3→D4 decision provenance binding;
 - contract invariant tests;
 - current status/architecture synchronization.
 
@@ -359,13 +389,15 @@ Stage 7-D4 may close only after:
 
 1. the specialist task list and V1/deferred surface are machine-readable and frozen;
 2. synthetic versus real ground-truth provenance rules are explicit;
-3. deterministic pitch/fusion authority is explicit;
-4. split/test/teacher-data boundaries are preserved;
-5. contract-focused tests pass;
-6. full repository regression + compile checks pass on the exact PR head;
-7. independent review finds no P1/P2 contract defect;
-8. explicit user merge approval is obtained;
-9. post-merge exact-main CI succeeds.
+3. logical-staff versus graphical-staff-instance semantics are explicit;
+4. deterministic raster/degradation geometry authority is explicit;
+5. deterministic pitch/fusion authority is explicit;
+6. split/test/teacher-data boundaries are preserved;
+7. contract-focused tests pass;
+8. full repository regression + compile checks pass on the exact PR head;
+9. independent review finds no P1/P2 contract defect;
+10. explicit user merge approval is obtained;
+11. post-merge exact-main CI succeeds.
 
 ## Next implementation package after D4
 
