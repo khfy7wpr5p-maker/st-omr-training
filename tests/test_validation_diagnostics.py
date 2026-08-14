@@ -29,21 +29,23 @@ def _pitch(step: str, octave: int = 4) -> SemanticPitchProjection:
     )
 
 
+def _measure(number: int, events: tuple[SemanticEventProjection, ...]) -> SemanticMeasureProjection:
+    return SemanticMeasureProjection(
+        number=number,
+        time_signature=(4, 4),
+        key_signature=0,
+        clef="treble",
+        voices=(SemanticVoiceProjection(voice_id=1, events=events),),
+    )
+
+
 def _projection(events: tuple[SemanticEventProjection, ...]) -> SemanticScoreProjection:
     return SemanticScoreProjection(
         parts=(
             SemanticPartProjection(
                 part_id="P1",
                 staff_count=1,
-                measures=(
-                    SemanticMeasureProjection(
-                        number=1,
-                        time_signature=(4, 4),
-                        key_signature=0,
-                        clef="treble",
-                        voices=(SemanticVoiceProjection(voice_id=1, events=events),),
-                    ),
-                ),
+                measures=(_measure(1, events),),
             ),
         ),
     )
@@ -134,6 +136,45 @@ class ValidationDiagnosticsTests(unittest.TestCase):
         self.assertEqual(sample.pitch_identity_correct, 0)
         self.assertEqual(sample.chord_events, 1)
         self.assertEqual(sample.chord_size_correct, 0)
+
+    def test_extra_predicted_measure_counts_toward_event_error(self):
+        whole_c = SemanticEventProjection(
+            "note", Fraction(0, 1), Fraction(1, 1), 1, (_pitch("C"),)
+        )
+        whole_d = SemanticEventProjection(
+            "note", Fraction(0, 1), Fraction(1, 1), 1, (_pitch("D"),)
+        )
+        target = _projection((whole_c,))
+        predicted = SemanticScoreProjection(
+            parts=(
+                SemanticPartProjection(
+                    part_id="P1",
+                    staff_count=1,
+                    measures=(
+                        _measure(1, (whole_c,)),
+                        _measure(2, (whole_d,)),
+                    ),
+                ),
+            ),
+        )
+        sample = analyze_validation_sample(
+            sample_id="9" * 64,
+            family_id="family-9",
+            target_token_ids=_ids(target),
+            predicted_token_ids=_ids(predicted),
+        )
+        self.assertEqual(sample.reference_events, 1)
+        self.assertEqual(sample.predicted_events, 2)
+        self.assertEqual(sample.extra_events, 1)
+        self.assertEqual(sample.event_edits, 1)
+        report, _raw, _digest = build_validation_diagnostic_report(
+            (sample,),
+            repository_sha="a" * 40,
+            checkpoint_sha256="b" * 64,
+            checkpoint_state_sha256="c" * 64,
+            source_run_id="d" * 64,
+        )
+        self.assertEqual(report["aggregate"]["event_error_rate"], 1.0)
 
     def test_report_is_canonical_order_independent_and_feature_bucketed(self):
         target = _projection(
