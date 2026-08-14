@@ -4,18 +4,19 @@ This file is the current stage-status source for this repository. Detailed close
 
 ## Current repository phase
 
-Verified baseline before Stage 7-D4 work:
+Verified baseline before Stage 7-D5 work:
 
-- `main`: `168c03755f0e06e8042fc0a391a357c71c6288fe`
-- PR #40 — Stage 7-D3 validation error diagnostics: MERGED
-- post-merge main CI: run #146 (`31797006780`) — SUCCESS
-- post-merge regression: 483/483 PASS
+- `main`: `96dbb720df7845baebc980518180b8dd9183776b`
+- PR #41 — Stage 7-D4 specialist OMR architecture contract: MERGED
+- post-merge main CI: run #151 (`31801492807`) — SUCCESS
+- post-merge regression: 499/499 PASS
 - Stage 7-D0: CLOSED
 - Stage 7-D1: CLOSED
 - Stage 7-D2: CLOSED
 - Stage 7-D3: CLOSED
+- Stage 7-D4: CLOSED
 
-The current active lane is **Stage 7-D4 — Specialist OMR Architecture Contract**. D4 performs no training and opens no TEST data. It freezes the decomposition into small visual/musical specialist tasks plus deterministic fusion/context validation.
+The current active lane is **Stage 7-D5 — StaffSet + StructureSet deterministic geometry pilot**. D5 performs no training and opens no TEST data. It proves that synthetic spatial ground truth can be extracted from the pinned Verovio layout and mapped deterministically into the exact final PNG coordinate space.
 
 ## Stage status
 
@@ -29,7 +30,8 @@ The current active lane is **Stage 7-D4 — Specialist OMR Architecture Contract
 | 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ✅ Closed |
 | 7-D2 | Synthetic V1 train/validation execution | ✅ Closed / non-production baseline |
 | 7-D3 | Validation-only semantic error diagnostics | ✅ Closed / PR #40 merged / main CI #146 PASS |
-| 7-D4 | Specialist OMR architecture + ground-truth/fusion contract | 🔄 Active — no training / TEST sealed |
+| 7-D4 | Specialist OMR architecture + ground-truth/fusion contract | ✅ Closed / PR #41 merged / main CI #151 PASS |
+| 7-D5 | StaffSet + StructureSet deterministic geometry pilot | 🔄 Active — no training / TEST sealed |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
 | 8-2 | Paired experiment profile | ✅ Closed / preserved |
@@ -94,7 +96,7 @@ The error map shows broad representation failure across pitch, rhythm, event typ
 
 ## Stage 7-D4 boundary
 
-D4 freezes the V1 expert/task graph and the ground-truth authority rules:
+D4 froze the V1 expert/task graph and the ground-truth authority rules:
 
 ```text
 StaffSet      -> staff geometry
@@ -112,12 +114,32 @@ Absolute pitch is **not** authoritative learned output in V1. It is resolved det
 
 Synthetic symbolic ground truth comes from canonical music. Synthetic spatial ground truth must come from pinned renderer geometry plus an exact deterministic raster/degradation coordinate transform. Real spatial ground truth requires independently human-verified annotation; an admitted image+MusicXML pair alone is insufficient for spatial specialist training.
 
+## Stage 7-D5 geometry proof
+
+D5 implements a secondary, separately fingerprinted geometry render of the same validated MusicXML using the same pinned Verovio 6.2.1 layout plus only invisible `svgBoundingBoxes` and `svgContentBoundingBoxes` instrumentation. The frozen Stage-3 renderer defaults/fingerprint are not modified.
+
+The pilot extracts:
+
+- one `StaffSet` graphical instance per rendered system in V1;
+- exactly five staff-line segments and staff spacing;
+- system and measure bounding boxes;
+- trailing barline segments;
+- visible G2-clef and meter bounding boxes when present;
+- canonical measure number and meter class from independently parsed MusicXML semantics.
+
+The pinned Verovio SVG uses a nested `class="definition-scale"` coordinate space plus ancestor transforms such as the page-margin translation. D5 resolves that coordinate space explicitly, applies the required SVG transforms, then maps geometry through CairoSVG scaling and the exact Pillow 12.3.0 `rotate(..., expand=True)` geometry used by controlled degradation. Photometric degradation does not alter coordinates.
+
+A D4 representation issue was found and corrected without rewriting the historical D4 fingerprint: scalar `barline_x` is superseded operationally by `barline_segment`, because a rotated final PNG makes a barline non-vertical.
+
+Pre-documentation exact-head CI #156 (`31804989648`) passed **514/514 tests**, including all six Stage-2 golden MusicXML live geometry/raster-equivalence tests and clean/light/medium final-coordinate mapping. The final exact-head CI result is recorded in the PR closure evidence rather than this branch-tracked status file, avoiding self-referential CI/head churn.
+
 ## Safety boundaries
 
 - No direct commits to `main`; changes use small branch/PR packages.
 - Large corpus/checkpoint artifacts stay outside normal Git.
-- D4 contains no model, trainer, optimizer, checkpoint loader or TEST evaluator.
-- Specialist derivatives inherit the source family split.
+- D5 contains no model, trainer, optimizer, checkpoint loader or TEST evaluator.
+- D5 has no dataset split loader; its live proof uses repository golden fixtures only.
+- Specialist derivatives inherit the source family split when a later corpus builder is introduced.
 - TEST specialist labels are not derived during development and TEST remains sealed until Stage 9.
 - Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain intact and parked.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
@@ -127,4 +149,4 @@ Synthetic symbolic ground truth comes from canonical music. Synthetic spatial gr
 
 ## Next gate
 
-Pass focused/full CI and independent review for Stage 7-D4. After D4 merge, the first implementation package is **StaffSet + StructureSet ground-truth extraction/pilot**. It must prove deterministic renderer-to-raster geometry labels before any specialist model training begins.
+Pass final exact-head CI and independent review for Stage 7-D5, then obtain explicit merge approval. After D5 closes, the next small package should build and independently validate TRAIN/VALIDATION-only `StaffSet` + `StructureSet` specialist derivatives from the frozen Synthetic Curriculum; TEST remains sealed and no specialist model training starts until that derivative-data gate is accepted.
