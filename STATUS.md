@@ -4,18 +4,18 @@ This file is the current stage-status source for this repository. Detailed close
 
 ## Current repository phase
 
-The GitHub repository is public and GitHub Actions CI is active.
+Verified baseline before Stage 7-D2 work:
 
-Verified baseline before Stage 7-D1 work:
-
-- `main`: `a3e8412df4dd8d84b0c69aac58361c597883e12c`
-- PR #37 — Stage 7-D export evidence gate: merged
-- post-merge main CI: run #126 (`31749693208`) — SUCCESS
+- `main`: `46c7cfe85e734dbbe2e4c0a9ee33dc0f9c5d0e1a`
+- PR #38 — Stage 7-D1 corpus byte acceptance: MERGED
+- post-merge main CI: run #136 (`31779546692`) — SUCCESS
+- post-merge regression: 465/465 PASS
 - Stage 7-D0: CLOSED
+- Stage 7-D1: CLOSED
 
-The current active lane is **Stage 7-D1 — Synthetic Corpus Byte / Manifest Acceptance**. The external frozen corpus acceptance run has passed and final PR-head CI has passed. D1 remains open until PR #38 is merged and exact-main post-merge CI succeeds. Model training is not authorized in D1.
+The current active lane is **Stage 7-D2 — Synthetic V1 Train / Validation Execution** on draft PR #39. D2 training has not yet been accepted or merged. The exact external run must occur from a clean PR checkout after PR-head CI is green.
 
-The accepted Stage 7-C model remains non-production: best validation loss was approximately `0.99924`, exact sequence accuracy was `0%`, token error rate was approximately `0.805`, and 21/21 validation predictions passed semantic/MusicXML regeneration checks.
+The Stage 7-C model remains the comparison baseline: best validation loss approximately `0.99924`, exact sequence accuracy `0%`, token error rate approximately `0.805`, and 21/21 validation predictions passed semantic/MusicXML regeneration checks.
 
 ## Stage status
 
@@ -26,14 +26,14 @@ The accepted Stage 7-C model remains non-production: best validation loss was ap
 | 7-B | Tokenizer/data/model/trainer implementation | ✅ Closed / main CI verified |
 | 7-C | Bounded baseline training + evidence | ✅ Closed / main CI verified; non-production baseline |
 | 7-D0 | Synthetic Curriculum v1 export-evidence identity gate | ✅ Closed / main CI verified |
-| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ⏭ Merge-ready; explicit merge approval pending — no training |
-| 7-D2 | Synthetic V1 train/validation execution | 🔒 Not started |
+| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ✅ Closed / PR #38 merged / main CI #136 PASS |
+| 7-D2 | Synthetic V1 train/validation execution | 🔄 Active — PR #39; authoritative run pending |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
 | 8-2 | Paired experiment profile | ✅ Closed / preserved |
-| 8-3A | Real pilot preparation/admission components | ⏸ Parked — do not expand during Synthetic V1 lane |
+| 8-3A | Real pilot preparation/admission components | ⏸ Parked during Synthetic V1 lane |
 | 8-3B | Paired real train/validation execution | 🔒 Not started |
-| 9 | Sealed benchmark and candidate decision | 🔒 Not started — test sealed |
+| 9 | Sealed benchmark and candidate decision | 🔒 Not started — TEST sealed |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
 
 ## Frozen Synthetic Curriculum v1
@@ -50,55 +50,56 @@ images               1536 = 1230 train + 153 validation + 153 test
 targets              512 MusicXML
 ```
 
-## Stage 7-D1 external acceptance evidence
-
-The exact verifier from PR #38 was run in Colab against the real frozen Drive archive and a fresh extraction after independent transport SHA-256 verification. The run returned code `0` and emitted the canonical D1 receipt.
+## Stage 7-D1 accepted receipt
 
 ```text
 receipt file SHA-256       9a86da742035a7a1644ffd8874587cdc479087539d6320596495a2bd6f7399d0
 artifact binding SHA-256   e603b945c6dc60cf7e618ae28a7734dee97cf0e05a81891479107b18a87af540
-archive bytes              494006801
 target bytes total         3506839
 image bytes total          494937881
-families                   test 51 / train 410 / validation 51
-samples                    test 153 / train 1230 / validation 153
-images                     1536
-targets                    512
 ```
 
-The receipt is canonical ASCII JSON and independently matches the frozen source commit, build ID, config fingerprint, manifest SHA-256, transport archive name, transport SHA-256, counts, and split contract. Test artifacts were read only for storage-integrity hashing; they remain sealed from training/validation.
+D1 was executed against the real Drive archive, independently checked, merged through PR #38, and verified again by exact-main CI #136.
 
-During the external run, a P2 archive-name contract typo in PR #38 was exposed fail-closed. The PR branch was corrected to the actual D0/Drive frozen archive name `st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz`, and a regression test now requires D0 and D1 to share that exact name.
+## Stage 7-D2 frozen development boundary
 
-Final PR head before merge approval: `6c52ec82c5e0851a11818b1efdb24d3ea2f85f4b`. PR CI run #134 (`31779153945`) checked GitHub's merge candidate `124f7fa20be8c10fa4f9121f58b2b4261ba7bb7a` and passed 465/465 tests, pinned dependency checks, `pip check`, and `compileall` on Ubuntu 24.04 / Python 3.13.
+D2 holds the Stage 7-C model, trainer, tokenizer and preprocessing policies fixed and changes only the accepted curriculum size.
 
-## Stage 7-D1 closure gate
+```text
+TRAIN       410 families / 1230 images -> parameter updates
+VALIDATION   51 families /  153 images -> checkpoint selection + development metrics
+TEST         51 families /  153 images -> sealed until Stage 9
+```
 
-D1 independently verifies:
+D2 profile: 40 epochs, batch size 4, 1 retained best checkpoint, 1536 max decode tokens, 8-measure decode constraint. Expected optimizer steps: 12,320.
 
-1. exact transport archive filename, size, and SHA-256;
-2. manifest SHA-256 and canonical manifest structure;
-3. build ID and config fingerprint;
-4. exact sample/image/target and family/split counts;
-5. family-exclusive split integrity and three derivatives per family;
-6. exact hash-addressed filename sets;
-7. SHA-256 of every persisted PNG and MusicXML artifact;
-8. no missing/extra/symlink artifacts;
-9. a small canonical hash-only acceptance receipt.
+Before training, D2 re-runs the D1 byte gate. After D1 returns, TEST rows are skipped before any D2 test artifact path or byte is derived. Only TRAIN and VALIDATION references may enter model-development code.
 
-All pre-merge D1 acceptance criteria are now PASS. D1 is not closed until PR #38 receives explicit merge approval, is merged, and exact-main post-merge CI succeeds.
+## D2 closure gate
+
+Stage 7-D2 may close only after all of the following:
+
+1. exact PR-head CI succeeds;
+2. the accepted Drive corpus passes D1 re-verification from the clean PR checkout;
+3. all 1,230 TRAIN images and 153 VALIDATION images are admitted with exact frozen identities;
+4. the 40-epoch run completes without TEST development access;
+5. validation loss improves over the deterministic untrained model;
+6. at least one validation prediction crosses the semantic/MusicXML gate;
+7. checkpoint, metrics and authoritative verification hashes are independently checked;
+8. the exact run result is recorded as small evidence;
+9. explicit merge approval is obtained;
+10. exact-main post-merge CI succeeds.
 
 ## Safety boundaries
 
 - No direct commits to `main`; changes use small branch/PR packages.
-- No stage closes without focused tests, full regression, and relevant CI evidence.
-- Large dataset/checkpoint artifacts stay outside normal Git.
-- Training may update parameters only from train; validation may select checkpoints; synthetic test remains sealed until Stage 9.
-- D1 may hash test artifacts only for complete archive-integrity verification and does not expose them to training/evaluation logic.
-- Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain intact.
+- Large corpus/checkpoint artifacts stay outside normal Git.
+- Parameter updates use TRAIN only; VALIDATION may select the checkpoint; TEST stays sealed until Stage 9.
+- D1 may read TEST artifact bytes only for whole-corpus storage integrity and returns no TEST sample data.
+- Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain intact and parked.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
 - No online or automatic learning path is allowed.
 
 ## Next gate
 
-PR #38 is merge-ready. Request explicit merge approval for exact head `6c52ec82c5e0851a11818b1efdb24d3ea2f85f4b`. After merge, verify exact-main GitHub CI before closing Stage 7-D1. Stage 7-D2 training remains locked until that closure evidence exists.
+Finish PR #39 CI, then execute `stage7d2_execution` in Colab against the already accepted Drive corpus from the exact clean PR head. Do not merge PR #39 before authoritative D2 evidence is independently verified.
