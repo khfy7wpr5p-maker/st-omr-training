@@ -4,15 +4,15 @@ This file is the current stage-status source for this repository. Detailed close
 
 ## Current repository phase
 
-Verified baseline before Stage 7-D6 work:
+Verified baseline before Stage 7-D7 work:
 
-- `main`: `b1e0b5b67544627222b10bbe64a7c9ae3aebbb61`
-- PR #42 — Stage 7-D5 StaffSet + StructureSet deterministic geometry pilot: MERGED
-- D5 post-merge main CI: run #160 (`31806509396`) — SUCCESS
-- D5 post-merge regression: 514/514 PASS
-- Stage 7-D0 through Stage 7-D5: CLOSED
+- `main`: `be8177bd294f6554e558f8385d2e00d89bc9dede`
+- PR #43 — Stage 7-D6 StaffSet + StructureSet specialist derivatives: MERGED
+- D6 post-merge main CI: run #171 (`31821595254`) — SUCCESS
+- D6 post-merge regression: 522/522 PASS
+- Stage 7-D0 through Stage 7-D6: CLOSED
 
-The current active lane is **Stage 7-D6 — TRAIN/VALIDATION StaffSet + StructureSet specialist derivative gate**. D6 performs no model training. It creates small canonical JSON labels that reference the existing frozen corpus PNGs by SHA-256; it does not duplicate the image corpus. TEST rows are skipped before specialist field/path/label derivation.
+The current active lane is **Stage 7-D7 — StaffSet + StructureSet specialist training**. D7 is the first real specialist-model training stage. It consumes only the accepted D6 TRAIN/VALIDATION derivative set, trains two independent models, keeps VALIDATION read-only, and keeps TEST sealed.
 
 ## Stage status
 
@@ -24,11 +24,12 @@ The current active lane is **Stage 7-D6 — TRAIN/VALIDATION StaffSet + Structur
 | 7-C | Bounded baseline training + evidence | ✅ Closed / non-production baseline |
 | 7-D0 | Synthetic Curriculum v1 export-evidence identity gate | ✅ Closed |
 | 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ✅ Closed |
-| 7-D2 | Synthetic V1 train/validation execution | ✅ Closed / non-production baseline |
+| 7-D2 | Synthetic V1 monolithic train/validation execution | ✅ Closed / non-production baseline |
 | 7-D3 | Validation-only semantic error diagnostics | ✅ Closed / specialist decomposition selected |
 | 7-D4 | Specialist OMR architecture + GT/fusion contract | ✅ Closed |
-| 7-D5 | StaffSet + StructureSet deterministic geometry pilot | ✅ Closed / PR #42 / main CI #160 PASS |
-| 7-D6 | TRAIN/VALIDATION StaffSet + StructureSet derivatives | 🔄 Active — no training / TEST sealed |
+| 7-D5 | StaffSet + StructureSet deterministic geometry | ✅ Closed |
+| 7-D6 | TRAIN/VALIDATION StaffSet + StructureSet derivatives | ✅ Closed / PR #43 / main CI #171 PASS |
+| 7-D7 | StaffSet + StructureSet specialist training | 🔄 Active — TEST sealed |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
 | 8-2 | Paired experiment profile | ✅ Closed / preserved |
@@ -50,15 +51,13 @@ images               1536 = 1230 train + 153 validation + 153 test
 targets              512 MusicXML
 ```
 
-## Accepted Stage 7-D2 / D3 finding
+## Accepted D2 / D3 finding
 
 D2 proved the monolithic execution path but not usable OMR recognition: best validation loss `0.9379074645594616`, exact sequence accuracy `0.0`, TER `0.847364947676063`, semantic/MusicXML validity `1.0`, TEST development exposure `0`.
 
-D3 then diagnosed the accepted D2 checkpoint on 153 validation images with zero optimizer steps, zero TRAIN diagnostic exposure and zero TEST diagnostic exposure. Key results included pitch identity `0.0`, duration accuracy about `0.1842`, chord-size accuracy `0.0`, rest recognition about `0.6563`, and TER about `0.8474`. The error map therefore rejected a simple “more epochs” response and selected **specialist musical-task decomposition**.
+D3 diagnosed the accepted D2 checkpoint on 153 validation images with zero optimizer steps and zero TEST exposure. Key results included pitch identity `0.0`, duration accuracy about `0.1842`, chord-size accuracy `0.0`, rest recognition about `0.6563`, and TER about `0.8474`. This rejected a simple “more epochs” response and selected specialist musical-task decomposition.
 
 ## Accepted specialist architecture
-
-D4 froze the V1 task graph:
 
 ```text
 StaffSet      -> staff geometry
@@ -74,22 +73,13 @@ ContextSet    -> deterministic musical validation
 
 Absolute pitch is not authoritative learned output in V1. It is resolved deterministically from `G2 + staff position + accidental state`.
 
-Synthetic symbolic GT comes from canonical music. Synthetic spatial GT comes from pinned renderer geometry plus exact deterministic coordinate replay. Real spatial GT later requires independently human-verified annotation; an image+MusicXML pair alone is insufficient.
+## Accepted D5 geometry
 
-## Accepted Stage 7-D5 geometry proof
+D5 established synthetic spatial GT using pinned Verovio 6.2.1 and deterministic final-PNG coordinate replay. The accepted `stage7d5-staff-structure-geometry-v2` contract excludes post-barline courtesy meter signatures from the current measure and uses `barline_segment` for rotation-safe geometry.
 
-D5 established the synthetic spatial GT boundary using the same pinned Verovio 6.2.1 layout plus separately fingerprinted invisible bbox instrumentation. It extracts graphical staff instances, five staff-line segments, staff spacing, systems, measures, trailing barline segments, visible G2/meter boxes and canonical measure/meter binding.
+## Accepted D6 derivative evidence
 
-D5 also corrected two geometry assumptions before closure:
-
-- scalar `barline_x` was superseded by `barline_segment`, because final-PNG rotation can slant a barline;
-- pinned Verovio drawing coordinates are resolved through the nested `class="definition-scale"` space plus ancestor transforms, rather than treating the outer SVG viewBox as drawing coordinates.
-
-All D5 live golden/raster-equivalence and clean/light/medium coordinate-mapping tests passed before merge; PR #42 then merged and post-merge CI #160 passed 514/514 tests.
-
-## Stage 7-D6 boundary
-
-D6 materializes the accepted D5 geometry only for the development splits:
+D6 materialized only TRAIN and VALIDATION specialist labels:
 
 ```text
 TRAIN       410 families / 1,230 PNG → 1,230 label sidecars
@@ -97,20 +87,73 @@ VALIDATION   51 families /   153 PNG →   153 label sidecars
 TEST         51 families /   153 PNG →     0 specialist labels
 ```
 
-Each sidecar is canonical hash-addressed JSON and binds the exact source PNG SHA-256, source MusicXML/SVG lineage, renderer/degradation fingerprints and final-PNG-coordinate StaffSet/StructureSet geometry. PNGs and MusicXML files are not copied into the derivative set.
+Authoritative D6 identities:
 
-The builder reruns D1 whole-corpus integrity first. D1 may hash TEST artifacts only as frozen storage-integrity evidence. Once the D6 manifest is read, TEST is skipped immediately after `split`; no TEST specialist artifact path, image hash, geometry or label is derived.
+```text
+derivative build ID      0faafe229f3497b1147cf0f0ac0ce4b7efe6fa31f360a6a33a3b82c986c8c519
+manifest SHA-256          e8e415eb6ba9d91a1a880709c3f31d559aa20bf5149734f45b5f84ced16afee9
+artifact binding SHA-256  3b7558f0f927ad47a61ed5afb5faa8584dca8647cf8683d4043686eb7b077ea1
+receipt SHA-256           8fe85747b77f2282be3662f0c3d180a440c88028638bf1df7ddadfbb7650fff2
+label count               1,383
+family count                461
+TEST specialist records       0
+```
 
-Persisted D6 artifacts are independently reparsed and gated for canonical bytes, source/provenance binding, exact counts, family-exclusive split inheritance, no forbidden split, label hashes, five-line StaffSet structure, system/staff/measure cross-reference consistency and finite in-bounds final-PNG geometry.
+The authoritative external build and second independent persisted-output gate both passed before PR #43 merged. No Staff/Structure model was trained in D6.
 
-See `STAGE7D6_SPECIALIST_DERIVATIVES.md` for the exact derivative contract.
+## Active D7 boundary
+
+D7 trains two task-isolated models:
+
+### Staff specialist
+
+Dense targets:
+
+- `staff_lines`
+- `staff_region`
+
+### Structure specialist
+
+Dense targets:
+
+- `system_region`
+- `measure_region`
+- `barline`
+- `clef_g2`
+- `meter_2_4`
+- `meter_3_4`
+- `meter_4_4`
+
+Both consume resized/inverted `96 × 512` grayscale images and deterministic rasterizations of the accepted D6 final-PNG geometry. They do not share weights or optimizers.
+
+Frozen D7 profile:
+
+```text
+TRAIN samples       1,230 / optimizer allowed
+VALIDATION samples    153 / read-only
+TEST records             0 / forbidden
+batch size                6
+epochs                     8 per specialist
+optimizer              AdamW
+learning rate          0.0007
+weight decay           0.0001
+grad clip              1.0
+objective              BCE-with-logits + soft Dice
+checkpoint selection   minimum validation loss per specialist
+runtime                pinned deterministic CPU PyTorch
+```
+
+D7 reruns the independent D6 verifier before loading training records and requires the exact accepted D6 manifest/build/artifact identities. A TEST record fails immediately after reading only `split`, before D7 image/label path derivation.
+
+Each authoritative D7 run stays outside normal Git and writes hash-addressed checkpoint, metrics, verification and COMPLETE artifacts. Staff and Structure checkpoint states must reload safely with `torch.load(..., weights_only=True)` and reproduce their exact model-state hashes.
 
 ## Safety boundaries
 
 - No direct commits to `main`; changes use branch/PR packages.
 - Large corpus/checkpoint artifacts stay outside normal Git.
-- D6 contains no model trainer, optimizer, checkpoint loader or TEST evaluator.
-- TEST specialist labels are not derived during development and TEST remains sealed until Stage 9.
+- TRAIN only can execute optimizer steps in D7.
+- VALIDATION is read-only and cannot mutate model weights.
+- TEST remains sealed until Stage 9.
 - Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain preserved and parked.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
 - Real geometry labels require human-verified annotation and explicit admission.
@@ -119,4 +162,6 @@ See `STAGE7D6_SPECIALIST_DERIVATIVES.md` for the exact derivative contract.
 
 ## Next gate
 
-Complete D6 exact-head CI and independent review, then run the authoritative derivative build against the frozen Synthetic Curriculum v1 outside Git. D6 closes only if the persisted gate proves exactly **1,383 development labels / 461 families / TEST specialist records = 0**. No StaffSet/StructureSet model training begins before that gate closes.
+Close D7 code/review/CI on one exact branch head, then run the authoritative Staff/Structure training outside Git against the accepted D6 derivatives. D7 closes only after checkpoint, metrics and verification hashes are independently accepted. TEST is not opened to decide whether the Staff/Structure specialists are good enough to continue.
+
+See `STAGE7D7_STAFF_STRUCTURE_TRAINING.md` for the exact active training contract.
