@@ -131,7 +131,7 @@ The pinned Verovio SVG uses a nested `class="definition-scale"` coordinate space
 
 A D4 representation issue was found and corrected without rewriting the historical D4 fingerprint: scalar `barline_x` is superseded operationally by `barline_segment`, because a rotated final PNG makes a barline non-vertical.
 
-Pre-documentation exact-head CI #156 (`31804989648`) passed **514/514 tests**, including all six Stage-2 golden MusicXML live geometry/raster-equivalence tests and clean/light/medium final-coordinate mapping. Final exact-head CI is required again after this documentation sync.
+Pre-documentation exact-head CI #156 (`31804989648`) passed **514/514 tests**, including all six Stage-2 golden MusicXML live geometry/raster-equivalence tests and clean/light/medium final-coordinate mapping. The final exact-head CI result is recorded in the PR closure evidence rather than this branch-tracked status file, avoiding self-referential CI/head churn.
 
 ## Safety boundaries
 
