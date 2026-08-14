@@ -4,17 +4,18 @@ This file is the current stage-status source for this repository. Detailed close
 
 ## Current repository phase
 
-Verified baseline before Stage 7-D3 work:
+Verified baseline before Stage 7-D4 work:
 
-- `main`: `9843d86bbb0599a938336c823d73a0ca53efa8d3`
-- PR #39 — Stage 7-D2 synthetic V1 train/validation execution: MERGED
-- post-merge main CI: run #142 (`31793136296`) — SUCCESS
-- post-merge regression: 471/471 PASS
+- `main`: `168c03755f0e06e8042fc0a391a357c71c6288fe`
+- PR #40 — Stage 7-D3 validation error diagnostics: MERGED
+- post-merge main CI: run #146 (`31797006780`) — SUCCESS
+- post-merge regression: 483/483 PASS
 - Stage 7-D0: CLOSED
 - Stage 7-D1: CLOSED
 - Stage 7-D2: CLOSED
+- Stage 7-D3: CLOSED
 
-The current active lane is **Stage 7-D3 — Validation Error Diagnostics**. D3 performs no training. It analyzes the already-used 153-sample validation split to identify where the accepted D2 model is wrong while keeping TEST sealed.
+The current active lane is **Stage 7-D4 — Specialist OMR Architecture Contract**. D4 performs no training and opens no TEST data. It freezes the decomposition into small visual/musical specialist tasks plus deterministic fusion/context validation.
 
 ## Stage status
 
@@ -26,12 +27,13 @@ The current active lane is **Stage 7-D3 — Validation Error Diagnostics**. D3 p
 | 7-C | Bounded baseline training + evidence | ✅ Closed / non-production baseline |
 | 7-D0 | Synthetic Curriculum v1 export-evidence identity gate | ✅ Closed |
 | 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ✅ Closed |
-| 7-D2 | Synthetic V1 train/validation execution | ✅ Closed / PR #39 merged / main CI #142 PASS |
-| 7-D3 | Validation-only semantic error diagnostics | 🔄 Active — no optimizer steps / TEST sealed |
+| 7-D2 | Synthetic V1 train/validation execution | ✅ Closed / non-production baseline |
+| 7-D3 | Validation-only semantic error diagnostics | ✅ Closed / PR #40 merged / main CI #146 PASS |
+| 7-D4 | Specialist OMR architecture + ground-truth/fusion contract | 🔄 Active — no training / TEST sealed |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
 | 8-2 | Paired experiment profile | ✅ Closed / preserved |
-| 8-3A | Real pilot preparation/admission components | ⏸ Parked during synthetic quality diagnosis |
+| 8-3A | Real pilot preparation/admission components | ⏸ Parked during specialist synthetic architecture work |
 | 8-3B | Paired real train/validation execution | 🔒 Not started |
 | 9 | Sealed benchmark and candidate decision | 🔒 Not started — TEST sealed |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
@@ -67,32 +69,62 @@ MusicXML validity      1.0
 TEST development use   0
 ```
 
-The model learned enough to reduce validation loss and to emit structurally valid supported-V1 music, but its exact reading accuracy remains poor. It is not a production OMR candidate.
+The D2 model is a diagnostic baseline, not a production OMR candidate.
 
-## Stage 7-D3 boundary
+## Accepted Stage 7-D3 diagnosis
 
-D3 uses the accepted D2 checkpoint and the same 153 validation images only. After the D1 whole-corpus integrity recheck:
+Authoritative validation-only D3 execution:
 
 ```text
-TRAIN       -> skip before D3 artifact path/byte derivation
-VALIDATION  -> 51 families / 153 images -> diagnostics only
-TEST        -> skip before D3 artifact path/byte derivation
-optimizer   -> 0 steps
+run id                    22b7d63f5112fb9d41fa72d502c7a3648781d692949bedf5fbbad8142e910ab7
+diagnostics SHA-256       b5843f896a2f75f8c0b111a8d1dd562a74b15cf67d48c0d4e1dfa8655ed41a6b
+verification SHA-256      558fb0a6e0bfe7e7f461361773a9f8a08b48c5dc4613bd1a3d3a73da7e5186e9
+validation samples        153 / 51 families
+TRAIN diagnostic exposure 0
+TEST diagnostic exposure  0
+optimizer steps            0
+pitch identity accuracy    0.0
+duration accuracy          0.1842105263
+rest recognition accuracy  0.6563467492
+chord-size accuracy        0.0
+token error rate           0.8473649477
 ```
 
-D3 measures token, measure, meter, event type, onset, duration, pitch, accidental, rest and chord-size errors and groups them by musical feature and clean/light/medium degradation profile.
+The error map shows broad representation failure across pitch, rhythm, event typing, chord grouping and event completeness. Clean/light/medium derivatives were diagnostically identical family-by-family. D3 therefore rejects a simple "more epochs" response and selects **specialist musical-task decomposition** as the next architecture axis.
+
+## Stage 7-D4 boundary
+
+D4 freezes the V1 expert/task graph and the ground-truth authority rules:
+
+```text
+StaffSet      -> staff geometry
+StructureSet  -> system / measure / barline / G2 / meter
+NoteHeadSet   -> note-head center / bbox / fill
+RestSet       -> supported rest glyph + duration
+AccidentalSet -> sharp / flat / natural glyphs
+RhythmSet     -> stem / beam / flag / duration
+PitchSet      -> staff position only
+ChordSet      -> 2-4 note vertical grouping
+ContextSet    -> deterministic musical validation
+```
+
+Absolute pitch is **not** authoritative learned output in V1. It is resolved deterministically from `G2 + staff position + accidental state`.
+
+Synthetic symbolic ground truth comes from canonical music. Synthetic spatial ground truth must come from pinned renderer geometry plus an exact deterministic raster/degradation coordinate transform. Real spatial ground truth requires independently human-verified annotation; an admitted image+MusicXML pair alone is insufficient for spatial specialist training.
 
 ## Safety boundaries
 
 - No direct commits to `main`; changes use small branch/PR packages.
 - Large corpus/checkpoint artifacts stay outside normal Git.
-- D3 cannot update parameters or optimizer state.
-- D1 may hash TEST bytes only for whole-corpus storage integrity; after D1, D3 derives no TRAIN/TEST artifact path or byte.
-- TEST remains sealed until Stage 9.
+- D4 contains no model, trainer, optimizer, checkpoint loader or TEST evaluator.
+- Specialist derivatives inherit the source family split.
+- TEST specialist labels are not derived during development and TEST remains sealed until Stage 9.
 - Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain intact and parked.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
+- Real geometry labels require human-verified annotation and explicit admission.
 - No online or automatic learning path is allowed.
+- Deterministic validators retain veto authority over learned specialist candidates.
 
 ## Next gate
 
-Pass focused/full CI for Stage 7-D3, then run the validation-only diagnostic CLI against the accepted Drive corpus and exact D2 checkpoint. The resulting error map determines the next model/data improvement package. Do not retrain or open TEST before that diagnosis is accepted.
+Pass focused/full CI and independent review for Stage 7-D4. After D4 merge, the first implementation package is **StaffSet + StructureSet ground-truth extraction/pilot**. It must prove deterministic renderer-to-raster geometry labels before any specialist model training begins.
