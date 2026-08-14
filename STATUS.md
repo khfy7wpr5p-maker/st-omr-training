@@ -31,7 +31,7 @@ The current active lane is **Stage 7-D10 — deterministic local barline/meter R
 | 7-D7 | StaffSet + StructureSet specialist training | ✅ Closed / PR #44 / main CI #175 PASS |
 | 7-D8 | Structure validation-only diagnostics | ✅ Closed / PR #45 / main CI #177 PASS |
 | 7-D9 | Structure refinement architecture/contract | ✅ Closed / PR #46 / main CI #181 PASS |
-| 7-D10 | Deterministic barline/meter local ROI derivatives | 🔄 Active — code gate PASS / external build pending / TEST sealed |
+| 7-D10 | Deterministic barline/meter local ROI derivatives | 🔄 Active — code gate under PR #47 / external build pending / TEST sealed |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
 | 8-2 | Paired experiment profile | ✅ Closed / preserved |
@@ -143,21 +143,13 @@ D10 binds each artifact to source PNG SHA, accepted D6 label SHA, split, measure
 
 Before `COMPLETE`, an independent persisted-output verifier reopens every ROI PNG/label and rederives hashes, identities, split/family cardinality, barline/meter pair completeness and receipt evidence. Only then is `COMPLETE` written and verified again.
 
-### Exact code/review gate
+### Code/review gate
 
-```text
-PR                        #47 (draft / unmerged)
-exact head                2efa0bb794f743532281f0939aadceee641ef4ff
-CI                         #187 / run 31841180351 — SUCCESS
-full regression            577/577 PASS
-pinned runtime             PASS
-pip check                  PASS
-compileall                 PASS
-P1/P2 review               PASS / no known merge blocker
-external authoritative     PENDING
-```
+Exact-head CI evidence is intentionally tracked in PR #47 rather than written into this branch-owned status file; embedding the branch's own SHA here would make the statement stale on every documentation commit.
 
-The review tightened two initially missing guarantees before the final head: an arbitrary subset cannot be mislabeled authoritative, and `COMPLETE` is impossible until persisted artifacts pass independent reopening/hash/shape/split verification.
+The review tightened two important guarantees: an arbitrary subset cannot be mislabeled authoritative, and `COMPLETE` is impossible until persisted artifacts pass independent reopening/hash/shape/split verification.
+
+External authoritative D10 materialization remains pending.
 
 ## Safety boundaries
 
@@ -174,6 +166,6 @@ The review tightened two initially missing guarantees before the final head: an 
 
 ## Next gate
 
-Run the authoritative external D10 build against the accepted frozen corpus + D6 derivatives at exact PR head `2efa0bb794f743532281f0939aadceee641ef4ff`. Record manifest/artifact-binding/receipt/transport evidence and confirm TEST=0 / optimizer=0. Only then may PR #47 be marked ready and merge approval requested.
+Run the authoritative external D10 build against the accepted frozen corpus + D6 derivatives at the exact current PR #47 head recorded by GitHub. Record manifest/artifact-binding/receipt/transport evidence and confirm TEST=0 / optimizer=0. Only then may PR #47 be marked ready and merge approval requested.
 
 See `STAGE7D10_LOCAL_ROI_DERIVATIVES.md` for the active contract.
