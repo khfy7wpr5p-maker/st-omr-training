@@ -1,14 +1,14 @@
 """Stage 7-D5 deterministic StaffSet + StructureSet geometry pilot.
 
-This module derives synthetic spatial ground truth from the same pinned Verovio
-layout used by ST-OMR, with invisible SVG bounding-box instrumentation. It does
-not train a model, load a checkpoint, or expose dataset/Test split paths.
+Synthetic spatial labels come from the same pinned Verovio layout used by the
+ST-OMR renderer. A second render enables invisible SVG bounding-box metadata;
+that instrumentation is independently fingerprinted and must not alter visible
+pixels.
 
-The historical Stage-7-D4 declarative contract used the scalar label
-``barline_x``. D5 corrects that representation for the operational
-``final_png_pixels`` coordinate space: after rotation a barline is a line
-segment, not a single x coordinate. The frozen D4 fingerprint is not rewritten;
-D5 records the versioned correction explicitly.
+D5 also records one versioned correction to the D4 declarative contract:
+``barline_x`` is not sufficient in final-PNG coordinates because controlled
+rotation makes a barline slanted. The operational D5 label is therefore the
+full ``barline_segment``. The historical D4 fingerprint is not rewritten.
 """
 
 from __future__ import annotations
@@ -39,8 +39,10 @@ from .renderer import (
 
 
 STAGE7D5_GEOMETRY_VERSION: Final[str] = "stage7d5-staff-structure-geometry-v1"
-STAGE7D5_GEOMETRY_RENDERER_VERSION: Final[str] = "stage7d5-verovio-bbox-instrumentation-v1"
-STAGE7D5_TRANSFORM_VERSION: Final[str] = "stage7d5-final-png-transform-v1"
+STAGE7D5_GEOMETRY_RENDERER_VERSION: Final[str] = (
+    "stage7d5-verovio-bbox-instrumentation-v1"
+)
+STAGE7D5_TRANSFORM_VERSION: Final[str] = "stage7d5-final-png-transform-v2"
 
 D5_STRUCTURE_LABELS: Final[tuple[str, ...]] = (
     "system_id",
@@ -68,6 +70,7 @@ _LINE_RE = re.compile(
     r"([-+]?(?:\d+(?:\.\d*)?|\.\d+))[\s,]+"
     r"([-+]?(?:\d+(?:\.\d*)?|\.\d+))\s*$"
 )
+_TRANSFORM_RE = re.compile(r"^\s*(translate|scale|matrix)\s*\(([^)]*)\)\s*$")
 
 
 class Stage7D5GeometryError(ValueError):
@@ -81,8 +84,10 @@ class Point2D:
 
     def __post_init__(self) -> None:
         if not all(
-            isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
-            for v in (self.x, self.y)
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            for value in (self.x, self.y)
         ):
             raise Stage7D5GeometryError("point coordinates must be finite numbers")
 
@@ -97,8 +102,10 @@ class AxisAlignedBox:
     def __post_init__(self) -> None:
         values = (self.x_min, self.y_min, self.x_max, self.y_max)
         if not all(
-            isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
-            for v in values
+            isinstance(value, (int, float))
+            and not isinstance(value, bool)
+            and math.isfinite(value)
+            for value in values
         ):
             raise Stage7D5GeometryError("box coordinates must be finite numbers")
         if self.x_max <= self.x_min or self.y_max <= self.y_min:
@@ -232,6 +239,29 @@ class GeometryRenderResult:
     pages: tuple[GeometryRenderedPage, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class _RawMeasure:
+    svg_id: str
+    system_id: str
+    bbox: AxisAlignedBox
+    barline: LineSegment
+    clef_bbox: AxisAlignedBox | None
+    meter_bbox: AxisAlignedBox | None
+    staff_lines: tuple[LineSegment, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _RawSystem:
+    svg_id: str
+    bbox: AxisAlignedBox
+    measures: tuple[_RawMeasure, ...]
+
+
+# SVG forward affine: x' = a*x + c*y + e; y' = b*x + d*y + f.
+_Affine = tuple[float, float, float, float, float, float]
+_IDENTITY: Final[_Affine] = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+
+
 def _canonical_sha256(payload: object) -> str:
     encoded = json.dumps(
         payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
@@ -255,7 +285,7 @@ def geometry_instrumentation_fingerprint(config: RendererConfig) -> str:
 def render_musicxml_geometry_svg(
     data: object, config: RendererConfig | None = None
 ) -> GeometryRenderResult:
-    """Render the same pinned layout with invisible bbox instrumentation enabled."""
+    """Render the pinned layout with only invisible bbox instrumentation added."""
 
     validation = validate_musicxml(data)
     if not validation.is_valid:
@@ -313,9 +343,7 @@ def render_musicxml_geometry_svg(
                 f"Verovio geometry render failed on page {page_number}: {type(exc).__name__}"
             ) from exc
         svg = _validate_svg(svg_text, page_number)
-        pages.append(
-            GeometryRenderedPage(page_number, svg, sha256(svg).hexdigest())
-        )
+        pages.append(GeometryRenderedPage(page_number, svg, sha256(svg).hexdigest()))
 
     return GeometryRenderResult(
         source_musicxml_sha256=musicxml_sha256(data),
@@ -349,19 +377,19 @@ def _is_visible_object_group(element: ET.Element, class_name: str) -> bool:
     )
 
 
-def _parse_view_box(root: ET.Element) -> tuple[float, float, float, float]:
-    text = root.attrib.get("viewBox")
+def _parse_view_box(element: ET.Element) -> tuple[float, float, float, float]:
+    text = element.attrib.get("viewBox")
     if not text:
         raise Stage7D5GeometryError("geometry SVG requires an explicit viewBox")
     parts = text.replace(",", " ").split()
     if len(parts) != 4:
         raise Stage7D5GeometryError("viewBox must contain four values")
     try:
-        x0, y0, width, height = (float(v) for v in parts)
+        x0, y0, width, height = (float(value) for value in parts)
     except ValueError as exc:
         raise Stage7D5GeometryError("viewBox must be numeric") from exc
     if (
-        not all(math.isfinite(v) for v in (x0, y0, width, height))
+        not all(math.isfinite(value) for value in (x0, y0, width, height))
         or width <= 0
         or height <= 0
     ):
@@ -369,7 +397,180 @@ def _parse_view_box(root: ET.Element) -> tuple[float, float, float, float]:
     return x0, y0, width, height
 
 
-def _bbox_for_group(group: ET.Element, *, content: bool) -> AxisAlignedBox:
+def _parse_numbers(text: str) -> tuple[float, ...]:
+    try:
+        values = tuple(float(value) for value in text.replace(",", " ").split())
+    except ValueError as exc:
+        raise Stage7D5GeometryError("SVG transform contains a nonnumeric value") from exc
+    if not values or not all(math.isfinite(value) for value in values):
+        raise Stage7D5GeometryError("SVG transform values must be finite")
+    return values
+
+
+def _parse_transform(element: ET.Element) -> _Affine:
+    text = element.attrib.get("transform")
+    if text is None or not text.strip():
+        return _IDENTITY
+    match = _TRANSFORM_RE.fullmatch(text)
+    if match is None:
+        raise Stage7D5GeometryError(
+            f"unsupported or compound SVG transform: {text!r}"
+        )
+    kind, args_text = match.groups()
+    args = _parse_numbers(args_text)
+    if kind == "translate":
+        if len(args) not in {1, 2}:
+            raise Stage7D5GeometryError("translate requires one or two values")
+        tx = args[0]
+        ty = args[1] if len(args) == 2 else 0.0
+        return (1.0, 0.0, 0.0, 1.0, tx, ty)
+    if kind == "scale":
+        if len(args) not in {1, 2}:
+            raise Stage7D5GeometryError("scale requires one or two values")
+        sx = args[0]
+        sy = args[1] if len(args) == 2 else sx
+        if sx == 0.0 or sy == 0.0:
+            raise Stage7D5GeometryError("zero SVG scale is not supported")
+        return (sx, 0.0, 0.0, sy, 0.0, 0.0)
+    if len(args) != 6:
+        raise Stage7D5GeometryError("matrix requires six values")
+    a, b, c, d, e, f = args
+    if abs(a * d - b * c) < 1e-12:
+        raise Stage7D5GeometryError("singular SVG matrix is not supported")
+    return (a, b, c, d, e, f)
+
+
+def _compose(parent: _Affine, child: _Affine) -> _Affine:
+    pa, pb, pc, pd, pe, pf = parent
+    ca, cb, cc, cd, ce, cf = child
+    return (
+        pa * ca + pc * cb,
+        pb * ca + pd * cb,
+        pa * cc + pc * cd,
+        pb * cc + pd * cd,
+        pa * ce + pc * cf + pe,
+        pb * ce + pd * cf + pf,
+    )
+
+
+def _apply_affine(point: Point2D, matrix: _Affine) -> Point2D:
+    a, b, c, d, e, f = matrix
+    return Point2D(a * point.x + c * point.y + e, b * point.x + d * point.y + f)
+
+
+def _cumulative_transform(
+    element: ET.Element,
+    coordinate_root: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> _Affine:
+    if element is coordinate_root:
+        return _IDENTITY
+    chain: list[ET.Element] = []
+    current = element
+    while current is not coordinate_root:
+        chain.append(current)
+        parent = parent_map.get(current)
+        if parent is None:
+            raise Stage7D5GeometryError(
+                "renderer geometry element is outside the selected coordinate root"
+            )
+        current = parent
+    matrix = _IDENTITY
+    for node in reversed(chain):
+        matrix = _compose(matrix, _parse_transform(node))
+    return matrix
+
+
+def _coordinate_root(
+    root: ET.Element,
+) -> tuple[ET.Element, tuple[float, float, float, float]]:
+    """Select the coordinate system that owns Verovio drawing coordinates.
+
+    Pinned Verovio emits drawing paths below ``svg#definition-scale`` whose
+    viewBox is normally 10x the outer page SVG viewBox. BBox rect coordinates
+    and staff/barline paths are expressed in this definition coordinate space.
+    """
+
+    outer_view_box = _parse_view_box(root)
+    matches = [
+        element
+        for element in root.iter()
+        if _local(element.tag) == "svg"
+        and element.attrib.get("id") == "definition-scale"
+    ]
+    if not matches:
+        return root, outer_view_box
+    if len(matches) != 1:
+        raise Stage7D5GeometryError(
+            "geometry SVG must contain at most one definition-scale SVG"
+        )
+    definition = matches[0]
+    if definition.attrib.get("transform", "").strip():
+        raise Stage7D5GeometryError(
+            "definition-scale SVG must not carry an additional transform"
+        )
+    for attr in ("x", "y"):
+        value = definition.attrib.get(attr)
+        if value not in {None, "", "0", "0px", "0.0"}:
+            raise Stage7D5GeometryError(
+                "offset definition-scale viewport is outside the D5 contract"
+            )
+    for attr in ("width", "height"):
+        value = definition.attrib.get(attr)
+        if value not in {None, "", "100%"}:
+            raise Stage7D5GeometryError(
+                "non-full definition-scale viewport is outside the D5 contract"
+            )
+    definition_view_box = _parse_view_box(definition)
+    outer_aspect = outer_view_box[2] / outer_view_box[3]
+    definition_aspect = definition_view_box[2] / definition_view_box[3]
+    if not math.isclose(outer_aspect, definition_aspect, rel_tol=1e-9, abs_tol=1e-12):
+        raise Stage7D5GeometryError(
+            "definition-scale and outer SVG aspect ratios disagree"
+        )
+    return definition, definition_view_box
+
+
+def _box_from_rect(
+    rect: ET.Element,
+    coordinate_root: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> AxisAlignedBox:
+    try:
+        x = float(rect.attrib["x"])
+        y = float(rect.attrib["y"])
+        width = float(rect.attrib["width"])
+        height = float(rect.attrib["height"])
+    except (KeyError, ValueError) as exc:
+        raise Stage7D5GeometryError("bbox rect has invalid geometry") from exc
+    if (
+        not all(math.isfinite(value) for value in (x, y, width, height))
+        or width <= 0
+        or height <= 0
+    ):
+        raise Stage7D5GeometryError("bbox rect geometry must be finite and positive")
+    matrix = _cumulative_transform(rect, coordinate_root, parent_map)
+    points = (
+        _apply_affine(Point2D(x, y), matrix),
+        _apply_affine(Point2D(x + width, y), matrix),
+        _apply_affine(Point2D(x + width, y + height), matrix),
+        _apply_affine(Point2D(x, y + height), matrix),
+    )
+    return AxisAlignedBox(
+        min(point.x for point in points),
+        min(point.y for point in points),
+        max(point.x for point in points),
+        max(point.y for point in points),
+    )
+
+
+def _bbox_for_group(
+    group: ET.Element,
+    *,
+    content: bool,
+    coordinate_root: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> AxisAlignedBox:
     object_id = group.attrib.get("id")
     if not object_id:
         raise Stage7D5GeometryError("renderer object group is missing id")
@@ -390,20 +591,14 @@ def _bbox_for_group(group: ET.Element, *, content: bool) -> AxisAlignedBox:
         raise Stage7D5GeometryError(
             f"{expected_id} must contain exactly one direct rect"
         )
-    rect = rects[0]
-    try:
-        x = float(rect.attrib["x"])
-        y = float(rect.attrib["y"])
-        width = float(rect.attrib["width"])
-        height = float(rect.attrib["height"])
-    except (KeyError, ValueError) as exc:
-        raise Stage7D5GeometryError(
-            f"{expected_id} has invalid rect geometry"
-        ) from exc
-    return AxisAlignedBox(x, y, x + width, y + height)
+    return _box_from_rect(rects[0], coordinate_root, parent_map)
 
 
-def _parse_line_path(path: ET.Element) -> LineSegment | None:
+def _parse_line_path(
+    path: ET.Element,
+    coordinate_root: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> LineSegment | None:
     if _local(path.tag) != "path":
         return None
     match = _LINE_RE.fullmatch(path.attrib.get("d", ""))
@@ -412,18 +607,24 @@ def _parse_line_path(path: ET.Element) -> LineSegment | None:
     values = tuple(float(value) for value in match.groups())
     if not all(math.isfinite(value) for value in values):
         return None
+    matrix = _cumulative_transform(path, coordinate_root, parent_map)
     return LineSegment(
-        Point2D(values[0], values[1]), Point2D(values[2], values[3])
+        _apply_affine(Point2D(values[0], values[1]), matrix),
+        _apply_affine(Point2D(values[2], values[3]), matrix),
     )
 
 
-def _direct_staff_lines(staff: ET.Element) -> tuple[LineSegment, ...]:
+def _direct_staff_lines(
+    staff: ET.Element,
+    coordinate_root: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> tuple[LineSegment, ...]:
     candidates: list[LineSegment] = []
     for child in staff:
-        segment = _parse_line_path(child)
+        segment = _parse_line_path(child, coordinate_root, parent_map)
         if segment is None:
             continue
-        if not math.isclose(segment.start.y, segment.end.y, abs_tol=1e-9):
+        if not math.isclose(segment.start.y, segment.end.y, abs_tol=1e-7):
             continue
         candidates.append(segment)
     if len(candidates) != 5:
@@ -434,7 +635,11 @@ def _direct_staff_lines(staff: ET.Element) -> tuple[LineSegment, ...]:
     return tuple(candidates)
 
 
-def _trailing_barline(measure: ET.Element) -> LineSegment:
+def _trailing_barline(
+    measure: ET.Element,
+    coordinate_root: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> LineSegment:
     candidates: list[LineSegment] = []
     for element in measure.iter():
         if _local(element.tag) != "g":
@@ -445,10 +650,10 @@ def _trailing_barline(measure: ET.Element) -> LineSegment:
         if not any(token in {"barLine", "barLineAttr"} for token in tokens):
             continue
         for child in element:
-            segment = _parse_line_path(child)
+            segment = _parse_line_path(child, coordinate_root, parent_map)
             if segment is None:
                 continue
-            if math.isclose(segment.start.x, segment.end.x, abs_tol=1e-9):
+            if math.isclose(segment.start.x, segment.end.x, abs_tol=1e-7):
                 candidates.append(segment)
     if not candidates:
         raise Stage7D5GeometryError(
@@ -459,7 +664,10 @@ def _trailing_barline(measure: ET.Element) -> LineSegment:
 
 
 def _optional_object_bbox(
-    measure: ET.Element, class_name: str
+    measure: ET.Element,
+    class_name: str,
+    coordinate_root: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
 ) -> AxisAlignedBox | None:
     groups = [
         element
@@ -473,27 +681,19 @@ def _optional_object_bbox(
             f"measure has ambiguous {class_name} renderer groups"
         )
     try:
-        return _bbox_for_group(groups[0], content=False)
+        return _bbox_for_group(
+            groups[0],
+            content=False,
+            coordinate_root=coordinate_root,
+            parent_map=parent_map,
+        )
     except Stage7D5GeometryError:
-        return _bbox_for_group(groups[0], content=True)
-
-
-@dataclass(frozen=True, slots=True)
-class _RawMeasure:
-    svg_id: str
-    system_id: str
-    bbox: AxisAlignedBox
-    barline: LineSegment
-    clef_bbox: AxisAlignedBox | None
-    meter_bbox: AxisAlignedBox | None
-    staff_lines: tuple[LineSegment, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class _RawSystem:
-    svg_id: str
-    bbox: AxisAlignedBox
-    measures: tuple[_RawMeasure, ...]
+        return _bbox_for_group(
+            groups[0],
+            content=True,
+            coordinate_root=coordinate_root,
+            parent_map=parent_map,
+        )
 
 
 def _parse_geometry_page(
@@ -507,10 +707,15 @@ def _parse_geometry_page(
         raise Stage7D5GeometryError("geometry SVG is malformed") from exc
     if _local(root.tag) != "svg":
         raise Stage7D5GeometryError("geometry source must be SVG")
-    view_box = _parse_view_box(root)
 
+    coordinate_root, view_box = _coordinate_root(root)
+    parent_map = {
+        child: parent for parent in coordinate_root.iter() for child in parent
+    }
     systems = [
-        element for element in root.iter() if _is_visible_object_group(element, "system")
+        element
+        for element in coordinate_root.iter()
+        if _is_visible_object_group(element, "system")
     ]
     if not systems:
         raise Stage7D5GeometryError("geometry SVG contains no visible system group")
@@ -522,7 +727,12 @@ def _parse_geometry_page(
         if not system_id or system_id in seen_ids:
             raise Stage7D5GeometryError("system ids must be non-empty and unique")
         seen_ids.add(system_id)
-        system_bbox = _bbox_for_group(system, content=True)
+        system_bbox = _bbox_for_group(
+            system,
+            content=True,
+            coordinate_root=coordinate_root,
+            parent_map=parent_map,
+        )
 
         measure_groups = [
             element
@@ -535,7 +745,12 @@ def _parse_geometry_page(
             if not measure_id or measure_id in seen_ids:
                 raise Stage7D5GeometryError("measure ids must be non-empty and unique")
             seen_ids.add(measure_id)
-            measure_bbox = _bbox_for_group(measure, content=True)
+            measure_bbox = _bbox_for_group(
+                measure,
+                content=True,
+                coordinate_root=coordinate_root,
+                parent_map=parent_map,
+            )
             staffs = [
                 element
                 for element in measure.iter()
@@ -556,10 +771,16 @@ def _parse_geometry_page(
                     svg_id=measure_id,
                     system_id=system_id,
                     bbox=measure_bbox,
-                    barline=_trailing_barline(measure),
-                    clef_bbox=_optional_object_bbox(measure, "clef"),
-                    meter_bbox=_optional_object_bbox(measure, "meterSig"),
-                    staff_lines=_direct_staff_lines(staffs[0]),
+                    barline=_trailing_barline(measure, coordinate_root, parent_map),
+                    clef_bbox=_optional_object_bbox(
+                        measure, "clef", coordinate_root, parent_map
+                    ),
+                    meter_bbox=_optional_object_bbox(
+                        measure, "meterSig", coordinate_root, parent_map
+                    ),
+                    staff_lines=_direct_staff_lines(
+                        staffs[0], coordinate_root, parent_map
+                    ),
                 )
             )
         if not raw_measures:
@@ -600,7 +821,7 @@ def _aggregate_staff(
         )
         y_values.append(y)
 
-    spacings = [y_values[i + 1] - y_values[i] for i in range(4)]
+    spacings = [y_values[index + 1] - y_values[index] for index in range(4)]
     if min(spacings) <= 0 or max(spacings) - min(spacings) > 1e-6:
         raise Stage7D5GeometryError(
             "staff lines must have deterministic equal positive spacing"
@@ -619,7 +840,7 @@ def extract_staff_structure_geometry(
     render_result: GeometryRenderResult,
     musicxml: bytes,
 ) -> tuple[PageGeometry, ...]:
-    """Extract StaffSet/StructureSet SVG-space GT and bind canonical measure semantics."""
+    """Extract StaffSet/StructureSet SVG-space GT and bind canonical semantics."""
 
     if not isinstance(render_result, GeometryRenderResult):
         raise TypeError("render_result must be GeometryRenderResult")
@@ -671,17 +892,18 @@ def extract_staff_structure_geometry(
                 meter_class = (
                     f"{canonical.time_signature[0]}/{canonical.time_signature[1]}"
                 )
-                measure = MeasureGeometry(
-                    measure_id=f"measure-{canonical.number:04d}",
-                    measure_number=canonical.number,
-                    system_id=raw_system.svg_id,
-                    measure_bbox=raw_measure.bbox,
-                    barline_segment=raw_measure.barline,
-                    clef_g2_bbox=raw_measure.clef_bbox,
-                    meter_bbox=raw_measure.meter_bbox,
-                    meter_class=meter_class,
+                measures.append(
+                    MeasureGeometry(
+                        measure_id=f"measure-{canonical.number:04d}",
+                        measure_number=canonical.number,
+                        system_id=raw_system.svg_id,
+                        measure_bbox=raw_measure.bbox,
+                        barline_segment=raw_measure.barline,
+                        clef_g2_bbox=raw_measure.clef_bbox,
+                        meter_bbox=raw_measure.meter_bbox,
+                        meter_class=meter_class,
+                    )
                 )
-                measures.append(measure)
                 system_measure_numbers.append(canonical.number)
             systems.append(
                 SystemGeometry(
@@ -697,8 +919,12 @@ def extract_staff_structure_geometry(
                 coordinate_space="pinned_verovio_svg",
                 view_box=view_box,
                 source_musicxml_sha256=render_result.source_musicxml_sha256,
-                base_renderer_config_fingerprint=render_result.base_renderer_config_fingerprint,
-                geometry_instrumentation_fingerprint=render_result.geometry_instrumentation_fingerprint,
+                base_renderer_config_fingerprint=(
+                    render_result.base_renderer_config_fingerprint
+                ),
+                geometry_instrumentation_fingerprint=(
+                    render_result.geometry_instrumentation_fingerprint
+                ),
                 geometry_svg_sha256=rendered_page.sha256,
                 systems=tuple(systems),
                 staff_instances=tuple(staff_instances),
@@ -721,18 +947,16 @@ def _pillow_rotation_reverse_affine(
     b = round(math.sin(radians), 15)
     d = round(-math.sin(radians), 15)
     e = round(math.cos(radians), 15)
-    c = 0.0
-    f = 0.0
+    matrix = (a, b, 0.0, d, e, 0.0)
 
     def transform(
         x: float,
         y: float,
-        matrix: tuple[float, float, float, float, float, float],
+        current: tuple[float, float, float, float, float, float],
     ) -> tuple[float, float]:
-        ma, mb, mc, md, me, mf = matrix
+        ma, mb, mc, md, me, mf = current
         return ma * x + mb * y + mc, md * x + me * y + mf
 
-    matrix = (a, b, c, d, e, f)
     center = (width / 2.0, height / 2.0)
     c0, f0 = transform(-center[0], -center[1], matrix)
     matrix = (a, b, c0 + center[0], d, e, f0 + center[1])
@@ -755,8 +979,7 @@ def _pillow_rotation_reverse_affine(
         -(new_height - height) / 2.0,
         matrix,
     )
-    matrix = (a, b, c1, d, e, f1)
-    return new_width, new_height, matrix
+    return new_width, new_height, (a, b, c1, d, e, f1)
 
 
 def _source_to_rotated(
@@ -796,7 +1019,7 @@ def _map_line(line: LineSegment, mapper) -> LineSegment:
 def map_page_geometry_to_final_png(
     page: PageGeometry, degraded_page: object
 ) -> PageGeometry:
-    """Map SVG geometry through exact CairoSVG scaling and Pillow rotation geometry."""
+    """Map definition-scale geometry through CairoSVG and Pillow rotation."""
 
     if not isinstance(page, PageGeometry) or page.coordinate_space != "pinned_verovio_svg":
         raise Stage7D5GeometryError("page must be SVG-space PageGeometry")
@@ -818,18 +1041,15 @@ def map_page_geometry_to_final_png(
         raise Stage7D5GeometryError("page_number provenance mismatch")
     if degraded_page.source_musicxml_sha256 != page.source_musicxml_sha256:
         raise Stage7D5GeometryError("MusicXML provenance mismatch")
-    if (
-        degraded_page.renderer_config_fingerprint
-        != page.base_renderer_config_fingerprint
-    ):
+    if degraded_page.renderer_config_fingerprint != page.base_renderer_config_fingerprint:
         raise Stage7D5GeometryError("renderer config provenance mismatch")
 
     x0, y0, vb_width, vb_height = page.view_box
     clean_width = degraded_page.clean_width
     clean_height = degraded_page.clean_height
     if not all(
-        isinstance(v, int) and not isinstance(v, bool) and v > 0
-        for v in (clean_width, clean_height)
+        isinstance(value, int) and not isinstance(value, bool) and value > 0
+        for value in (clean_width, clean_height)
     ):
         raise Stage7D5GeometryError(
             "clean raster dimensions must be positive integers"
@@ -838,7 +1058,7 @@ def map_page_geometry_to_final_png(
     expected_height = vb_height * scale
     if abs(expected_height - clean_height) > 1.0:
         raise Stage7D5GeometryError(
-            "CairoSVG raster dimensions do not preserve the SVG viewBox aspect ratio"
+            "CairoSVG raster dimensions do not preserve the geometry viewBox aspect ratio"
         )
 
     def svg_to_clean(point: Point2D) -> Point2D:
@@ -851,10 +1071,7 @@ def map_page_geometry_to_final_png(
         out_width, out_height, reverse = _pillow_rotation_reverse_affine(
             clean_width, clean_height, rotation_mdeg / 1000.0
         )
-        if (out_width, out_height) != (
-            degraded_page.width,
-            degraded_page.height,
-        ):
+        if (out_width, out_height) != (degraded_page.width, degraded_page.height):
             raise Stage7D5GeometryError(
                 "Pillow rotation replay dimensions do not match degraded artifact"
             )
@@ -863,10 +1080,7 @@ def map_page_geometry_to_final_png(
             return _source_to_rotated(svg_to_clean(point), reverse)
 
     else:
-        if (clean_width, clean_height) != (
-            degraded_page.width,
-            degraded_page.height,
-        ):
+        if (clean_width, clean_height) != (degraded_page.width, degraded_page.height):
             raise Stage7D5GeometryError(
                 "photometric-only derivative unexpectedly changed geometry dimensions"
             )
@@ -877,10 +1091,10 @@ def map_page_geometry_to_final_png(
         lines = tuple(_map_line(line, mapper) for line in staff.five_staff_lines)
         spacing = sum(
             math.hypot(
-                lines[i + 1].start.x - lines[i].start.x,
-                lines[i + 1].start.y - lines[i].start.y,
+                lines[index + 1].start.x - lines[index].start.x,
+                lines[index + 1].start.y - lines[index].start.y,
             )
-            for i in range(4)
+            for index in range(4)
         ) / 4.0
         mapped_staff.append(
             StaffInstanceGeometry(
@@ -925,7 +1139,7 @@ def map_page_geometry_to_final_png(
     payload = {
         "version": STAGE7D5_TRANSFORM_VERSION,
         "geometry_svg_sha256": page.geometry_svg_sha256,
-        "view_box": page.view_box,
+        "geometry_view_box": page.view_box,
         "clean_size": [clean_width, clean_height],
         "final_size": [degraded_page.width, degraded_page.height],
         "degradation_config_fingerprint": degraded_page.degradation_config_fingerprint,
