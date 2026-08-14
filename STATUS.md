@@ -1,110 +1,104 @@
 # ST-OMR Training Lab Status
 
-This file is the current stage-status source for this repository.
+This file is the current stage-status source for this repository. Detailed closed-stage architecture remains in `ARCHITECTURE.md`; the current active-lane overlay is in `ARCHITECTURE_CURRENT.md`.
 
 ## Current repository phase
 
-The repository is public and GitHub Actions CI is active.
+The GitHub repository is public and GitHub Actions CI is active.
 
-Stages 0 through 6, all Stage 7 packages, Stage 8-0, Stage 8-1, and Stage 8-2 are complete on `main`.
+Verified baseline before Stage 7-D1 work:
 
-Stage 8-2 implementation merged through PR #31 from exact source head `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` commit `ba93736efa1411bf49020e52ddb688d63f7876c1`. Closure synchronization PR #32 merged to exact `main` `99a32ef917ba4ba5c72ef6a537c24c90a1b0c47f`; exact-main GitHub Actions run #104 (`31712294207`) succeeded. Stage 8-2 is therefore **closed and main CI verified**.
+- `main`: `a3e8412df4dd8d84b0c69aac58361c597883e12c`
+- PR #37 — Stage 7-D export evidence gate: merged
+- post-merge main CI: run #126 (`31749693208`) — SUCCESS
+- Stage 7-D0: CLOSED
 
-Stage 8-3A — Pilot Data Preparation + Admission — is the active package. Its first implementation freezes deterministic PNG-source→training-PNG derivation and fail-closed PrIMuS-style auxiliary-package triage. No real file is committed, no model/checkpoint is loaded, no training/fine-tuning is executed, and neither sealed test split is opened.
+The current active lane is **Stage 7-D1 — Synthetic Corpus Byte / Manifest Acceptance**. The external frozen corpus acceptance run has passed and final PR-head CI has passed. D1 remains open until PR #38 is merged and exact-main post-merge CI succeeds. Model training is not authorized in D1.
 
-The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. The accepted Stage 7-C model remains non-production: exact sequence accuracy is 0% and token error rate is approximately 80.5%.
+The accepted Stage 7-C model remains non-production: best validation loss was approximately `0.99924`, exact sequence accuracy was `0%`, token error rate was approximately `0.805`, and 21/21 validation predictions passed semantic/MusicXML regeneration checks.
 
 ## Stage status
 
 | Stage | Description | Status |
 |---|---|---|
-| 0 | Safety and architecture baseline | ✅ Closed |
-| 1 | ST Music Generator | ✅ Closed — main CI verified |
-| 2 | MusicXML pipeline | ✅ Closed — main CI verified |
-| 3 | Renderer integration | ✅ Closed — main CI verified |
-| 4 | Controlled degradation | ✅ Closed — main CI verified |
-| 5-A | Dataset contract + independent manifest validator | ✅ Closed — main CI verified |
-| 5 | Dataset validation | ✅ Closed — main CI verified |
-| 6 | Synthetic Dataset v1 | ✅ Closed — main CI verified |
-| 7-A | Baseline training contract freeze | ✅ Closed — main CI verified |
-| 7-B | Tokenizer/data/model/trainer smoke implementation | ✅ Closed — main CI verified |
-| 7-C | Bounded baseline training run + evidence | ✅ Closed — main CI verified |
-| 8-0 | Real data & fine-tuning contract freeze | ✅ Closed — main CI verified |
-| 8-1 | Quarantine/intake + byte-level validation | ✅ Closed — main CI verified |
-| 8-2 | Paired experiment run profile freeze | ✅ Closed — main CI verified |
-| 8-3A | Pilot source→training-PNG preparation + admission | 🔄 Active — no training |
+| 0–6 | Deterministic music → validated synthetic dataset pipeline | ✅ Closed / main CI verified |
+| 7-A | Training contract freeze | ✅ Closed / main CI verified |
+| 7-B | Tokenizer/data/model/trainer implementation | ✅ Closed / main CI verified |
+| 7-C | Bounded baseline training + evidence | ✅ Closed / main CI verified; non-production baseline |
+| 7-D0 | Synthetic Curriculum v1 export-evidence identity gate | ✅ Closed / main CI verified |
+| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ⏭ Merge-ready; explicit merge approval pending — no training |
+| 7-D2 | Synthetic V1 train/validation execution | 🔒 Not started |
+| 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
+| 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
+| 8-2 | Paired experiment profile | ✅ Closed / preserved |
+| 8-3A | Real pilot preparation/admission components | ⏸ Parked — do not expand during Synthetic V1 lane |
 | 8-3B | Paired real train/validation execution | 🔒 Not started |
-| 9 | Benchmark and candidate decision | 🔒 Not started — test sealed |
+| 9 | Sealed benchmark and candidate decision | 🔒 Not started — test sealed |
 | 10 | ScoreMosaic candidate integration | 🔒 Not started |
 
-## Recent verified merge evidence
+## Frozen Synthetic Curriculum v1
 
-- Stage 6 closure documentation merged through PR #18 to `046c9a4e7e41e94b0b4465a2610f30361055a3ed`; run #20 (`31674836433`) succeeded.
-- Stage 7-A merged through PR #19 to `0f04b0182b6753cfb8816d1287adb5ee973e0c28`; post-merge run #22 (`31675913632`) succeeded. Closure synchronization PR #20 merged to `6a13760d9d17130ea86636f4828ff1bff035f30d`; run #24 (`31676871798`) succeeded.
-- Stage 7-B final source `a8ad8bc9f14953f0ed35ef5a5a8275be69af5ebd` passed run #30 (`31679413312`) with **336/336 tests**; PR #21 merged to `d02dce4ee17dfccf6f05519ab0970fdc188d0147`, and run #31 (`31679810478`) succeeded. Closure synchronization PR #22 merged to `1befaf260023852ef3bee5c8abab016f464557bb`; run #33 (`31681668145`) succeeded.
-- Stage 7-C source `7a993304218fa19609ea512665148dac3eea503a` passed run #67 (`31691794239`) with **361/361 tests**, guarded benchmark, and accepted authoritative evidence. PR #23 merged to `2c2c478eb361fa90a3bccd819b623680eb12de0b`; run #68 (`31692849892`) succeeded. Closure synchronization PR #24 merged to `e56fad04e43bc6302a8cda60c6f382e83a23d734`; run #70 (`31693998756`) succeeded.
-- Stage 8-0 PR #25 merged to `86487a4c3c41264b02bd159cd647a1318d9b9b88`; run #75 (`31698691405`) succeeded. Closure synchronization PR #26 merged to `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; run #77 (`31699497562`) succeeded.
-- Stage 8-1 PR #29 merged from exact source `ed4113a25f6e12055b9277f959a4580259d37d40` to `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) succeeded with **394/394 tests**, `pip check`, pinned runtime checks, and `compileall`.
-- Stage 8-1 closure synchronization PR #30 merged to exact `main` `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`; post-merge run #94 (`31705382162`) succeeded.
-- Stage 8-2 PR #31 merged from exact source `f0ae7ff6d7206789cbe543b75664e557368233b7` to `ba93736efa1411bf49020e52ddb688d63f7876c1`; post-merge run #102 (`31710085383`) succeeded.
-- Stage 8-2 closure synchronization PR #32 merged to exact `main` `99a32ef917ba4ba5c72ef6a537c24c90a1b0c47f`; post-merge run #104 (`31712294207`) succeeded.
+```text
+source commit       adc8139539d3c8cd6a2e3ee4ce4de6db4dcfeb90
+config fingerprint  154bf1c3e6dfe4e6db096f8b668f29df0623cfd38352b89a04d295764c7458cb
+build id            d9320e362f162cd2ace2a830a7b93e0c21ceba2d51a4e95ef1c7a9b11a108352
+manifest SHA-256     44a963cd7dbc612fa29c2953ea8b2c8776d89ce470074e8f8b3fe25c6e165f34
+transport SHA-256    4a9f3bb337ef99386081dff29c4c1fc3047dc3ada4db13c93b6254e680918e2b
+archive bytes        494006801
+families             512 = 410 train + 51 validation + 51 test
+images               1536 = 1230 train + 153 validation + 153 test
+targets              512 MusicXML
+```
 
-The `CI VERIFIED` statement applies only to exact GitHub commits or GitHub-generated PR merge candidates exercised by GitHub-hosted CI.
+## Stage 7-D1 external acceptance evidence
 
-## Stage 7 closed capability boundary
+The exact verifier from PR #38 was run in Colab against the real frozen Drive archive and a fresh extraction after independent transport SHA-256 verification. The run returned code `0` and emitted the canonical D1 receipt.
 
-Stage 7 proved that the validated Stage 5/6 synthetic pipeline can train the frozen CNN/GRU baseline and produce reproducible evidence without test access. The accepted Stage 7-C run completed 40 epochs/1560 steps, improved validation loss from `3.560342441426505` to `0.9992435761603257`, and produced 21/21 semantically valid and MusicXML-regenerable validation predictions. Exact sequence accuracy remained 0% and token error rate remained approximately 80.5%, so no production-candidate claim is made.
+```text
+receipt file SHA-256       9a86da742035a7a1644ffd8874587cdc479087539d6320596495a2bd6f7399d0
+artifact binding SHA-256   e603b945c6dc60cf7e618ae28a7734dee97cf0e05a81891479107b18a87af540
+archive bytes              494006801
+target bytes total         3506839
+image bytes total          494937881
+families                   test 51 / train 410 / validation 51
+samples                    test 153 / train 1230 / validation 153
+images                     1536
+targets                    512
+```
 
-## Stage 8-0 closed capability boundary
+The receipt is canonical ASCII JSON and independently matches the frozen source commit, build ID, config fingerprint, manifest SHA-256, transport archive name, transport SHA-256, counts, and split contract. Test artifacts were read only for storage-integrity hashing; they remain sealed from training/validation.
 
-Contract: [STAGE8_REAL_DATA_CONTRACT.md](STAGE8_REAL_DATA_CONTRACT.md)
+During the external run, a P2 archive-name contract typo in PR #38 was exposed fail-closed. The PR branch was corrected to the actual D0/Drive frozen archive name `st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz`, and a regression test now requires D0 and D1 to share that exact name.
 
-Stage 8-0 froze rights/provenance/permission/privacy, quarantine/admission, image–MusicXML pairing, immutable identity, exact duplicate/leakage vetoes, train/validation-only development access, sealed-test isolation, Candidate A/B definitions, and ScoreMosaic/teacher-correction isolation.
+Final PR head before merge approval: `6c52ec82c5e0851a11818b1efdb24d3ea2f85f4b`. PR CI run #134 (`31779153945`) checked GitHub's merge candidate `124f7fa20be8c10fa4f9121f58b2b4261ba7bb7a` and passed 465/465 tests, pinned dependency checks, `pip check`, and `compileall` on Ubuntu 24.04 / Python 3.13.
 
-## Stage 8-1 closed capability boundary
+## Stage 7-D1 closure gate
 
-Contract: [STAGE8_1_INTAKE_CONTRACT.md](STAGE8_1_INTAKE_CONTRACT.md)
+D1 independently verifies:
 
-Stage 8-1 froze and verified in-memory byte validation, pre-hash size guards, exact source/image/MusicXML hashes, grayscale-PNG validation, supported-V1 MusicXML/token semantics, deterministic hash-only receipts, bounded dHash near-duplicate review, a one-receipt-per-sample development handoff, and a contract-only real-test sealing boundary. No real files were ingested or persisted.
+1. exact transport archive filename, size, and SHA-256;
+2. manifest SHA-256 and canonical manifest structure;
+3. build ID and config fingerprint;
+4. exact sample/image/target and family/split counts;
+5. family-exclusive split integrity and three derivatives per family;
+6. exact hash-addressed filename sets;
+7. SHA-256 of every persisted PNG and MusicXML artifact;
+8. no missing/extra/symlink artifacts;
+9. a small canonical hash-only acceptance receipt.
 
-## Stage 8-2 closed capability boundary
+All pre-merge D1 acceptance criteria are now PASS. D1 is not closed until PR #38 receives explicit merge approval, is merged, and exact-main post-merge CI succeeds.
 
-Contract: [STAGE8_2_RUN_PROFILE.md](STAGE8_2_RUN_PROFILE.md)
+## Safety boundaries
 
-Stage 8-2 froze:
-
-- the exact first real-data pilot profile: **50 admitted development pairs = 40 train + 10 validation**;
-- a shared deterministic model/tokenizer/preprocess/trainer/data-order/metric/resource profile for Candidate A and Candidate B;
-- Candidate A binding to the exact accepted Stage 7-C checkpoint/model-state hashes with no fallback;
-- Candidate B binding to deterministic from-scratch initialization with no checkpoint;
-- deterministic Stage 8-2 profile, admitted-manifest, Stage 8-1 receipt-set, and sealed-test commitment bindings;
-- validation every epoch, finite-only numeric evidence, and strict improvement below pre-update validation loss before an experiment can be accepted.
-
-Stage 8-2 did not authorize or perform real-data IO, source conversion, dataset persistence, checkpoint loading, optimizer steps, sealed-test access, Stage 9/10, or ScoreMosaic integration.
-
-## Stage 8-3A active boundary
-
-Contract: [STAGE8_3A_PREPARATION_CONTRACT.md](STAGE8_3A_PREPARATION_CONTRACT.md)
-
-The first Stage 8-3A implementation may only:
-
-- accept explicitly supplied source-PNG bytes in memory;
-- retain/hash the original source identity without rewriting it;
-- deterministically derive an 8-bit grayscale training PNG with no crop/resize/rotation;
-- verify fixed Pillow/runtime, pixel/byte bounds, no transparency, single-frame input, fixed output encoding, preserved geometry, and the Stage 8-1 grayscale-PNG structure;
-- emit hash-only preparation evidence;
-- triage bounded PrIMuS-style MEI/semantic/agnostic auxiliary packages for parseability, header coherence, and obvious V1 exclusions;
-- use synthetic-only repository tests;
-- keep all real files external.
-
-MEI/semantic/agnostic/MIDI/PAE data are not automatically MusicXML or admitted labels. A real sample still needs supported-V1 ground-truth MusicXML, rights/provenance/pairing approval, Stage 8-0 admission, Stage 8-1 exact-byte/semantic receipt validation, and family/duplicate/leakage clearance before it counts toward the 50-pair pilot.
-
-The first external smoke packages are usable for format triage but contain features outside the frozen V1 surface, so they are not admitted training samples. Stage 8-3A remains open until exactly 50 pairs pass the complete admission boundary and an exact family-exclusive 40/10 handoff is produced.
-
-## CI baseline
-
-The active `.github/workflows/ci.yml` runs on pull requests, pushes to `main`, and manual dispatch using GitHub-hosted Ubuntu 24.04 / Python 3.13, read-only repository contents permission, pinned GitHub action commits, exact dependency/runtime checks, `pip check`, complete unittest discovery, and Python compile validation. Ordinary CI contains no full training path.
+- No direct commits to `main`; changes use small branch/PR packages.
+- No stage closes without focused tests, full regression, and relevant CI evidence.
+- Large dataset/checkpoint artifacts stay outside normal Git.
+- Training may update parameters only from train; validation may select checkpoints; synthetic test remains sealed until Stage 9.
+- D1 may hash test artifacts only for complete archive-integrity verification and does not expose them to training/evaluation logic.
+- Existing Stage 8 rights/provenance/privacy/duplicate/leakage controls remain intact.
+- ScoreMosaic uploads and teacher corrections are not automatic training data.
+- No online or automatic learning path is allowed.
 
 ## Next gate
 
-Stage 8-3A must close through implementation, exact PR-head CI, explicit merge approval, exact-main CI, and the external 50-pair admission/handoff evidence before Stage 8-3B may start. Stage 8-3B training, Stage 9, and Stage 10 remain locked.
+PR #38 is merge-ready. Request explicit merge approval for exact head `6c52ec82c5e0851a11818b1efdb24d3ea2f85f4b`. After merge, verify exact-main GitHub CI before closing Stage 7-D1. Stage 7-D2 training remains locked until that closure evidence exists.

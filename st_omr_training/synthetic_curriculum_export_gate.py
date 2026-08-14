@@ -11,7 +11,7 @@ from .synthetic_curriculum_acceptance import (
 )
 
 _EXPECTED_REPOSITORY = "https://github.com/khfy7wpr5p-maker/st-omr-training.git"
-_EXPECTED_ARCHIVE = "st-omr-synthetic-curriculum-v1-d9320e362f162cd2a.tar.gz"
+_EXPECTED_ARCHIVE = "st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz"
 _EXPECTED_PROFILE = "st-synthetic-curriculum-v1"
 _EXPECTED_PROFILE_COUNTS = {
     "chord-only": 64,
