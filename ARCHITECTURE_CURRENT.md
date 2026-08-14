@@ -23,12 +23,22 @@ Stage 7-D0 canonical export-evidence gate       ✅ CLOSED
         ↓
 Stage 7-D1 archive/corpus byte acceptance       ✅ CLOSED
         ↓
-Stage 7-D2 full synthetic train + validation    🔄 ACTIVE
+Stage 7-D2 full synthetic train + validation    ✅ CLOSED
+        ↓
+Stage 7-D3 validation error diagnostics         🔄 ACTIVE
+        ↓
+Targeted model/data improvement package         🔒 choose from D3 evidence
         ↓
 Stage 9 sealed test benchmark/candidate gate    🔒 TEST SEALED
 ```
 
-## D2 execution boundary
+## Accepted D2 model
+
+D2 completed 40 epochs / 12,320 optimizer steps on 1,230 TRAIN images and selected epoch 20 from 153 VALIDATION images. The accepted checkpoint is hash-bound outside Git.
+
+The result proves that the training/evidence pipeline works and that validation loss improved, but exact-sequence accuracy remains `0.0` and token error rate remains approximately `0.8474`. Semantic and MusicXML regeneration validity are `1.0`. This is therefore a diagnostic baseline, not a production OMR model.
+
+## D3 diagnostic boundary
 
 ```text
 Accepted frozen Drive archive/corpus
@@ -38,45 +48,58 @@ D1 re-verification (integrity only)
         ├── every persisted artifact SHA-256
         └── TEST may be read only here for storage integrity
         ↓
-D2 development loader
-        ├── TEST row? → skip before artifact path/byte derivation
-        ├── TRAIN → 410 families / 1230 images
+D3 validation loader
+        ├── TRAIN row → skip before artifact path/byte derivation
+        ├── TEST row  → skip before artifact path/byte derivation
         └── VALIDATION → 51 families / 153 images
         ↓
-Frozen Stage 7-C model/trainer/tokenizer/preprocess
+Exact accepted D2 checkpoint + verification gate
         ↓
-40 epochs / batch 4 / 12,320 optimizer steps
+Frozen D2 greedy constrained decoder
         ↓
-validation-selected best checkpoint
+Per-validation-sample semantic comparison
+        ├── token / exact sequence
+        ├── measure / meter
+        ├── event type / onset / duration
+        ├── pitch / accidental
+        ├── rest recognition
+        └── chord size
         ↓
-validation decoding + semantic/MusicXML gates
+Feature buckets
+        ├── meter
+        ├── note/rest/chord
+        ├── duration
+        ├── chord size
+        ├── accidental presence
+        └── clean/light/medium degradation
         ↓
-hash-addressed checkpoint + canonical metrics + strict reload verification
+hash-addressed diagnostics + verification evidence
 ```
 
-The model/trainer/preprocessing surface is intentionally held equal to Stage 7-C. D2 isolates the effect of the larger balanced Synthetic Curriculum v1 instead of mixing a data change with an architecture change.
+D3 performs **zero optimizer steps**. It cannot modify the checkpoint and cannot use TRAIN or TEST artifact bytes after D1.
 
 ## Split boundary
 
-- Train: 410 families / 1,230 images — parameter updates only.
-- Validation: 51 families / 153 images — checkpoint selection and development metrics only.
+- Train: 410 families / 1,230 images — not exposed to D3 diagnostics after D1.
+- Validation: 51 families / 153 images — D3 diagnostic surface.
 - Test: 51 families / 153 images — sealed until Stage 9.
 
-D1 may hash TEST bytes only for complete archive integrity and returns no test sample data. After D1 returns, the D2 loader skips TEST before deriving any test artifact path or reading any test artifact byte.
+D1 may hash TEST bytes only for complete archive integrity and returns no test sample data. After D1 returns, D3 skips TRAIN and TEST before deriving any artifact path or reading any artifact byte.
 
-## Evidence boundary
+## Decision boundary after D3
 
-D2 output may retain externally:
+D3 does not itself choose or train a new model. Its accepted error map must identify the dominant failure mode before the next package is opened. Examples:
 
-- one best checkpoint;
-- canonical metrics JSON;
-- canonical authoritative verification JSON;
-- small hashes/metrics suitable for durable repository documentation after independent verification.
+- pitch-dominant failure → visual encoder/feature extraction investigation;
+- rhythm/duration-dominant failure → sequence/decoder or target-balance investigation;
+- chord/rest-specific failure → targeted curriculum balancing;
+- degradation-sensitive failure → image preprocessing/augmentation investigation;
+- broad failure across all categories → architecture-capacity review before adding more data.
 
-Large checkpoint/corpus bytes do not enter normal Git.
+Only one small improvement axis should be changed at a time so that its effect can be measured on the same validation surface.
 
 ## Real-data lane
 
-The existing Stage 8 real-data rights/provenance/privacy/intake/preparation architecture is preserved and parked. It is not expanded by Stage 7-D2. The existing 50-pair pilot contract remains 40 train + 10 validation after admission; no real data is admitted merely by being present.
+The existing Stage 8 real-data rights/provenance/privacy/intake/preparation architecture remains preserved and parked during D3. The 50-pair real pilot contract remains 40 train + 10 validation after admission; no real data is admitted merely by being present.
 
 ScoreMosaic uploads and teacher corrections are not automatic training data. Online/automatic learning remains prohibited.
