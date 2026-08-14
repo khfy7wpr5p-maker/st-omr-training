@@ -92,6 +92,22 @@ meter positive localization 2px F1       >= 0.600
 
 A completed training run may persist evidence even when one or more thresholds fail. In that case `acceptance_passed=false`; TEST remains sealed and the stage is not eligible for closure/merge on quality grounds.
 
+## Independent persisted-run verification
+
+`verify_stage7d11_run` is a second read-only verification path. It does not trust the trainer return object. After an external training run it independently reopens the completed run directory and checks:
+
+- exact run identity from repository/profile/D10 manifest/D10 artifact-binding identities;
+- exactly one hash-addressed checkpoint, metrics file, verification file, and the exact `COMPLETE` marker;
+- no unexpected top-level artifact;
+- content SHA-256 values against filenames and cross-file hash bindings;
+- canonical metrics and verification JSON;
+- D10 provenance, TEST=0, and frozen D7 Structure-core non-load/non-mutation evidence;
+- exactly 2,464 optimizer steps per refiner;
+- persisted validation metrics and reproduction of the frozen D9 acceptance decision;
+- safe `torch.load(..., weights_only=True)`, strict state reload, state SHA-256 reproduction, and parameter-count reproduction.
+
+D11 external evidence is not accepted until this independent verifier passes on the persisted run.
+
 ## Safety boundary
 
 - TEST records are forbidden and rejected before any non-split field is touched.
@@ -101,6 +117,7 @@ A completed training run may persist evidence even when one or more thresholds f
 - Repository and pinned runtime identities are checked before and after training.
 - Run output must be fresh and outside normal Git.
 - Checkpoints are safely reloaded with `weights_only=True` and both state hashes are reproduced before `COMPLETE`.
+- The completed persisted run is independently reopened and reverified before its evidence can be accepted.
 - A failed D11 validation gate does not authorize TEST access or post-hoc threshold changes.
 
 ## Closure gate
@@ -112,6 +129,7 @@ D11 can close only after:
 3. accepted D10 manifest/artifact-binding identities are explicitly frozen for the external run;
 4. authoritative external training completes with exactly 2,464 optimizer steps per refiner;
 5. checkpoint/metrics/verification hashes are recorded outside Git;
-6. all four frozen D9 validation thresholds pass;
-7. TEST remains unopened;
-8. explicit merge approval is obtained.
+6. the independent persisted-run verifier passes;
+7. all four frozen D9 validation thresholds pass;
+8. TEST remains unopened;
+9. explicit merge approval is obtained.
