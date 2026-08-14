@@ -13,7 +13,7 @@ Verified baseline before Stage 7-D1 work:
 - post-merge main CI: run #126 (`31749693208`) — SUCCESS
 - Stage 7-D0: CLOSED
 
-The current active lane is **Stage 7-D1 — Synthetic Corpus Byte / Manifest Acceptance**. The external frozen corpus acceptance run has passed; D1 remains open until PR #38 is merged and exact-main post-merge CI succeeds. Model training is not authorized in D1.
+The current active lane is **Stage 7-D1 — Synthetic Corpus Byte / Manifest Acceptance**. The external frozen corpus acceptance run has passed and final PR-head CI has passed. D1 remains open until PR #38 is merged and exact-main post-merge CI succeeds. Model training is not authorized in D1.
 
 The accepted Stage 7-C model remains non-production: best validation loss was approximately `0.99924`, exact sequence accuracy was `0%`, token error rate was approximately `0.805`, and 21/21 validation predictions passed semantic/MusicXML regeneration checks.
 
@@ -26,7 +26,7 @@ The accepted Stage 7-C model remains non-production: best validation loss was ap
 | 7-B | Tokenizer/data/model/trainer implementation | ✅ Closed / main CI verified |
 | 7-C | Bounded baseline training + evidence | ✅ Closed / main CI verified; non-production baseline |
 | 7-D0 | Synthetic Curriculum v1 export-evidence identity gate | ✅ Closed / main CI verified |
-| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | 🔄 External PASS; merge + exact-main CI pending — no training |
+| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ⏭ Merge-ready; explicit merge approval pending — no training |
 | 7-D2 | Synthetic V1 train/validation execution | 🔒 Not started |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
@@ -68,7 +68,9 @@ targets                    512
 
 The receipt is canonical ASCII JSON and independently matches the frozen source commit, build ID, config fingerprint, manifest SHA-256, transport archive name, transport SHA-256, counts, and split contract. Test artifacts were read only for storage-integrity hashing; they remain sealed from training/validation.
 
-During the external run, a P2 archive-name contract typo in PR #38 was exposed fail-closed. The PR branch was corrected to the actual D0/Drive frozen archive name `st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz`, and a regression test now requires D0 and D1 to share that exact name. PR CI run #133 (`31778806224`) then passed 465/465 tests, pinned dependency checks, `pip check`, and `compileall` on the corrected head before this status synchronization commit.
+During the external run, a P2 archive-name contract typo in PR #38 was exposed fail-closed. The PR branch was corrected to the actual D0/Drive frozen archive name `st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz`, and a regression test now requires D0 and D1 to share that exact name.
+
+Final PR head before merge approval: `6c52ec82c5e0851a11818b1efdb24d3ea2f85f4b`. PR CI run #134 (`31779153945`) checked GitHub's merge candidate `124f7fa20be8c10fa4f9121f58b2b4261ba7bb7a` and passed 465/465 tests, pinned dependency checks, `pip check`, and `compileall` on Ubuntu 24.04 / Python 3.13.
 
 ## Stage 7-D1 closure gate
 
@@ -84,7 +86,7 @@ D1 independently verifies:
 8. no missing/extra/symlink artifacts;
 9. a small canonical hash-only acceptance receipt.
 
-The external byte gate is now PASS. D1 is not closed until the final PR head passes CI, PR #38 is explicitly approved for merge, the PR is merged, and exact-main post-merge CI succeeds.
+All pre-merge D1 acceptance criteria are now PASS. D1 is not closed until PR #38 receives explicit merge approval, is merged, and exact-main post-merge CI succeeds.
 
 ## Safety boundaries
 
@@ -99,4 +101,4 @@ The external byte gate is now PASS. D1 is not closed until the final PR head pas
 
 ## Next gate
 
-Wait for CI on the final PR #38 head after this evidence/status synchronization. If it passes and no material review finding remains, mark PR #38 ready for review and request explicit merge approval. Only after merge plus exact-main post-merge CI success can Stage 7-D1 close and Stage 7-D2 become eligible as a separate later package.
+PR #38 is merge-ready. Request explicit merge approval for exact head `6c52ec82c5e0851a11818b1efdb24d3ea2f85f4b`. After merge, verify exact-main GitHub CI before closing Stage 7-D1. Stage 7-D2 training remains locked until that closure evidence exists.
