@@ -50,6 +50,57 @@ def _geometry_source(*, family_id: str, geometry_result, page) -> DegradationSou
     )
 
 
+def _assert_raw_staff_and_barlines_inside_viewbox(testcase: unittest.TestCase, page) -> None:
+    x0, y0, width, height = page.view_box
+    x1 = x0 + width
+    y1 = y0 + height
+    for staff in page.staff_instances:
+        for line in staff.five_staff_lines:
+            for point in (line.start, line.end):
+                testcase.assertGreaterEqual(
+                    point.x,
+                    x0 - 1e-6,
+                    f"raw staff x outside viewBox: point={point!r} viewBox={page.view_box!r}",
+                )
+                testcase.assertGreaterEqual(
+                    point.y,
+                    y0 - 1e-6,
+                    f"raw staff y outside viewBox: point={point!r} viewBox={page.view_box!r}",
+                )
+                testcase.assertLessEqual(
+                    point.x,
+                    x1 + 1e-6,
+                    f"raw staff x outside viewBox: point={point!r} viewBox={page.view_box!r}",
+                )
+                testcase.assertLessEqual(
+                    point.y,
+                    y1 + 1e-6,
+                    f"raw staff y outside viewBox: point={point!r} viewBox={page.view_box!r}",
+                )
+    for measure in page.measures:
+        for point in (measure.barline_segment.start, measure.barline_segment.end):
+            testcase.assertGreaterEqual(
+                point.x,
+                x0 - 1e-6,
+                f"raw barline x outside viewBox: point={point!r} viewBox={page.view_box!r}",
+            )
+            testcase.assertGreaterEqual(
+                point.y,
+                y0 - 1e-6,
+                f"raw barline y outside viewBox: point={point!r} viewBox={page.view_box!r}",
+            )
+            testcase.assertLessEqual(
+                point.x,
+                x1 + 1e-6,
+                f"raw barline x outside viewBox: point={point!r} viewBox={page.view_box!r}",
+            )
+            testcase.assertLessEqual(
+                point.y,
+                y1 + 1e-6,
+                f"raw barline y outside viewBox: point={point!r} viewBox={page.view_box!r}",
+            )
+
+
 class Stage7D5LiveGeometryTests(unittest.TestCase):
     def test_all_goldens_preserve_visible_raster_and_extract_staff_structure(self) -> None:
         for name in GOLDEN_NAMES:
@@ -103,6 +154,7 @@ class Stage7D5LiveGeometryTests(unittest.TestCase):
                     sum(len(page.staff_instances) for page in pages),
                 )
                 for page in pages:
+                    _assert_raw_staff_and_barlines_inside_viewbox(self, page)
                     for staff in page.staff_instances:
                         self.assertEqual(len(staff.five_staff_lines), 5)
                         self.assertGreater(staff.staff_spacing, 0.0)
@@ -116,6 +168,8 @@ class Stage7D5LiveGeometryTests(unittest.TestCase):
         geometry = render_musicxml_geometry_svg(musicxml)
         svg_pages = extract_staff_structure_geometry(geometry, musicxml)
         self.assertEqual(len(base.pages), len(svg_pages))
+        for page in svg_pages:
+            _assert_raw_staff_and_barlines_inside_viewbox(self, page)
 
         for profile, seed in (("clean", 4101), ("light", 4102), ("medium", 4103)):
             with self.subTest(profile=profile):
