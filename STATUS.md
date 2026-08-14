@@ -13,7 +13,7 @@ Verified baseline before Stage 7-D1 work:
 - post-merge main CI: run #126 (`31749693208`) — SUCCESS
 - Stage 7-D0: CLOSED
 
-The current active lane is **Stage 7-D1 — Synthetic Corpus Byte / Manifest Acceptance**. Model training is not authorized in D1.
+The current active lane is **Stage 7-D1 — Synthetic Corpus Byte / Manifest Acceptance**. The external frozen corpus acceptance run has passed; D1 remains open until PR #38 is merged and exact-main post-merge CI succeeds. Model training is not authorized in D1.
 
 The accepted Stage 7-C model remains non-production: best validation loss was approximately `0.99924`, exact sequence accuracy was `0%`, token error rate was approximately `0.805`, and 21/21 validation predictions passed semantic/MusicXML regeneration checks.
 
@@ -26,7 +26,7 @@ The accepted Stage 7-C model remains non-production: best validation loss was ap
 | 7-B | Tokenizer/data/model/trainer implementation | ✅ Closed / main CI verified |
 | 7-C | Bounded baseline training + evidence | ✅ Closed / main CI verified; non-production baseline |
 | 7-D0 | Synthetic Curriculum v1 export-evidence identity gate | ✅ Closed / main CI verified |
-| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | 🔄 Active — no training |
+| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | 🔄 External PASS; merge + exact-main CI pending — no training |
 | 7-D2 | Synthetic V1 train/validation execution | 🔒 Not started |
 | 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
 | 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
@@ -50,11 +50,29 @@ images               1536 = 1230 train + 153 validation + 153 test
 targets              512 MusicXML
 ```
 
-Drive export contains the expected archive plus small export evidence, `build.json`, and `manifest.sha256`. The small files match the frozen identities. The 494 MB archive exceeds the connected Drive download limit in this environment, so D1 must not claim byte acceptance until the new verifier is run against the real archive/corpus in Colab or another local workspace and produces its small PASS receipt.
+## Stage 7-D1 external acceptance evidence
+
+The exact verifier from PR #38 was run in Colab against the real frozen Drive archive and a fresh extraction after independent transport SHA-256 verification. The run returned code `0` and emitted the canonical D1 receipt.
+
+```text
+receipt file SHA-256       9a86da742035a7a1644ffd8874587cdc479087539d6320596495a2bd6f7399d0
+artifact binding SHA-256   e603b945c6dc60cf7e618ae28a7734dee97cf0e05a81891479107b18a87af540
+archive bytes              494006801
+target bytes total         3506839
+image bytes total          494937881
+families                   test 51 / train 410 / validation 51
+samples                    test 153 / train 1230 / validation 153
+images                     1536
+targets                    512
+```
+
+The receipt is canonical ASCII JSON and independently matches the frozen source commit, build ID, config fingerprint, manifest SHA-256, transport archive name, transport SHA-256, counts, and split contract. Test artifacts were read only for storage-integrity hashing; they remain sealed from training/validation.
+
+During the external run, a P2 archive-name contract typo in PR #38 was exposed fail-closed. The PR branch was corrected to the actual D0/Drive frozen archive name `st-omr-synthetic-curriculum-v1-d9320e362f162cd2.tar.gz`, and a regression test now requires D0 and D1 to share that exact name. PR CI run #133 (`31778806224`) then passed 465/465 tests, pinned dependency checks, `pip check`, and `compileall` on the corrected head before this status synchronization commit.
 
 ## Stage 7-D1 closure gate
 
-D1 must independently verify:
+D1 independently verifies:
 
 1. exact transport archive filename, size, and SHA-256;
 2. manifest SHA-256 and canonical manifest structure;
@@ -66,7 +84,7 @@ D1 must independently verify:
 8. no missing/extra/symlink artifacts;
 9. a small canonical hash-only acceptance receipt.
 
-Passing repository tests alone does not close D1. The actual external corpus-byte receipt is mandatory.
+The external byte gate is now PASS. D1 is not closed until the final PR head passes CI, PR #38 is explicitly approved for merge, the PR is merged, and exact-main post-merge CI succeeds.
 
 ## Safety boundaries
 
@@ -81,4 +99,4 @@ Passing repository tests alone does not close D1. The actual external corpus-byt
 
 ## Next gate
 
-Complete Stage 7-D1 verifier implementation on a branch, pass focused tests and full GitHub CI, then run the exact verifier against the frozen Drive archive/corpus in Colab/local workspace. Only when both code/CI and external byte evidence pass can D1 be considered merge-ready. Stage 7-D2 training remains locked until D1 is closed.
+Wait for CI on the final PR #38 head after this evidence/status synchronization. If it passes and no material review finding remains, mark PR #38 ready for review and request explicit merge approval. Only after merge plus exact-main post-merge CI success can Stage 7-D1 close and Stage 7-D2 become eligible as a separate later package.
