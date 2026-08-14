@@ -33,7 +33,11 @@ Stage 7-D5 StaffSet + StructureSet geometry     ✅ CLOSED
         ↓
 Stage 7-D6 TRAIN/VAL specialist derivatives     ✅ CLOSED / TEST SEALED
         ↓
-Stage 7-D7 StaffSet + StructureSet training     🔄 ACTIVE / TEST SEALED
+Stage 7-D7 StaffSet + StructureSet training     ✅ CLOSED / TEST SEALED
+        ↓
+Stage 7-D8 Structure validation diagnostics     🔄 ACTIVE / optimizer 0 / TEST SEALED
+        ↓
+Structure refinement decision                   🔒 evidence-dependent
         ↓
 NoteHead / Rest / Accidental specialists        🔒
         ↓
@@ -47,6 +51,8 @@ Stage 9 sealed test benchmark/candidate gate    🔒 TEST SEALED
 ## Why the architecture changed
 
 The accepted D2 monolithic baseline learned enough to produce structurally valid semantic sequences, but recognition remained poor: exact-sequence accuracy `0.0` and TER about `0.8474`. D3 localized broad failures across pitch, duration, event type, chord size and event completeness. This rejected “more epochs” as the primary response and selected small musical tasks with specialist models.
+
+D7 then proved that specialist learning works, but it also showed why specialist results must be interpreted per task rather than accepted from one aggregate loss. Staff geometry learned strongly; Structure learned system/measure/clef well while barline and meter channels remained weak. D8 therefore diagnoses those exact channels before any refinement is selected.
 
 ## Specialist OMR graph
 
@@ -95,23 +101,18 @@ MusicXML alone is not a pixel-geometry source. AI never manufactures ground trut
 
 ## Closed D5 spatial boundary
 
-D5 established deterministic StaffSet/StructureSet geometry with pinned Verovio 6.2.1 and exact final-PNG coordinate replay. It fails closed on ambiguous/missing geometry, unsupported transforms, non-five-line staffs, provenance mismatch or coordinate drift.
+D5 established deterministic StaffSet/StructureSet geometry with pinned Verovio 6.2.1 and exact final-PNG coordinate replay. The accepted contract is `stage7d5-staff-structure-geometry-v2`.
 
-The final accepted geometry contract is `stage7d5-staff-structure-geometry-v2`. It excludes post-barline courtesy/anticipatory `meterSig` geometry from the current measure while retaining fail-closed behavior for ambiguous pre-barline meters. Rotated final PNGs use a two-point `barline_segment`, not a scalar x-coordinate.
+It excludes post-barline courtesy/anticipatory `meterSig` geometry from the current measure, retains fail-closed behavior for ambiguous pre-barline meters, and uses a two-point `barline_segment` for rotation-safe geometry.
 
 ## Closed D6 derivative layer
 
 D6 applied the closed D5 geometry contract only to the frozen development surface:
 
 ```text
-Frozen source manifest
-        ↓
-read split first
-        ├── TEST → immediate skip
-        ├── TRAIN       1,230 images / 410 families
-        └── VALIDATION    153 images /  51 families
-                    ↓
-         canonical hash-addressed label sidecars
+TRAIN       1,230 images / 410 families
+VALIDATION    153 images /  51 families
+TEST            0 specialist labels
 ```
 
 Accepted D6 evidence:
@@ -126,34 +127,104 @@ families                     461
 TEST specialist records        0
 ```
 
-D6 output contains no copied PNGs/MusicXML. Each sidecar references the frozen source PNG by SHA-256 and binds source lineage, renderer/degradation fingerprints, D5 geometry/transform versions and final-PNG StaffSet/StructureSet geometry.
+## Closed D7 specialist training
 
-## Active D7 specialist training
-
-D7 is the first specialist model-training stage. It trains **two independent models** from the same accepted D6 development dataset; they do not share weights or an optimizer.
+D7 trained two independent dense-geometry models; they share neither weights nor optimizer state.
 
 ```text
-D6 TRAIN sidecars + frozen PNGs
-        ├── Staff specialist
-        │      targets: staff_lines + staff_region
-        │
-        └── Structure specialist
-               targets: system_region
-                        measure_region
-                        barline
-                        clef_g2
-                        meter_2_4 / meter_3_4 / meter_4_4
+Staff specialist
+  staff_lines
+  staff_region
+
+Structure specialist
+  system_region
+  measure_region
+  barline
+  clef_g2
+  meter_2_4
+  meter_3_4
+  meter_4_4
 ```
 
-D7 rasterizes variable-length D6 geometry deterministically to fixed `96 × 512` dense targets. The frozen profile uses batch size 6, 8 epochs per specialist, AdamW, learning rate `0.0007`, weight decay `0.0001`, gradient clip `1.0`, and BCE-with-logits + soft Dice. Best checkpoints are selected independently by minimum validation loss.
+Frozen D7 profile:
 
-Split authority is strict:
+```text
+input                  96 × 512 grayscale
+batch                   6
+epochs                  8 per specialist
+optimizer               AdamW
+learning rate           0.0007
+weight decay            0.0001
+grad clip               1.0
+objective               BCE-with-logits + soft Dice
+checkpoint selection    minimum validation loss per specialist
+TRAIN                   1,230 / optimizer allowed
+VALIDATION                153 / read-only
+TEST                        0 records
+```
 
-- TRAIN 1,230 images / 410 families: optimizer allowed;
-- VALIDATION 153 images / 51 families: read-only model selection/metrics;
-- TEST: no D7 record/path/byte access; sealed until Stage 9.
+Authoritative D7 external evidence:
 
-Authoritative D7 output stays outside normal Git and is hash-addressed (`checkpoint`, `metrics`, `verification`, `COMPLETE`). The checkpoint must reload with `weights_only=True` and reproduce exact Staff/Structure state hashes before a run can close.
+```text
+run ID                 4ce2903206c7965471bb9569d379d8d9d1022d9248d80886638acfe0bd822598
+checkpoint SHA-256     5f009ca8ba68d38497a7dd25590d4dd98c537f20c5d5525bf66e288afbf417dc
+metrics SHA-256        43cd98a75c2db740b4af6ee3c8826122fa387347820d2e7d2c639ac2fe30f792
+verification SHA-256   cdc0733af1bd6c7336f5bd2a0cb12fcae269120d8b5a9a564f08db860ee21a0a
+TEST opened            false
+```
+
+Staff result:
+
+```text
+best validation loss  0.11952157418888348
+staff_lines Dice      0.9216719705324906
+staff_region Dice     0.9126690970017359
+```
+
+Structure result:
+
+```text
+best validation loss  0.49127569106908947
+system_region Dice    0.93046746804164
+measure_region Dice   0.8445145579484793
+clef_g2 Dice          0.8228637140530807
+barline Dice          0.2667824041384917
+meter_2_4 Dice        0.34398488560691476
+meter_3_4 Dice        0.34151152062874574
+meter_4_4 Dice        0.3092358358777486
+```
+
+D7 is closed because the first specialist training package and evidence path succeeded; the weak Structure channels are explicitly carried forward as unresolved diagnostic questions, not silently accepted as production quality.
+
+## Active D8 diagnostic boundary
+
+D8 performs **no training**. It binds the exact D7 checkpoint/metrics/verification bundle, safely reloads the checkpoint with `weights_only=True`, reproduces the accepted Structure validation loss and all seven channel Dice values, and only then performs extra diagnostics on VALIDATION.
+
+```text
+TRAIN tensors          0
+VALIDATION tensors   153 / 51 families
+TEST records           0
+optimizer steps         0
+model mutation      false
+```
+
+D8 measures:
+
+1. global probability threshold sweep from `0.05` to `0.95`;
+2. exact threshold-`0.50` precision/recall/Dice;
+3. deterministic per-channel best diagnostic threshold;
+4. positive-record and positive-pixel prevalence;
+5. mean probability separation on positive vs negative target pixels;
+6. 1-pixel and 2-pixel tolerant localization F1 at threshold `0.50` and at each diagnostic best threshold.
+
+This evidence is used to decide whether barline/meter weakness is primarily:
+
+- threshold/calibration;
+- thin-object near-miss localization;
+- sparse-target/representation limitation;
+- or a combination.
+
+D8 itself does not change the accepted D7 loss, target masks, threshold, crop policy, model, epochs, or architecture.
 
 ## StaffSet / StructureSet surface
 
@@ -204,4 +275,4 @@ Deferred: multiple voices, grand staff, multiple instruments, cross-staff, tuple
 
 Stage 8 rights/provenance/privacy/intake/preparation architecture remains preserved and parked while the synthetic specialist lane is established. ScoreMosaic uploads and teacher corrections are not automatic training data. Online/automatic learning remains prohibited.
 
-See `STAGE7D7_STAFF_STRUCTURE_TRAINING.md` for the active D7 contract.
+See `STAGE7D8_STRUCTURE_DIAGNOSTICS.md` for the active D8 contract.
