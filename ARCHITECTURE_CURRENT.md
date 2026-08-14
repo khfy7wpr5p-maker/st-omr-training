@@ -9,7 +9,7 @@ Canonical ST Music
         ↓
 Deterministic MusicXML writer + independent validators
         ↓
-Verovio renderer
+Pinned Verovio renderer
         ↓
 Controlled degradation
         ↓
@@ -25,81 +25,120 @@ Stage 7-D1 archive/corpus byte acceptance       ✅ CLOSED
         ↓
 Stage 7-D2 full synthetic train + validation    ✅ CLOSED
         ↓
-Stage 7-D3 validation error diagnostics         🔄 ACTIVE
+Stage 7-D3 validation error diagnostics         ✅ CLOSED
         ↓
-Targeted model/data improvement package         🔒 choose from D3 evidence
+Stage 7-D4 specialist architecture contract     🔄 ACTIVE
+        ↓
+StaffSet + StructureSet geometry pilot          🔒 NEXT
+        ↓
+NoteHead / Rest / Accidental specialists        🔒
+        ↓
+Rhythm / StaffPosition / Chord specialists      🔒
+        ↓
+Deterministic fusion + ContextSet validation    🔒
         ↓
 Stage 9 sealed test benchmark/candidate gate    🔒 TEST SEALED
 ```
 
-## Accepted D2 model
+## Accepted D2/D3 evidence
 
-D2 completed 40 epochs / 12,320 optimizer steps on 1,230 TRAIN images and selected epoch 20 from 153 VALIDATION images. The accepted checkpoint is hash-bound outside Git.
+D2 completed 40 epochs / 12,320 optimizer steps on 1,230 TRAIN images and selected epoch 20 from 153 VALIDATION images. The accepted checkpoint reduced validation loss but exact-sequence accuracy remained `0.0` and token error rate remained about `0.8474`; it is not a production OMR candidate.
 
-The result proves that the training/evidence pipeline works and that validation loss improved, but exact-sequence accuracy remains `0.0` and token error rate remains approximately `0.8474`. Semantic and MusicXML regeneration validity are `1.0`. This is therefore a diagnostic baseline, not a production OMR model.
+D3 then diagnosed the accepted checkpoint on the same 153 validation images with zero optimizer steps, zero TRAIN diagnostic exposure and zero TEST diagnostic exposure. The error map showed broad failure across pitch, rhythm, event type, chord size and event completeness. Clean/light/medium variants were diagnostically identical family-by-family. D3 therefore selected specialist task decomposition rather than further monolithic training.
 
-## D3 diagnostic boundary
+## Stage 7-D4 specialist architecture
 
 ```text
-Accepted frozen Drive archive/corpus
+PDF / score image
         ↓
-D1 re-verification (integrity only)
-        ├── transport + manifest + build identities
-        ├── every persisted artifact SHA-256
-        └── TEST may be read only here for storage integrity
+page/system preparation
         ↓
-D3 validation loader
-        ├── TRAIN row → skip before artifact path/byte derivation
-        ├── TEST row  → skip before artifact path/byte derivation
-        └── VALIDATION → 51 families / 153 images
+StaffSet / staff_geometry
         ↓
-Exact accepted D2 checkpoint + verification gate
+StructureSet / systems + measures + barlines + G2 + meter
         ↓
-Frozen D2 greedy constrained decoder
+┌───────────────────────────────────────────────┐
+│ NoteHeadSet      note-head center/bbox/fill  │
+│ RestSet          supported rest glyphs       │
+│ AccidentalSet    sharp/flat/natural glyphs   │
+└───────────────────────────────────────────────┘
         ↓
-Per-validation-sample semantic comparison
-        ├── token / exact sequence
-        ├── measure / meter
-        ├── event type / onset / duration
-        ├── pitch / accidental
-        ├── rest recognition
-        └── chord size
+┌───────────────────────────────────────────────┐
+│ RhythmSet        stem/beam/flag/duration     │
+│ PitchSet         discrete staff position     │
+│ ChordSet         2–4 note vertical grouping │
+└───────────────────────────────────────────────┘
         ↓
-Feature buckets
-        ├── meter
-        ├── note/rest/chord
-        ├── duration
-        ├── chord size
-        ├── accidental presence
-        └── clean/light/medium degradation
+Deterministic association / pitch resolution
         ↓
-hash-addressed diagnostics + verification evidence
+ContextSet + hard musical validators
+        ↓
+Canonical candidate music
+        ↓
+Existing deterministic MusicXML writer
+        ↓
+Independent MusicXML validation / round-trip
+        ↓
+Candidate + confidence / veto
 ```
 
-D3 performs **zero optimizer steps**. It cannot modify the checkpoint and cannot use TRAIN or TEST artifact bytes after D1.
+## Ground-truth authority
+
+Synthetic labels are split into two classes:
+
+- **symbolic** labels come from the existing canonical music object;
+- **spatial** labels must come from pinned Verovio renderer geometry and be mapped through the exact raster/degradation geometry transform.
+
+MusicXML alone is not a valid source of pixel geometry. If renderer elements cannot be linked reliably to canonical events, that specialist sample fails closed.
+
+For real images, an admitted image+MusicXML pair is not sufficient for spatial specialist training. Staff lines, measure boxes, note-head centers, accidental boxes, stem/beam geometry and chord spatial grouping require independently human-verified annotation under a later explicit admission contract.
+
+## Pitch authority
+
+The learned V1 pitch specialist is spatial only:
+
+```text
+note-head + staff geometry
+        ↓
+staff_position + confidence
+        ↓
+DETERMINISTIC
+G2 + staff position + accidental state
+        ↓
+canonical pitch
+```
+
+A learned absolute pitch prediction cannot override the deterministic resolver.
+
+## Fusion authority
+
+V1 fusion is deterministic, not learned. It must enforce at minimum:
+
+- supported V1 G2/key/meter surface;
+- exact measure duration totals;
+- deterministic accidental scope;
+- chord size 2–4;
+- common chord onset and duration;
+- explicit conflicts/low-confidence regions;
+- veto on unsupported or ambiguous hard-rule violations;
+- existing deterministic MusicXML writer and independent validation/round-trip.
+
+## V1/deferred boundary
+
+V1 remains single part, single staff, single voice, treble G2, key 0, meters `2/4|3/4|4/4`, whole/half/quarter/eighth notes, half/quarter/eighth rests, 2–4-note chords, and controlled sharp/flat/natural.
+
+Still deferred: multiple voices, grand staff, multiple instruments, cross-staff, tuplets, ties, slurs, dotted values, full-measure/multi-measure rests, and non-zero key signatures.
 
 ## Split boundary
 
-- Train: 410 families / 1,230 images — not exposed to D3 diagnostics after D1.
-- Validation: 51 families / 153 images — D3 diagnostic surface.
-- Test: 51 families / 153 images — sealed until Stage 9.
+- Train: 410 families / 1,230 images — specialist development may derive labels only here.
+- Validation: 51 families / 153 images — specialist selection/diagnostics may derive labels here.
+- Test: 51 families / 153 images — sealed until Stage 9; no specialist label derivation during development.
 
-D1 may hash TEST bytes only for complete archive integrity and returns no test sample data. After D1 returns, D3 skips TRAIN and TEST before deriving any artifact path or reading any artifact byte.
-
-## Decision boundary after D3
-
-D3 does not itself choose or train a new model. Its accepted error map must identify the dominant failure mode before the next package is opened. Examples:
-
-- pitch-dominant failure → visual encoder/feature extraction investigation;
-- rhythm/duration-dominant failure → sequence/decoder or target-balance investigation;
-- chord/rest-specific failure → targeted curriculum balancing;
-- degradation-sensitive failure → image preprocessing/augmentation investigation;
-- broad failure across all categories → architecture-capacity review before adding more data.
-
-Only one small improvement axis should be changed at a time so that its effect can be measured on the same validation surface.
+Every specialist derivative inherits its source family's split. D1 whole-corpus hashing remains storage-integrity only and does not open TEST for model development.
 
 ## Real-data lane
 
-The existing Stage 8 real-data rights/provenance/privacy/intake/preparation architecture remains preserved and parked during D3. The 50-pair real pilot contract remains 40 train + 10 validation after admission; no real data is admitted merely by being present.
+The existing Stage 8 rights/provenance/privacy/intake/preparation architecture remains preserved and parked during specialist synthetic architecture work. Existing real image+MusicXML admission does not automatically satisfy specialist spatial-label requirements.
 
-ScoreMosaic uploads and teacher corrections are not automatic training data. Online/automatic learning remains prohibited.
+ScoreMosaic uploads and teacher corrections are not automatic training data. Any future correction must pass explicit permission/licensing/privacy/provenance/quality/split admission before it may become training data. Online/automatic learning remains prohibited.
