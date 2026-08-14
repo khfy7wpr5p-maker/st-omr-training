@@ -1,12 +1,12 @@
 # Stage 7-D3 — Validation Error Diagnostics
 
-Status: **active — validation analysis only; no training**.
+Status: **closed — PR #40 merged; post-merge main CI #146 SUCCESS**.
 
-Stage 7-D3 diagnoses why the accepted Stage 7-D2 synthetic model is still inaccurate. It does not alter model weights, retrain, open TEST, ingest real data, or integrate with ScoreMosaic.
+Stage 7-D3 diagnosed why the accepted Stage 7-D2 synthetic model remained inaccurate. It altered no model weights, performed no retraining, opened no TEST data, ingested no real data, and integrated nothing into ScoreMosaic.
 
 ## Starting baseline
 
-D3 starts after the verified merge of PR #39:
+D3 started after the verified merge of PR #39:
 
 - `main`: `9843d86bbb0599a938336c823d73a0ca53efa8d3`
 - post-merge CI #142: SUCCESS
@@ -31,7 +31,7 @@ verification SHA-256   6743425d42da77dfacef50388e879d45aa01f01b740cfd2deb381a554
 
 ## Data boundary
 
-D3 is **validation-only** after the existing D1 whole-corpus integrity recheck.
+D3 was **validation-only** after the existing D1 whole-corpus integrity recheck.
 
 ```text
 D1 integrity re-verification
@@ -42,11 +42,46 @@ D3 manifest loader
         └── VALIDATION → 51 families / 153 images only
 ```
 
-D1 may hash TRAIN/TEST bytes for complete archive integrity, but the D3 diagnostic code receives no TRAIN or TEST sample artifact data. D3 reports `optimizer_steps = 0`.
+D1 could hash TRAIN/TEST bytes for complete archive integrity, but the D3 diagnostic code received no TRAIN or TEST sample artifact data. D3 reported `optimizer_steps = 0`.
+
+## Authoritative external result
+
+```text
+run id                    22b7d63f5112fb9d41fa72d502c7a3648781d692949bedf5fbbad8142e910ab7
+diagnostics SHA-256       b5843f896a2f75f8c0b111a8d1dd562a74b15cf67d48c0d4e1dfa8655ed41a6b
+verification SHA-256      558fb0a6e0bfe7e7f461361773a9f8a08b48c5dc4613bd1a3d3a73da7e5186e9
+validation samples        153 / 51 families
+TRAIN diagnostic exposure 0
+TEST diagnostic exposure  0
+optimizer steps            0
+```
+
+Aggregate validation diagnostics:
+
+```text
+exact sequence accuracy      0.0000000000
+token error rate             0.8473649477
+measure exact accuracy       0.0049019608
+meter accuracy               0.3014705882
+event error rate             1.0348047538
+event type accuracy          0.1799660441
+onset accuracy               0.1494057725
+duration accuracy            0.1842105263
+pitch identity accuracy      0.0000000000
+display accidental accuracy  0.0000000000
+chord-size accuracy          0.0000000000
+rest recognition accuracy    0.6563467492
+reference events             3534
+predicted events             2601
+missing events               1200
+extra events                 267
+```
+
+All 51 validation families contained clean/light/medium derivatives, and every family's three variants produced identical diagnostic counts. Aggregate degradation buckets were also exactly identical. The dominant failure was therefore not degradation sensitivity alone.
 
 ## Diagnostic surface
 
-For each of the 153 validation predictions, D3 records deterministic error counts for:
+For each of the 153 validation predictions, D3 recorded deterministic error counts for:
 
 - token edit distance / token error rate;
 - exact full-sequence match;
@@ -62,7 +97,7 @@ For each of the 153 validation predictions, D3 records deterministic error count
 - chord-size accuracy;
 - missing and extra events.
 
-The report also groups errors by ground-truth feature tags:
+The report also grouped errors by ground-truth feature tags:
 
 - meter (`2/4`, `3/4`, `4/4`);
 - event type and mixed-event samples;
@@ -71,11 +106,9 @@ The report also groups errors by ground-truth feature tags:
 - accidental present/absent;
 - degradation profile (`clean`, `light`, `medium`).
 
-This is a diagnosis layer, not a new benchmark. Feature-bucket metrics use the existing validation set and therefore may guide development.
-
 ## Accepted source model gate
 
-D3 refuses arbitrary checkpoints. Before decoding it must independently verify:
+D3 refused arbitrary checkpoints. Before decoding it independently verified:
 
 1. exact D2 checkpoint file SHA-256;
 2. exact D2 verification artifact SHA-256 and canonical JSON;
@@ -88,7 +121,7 @@ D3 refuses arbitrary checkpoints. Before decoding it must independently verify:
 
 ## Output
 
-D3 writes only small hash-addressed evidence outside normal Git:
+D3 wrote only small hash-addressed evidence outside normal Git:
 
 ```text
 <run-root>/<run-id>/
@@ -97,25 +130,32 @@ D3 writes only small hash-addressed evidence outside normal Git:
 └── COMPLETE
 ```
 
-The diagnostics file may contain synthetic validation sample/family hash identities and per-sample error counts. It contains no PNG or MusicXML bytes.
+The diagnostics file contains synthetic validation sample/family hash identities and per-sample error counts, but no PNG or MusicXML bytes.
 
-## Closure gate
+## Closure evidence
 
-Stage 7-D3 may close only after:
+D3 closure requirements are complete:
 
-1. diagnostic code and focused tests pass on the exact PR head;
-2. full repository regression and compile checks pass in GitHub CI;
-3. the real frozen corpus passes D1 re-verification;
-4. the exact accepted D2 checkpoint and verification artifact pass the D3 source-model gate;
-5. all 153 validation samples are decoded and diagnosed;
-6. TRAIN artifact bytes are not exposed to diagnostics after D1;
-7. TEST artifact paths/bytes are not exposed after D1;
-8. optimizer steps remain zero;
-9. diagnostics and verification artifact hashes are independently checked;
-10. the resulting error map is used to choose the next small model/data improvement package;
-11. explicit merge approval is obtained;
-12. post-merge exact-main CI succeeds.
+1. diagnostic code and focused tests passed on exact PR head `c25caddeaa897df5eeaad545e68f51aafc19c1f6`;
+2. exact-head CI #145 passed with 483/483 tests;
+3. real frozen corpus passed D1 re-verification;
+4. exact accepted D2 checkpoint and verification artifact passed the D3 source-model gate;
+5. all 153 validation samples were decoded and diagnosed;
+6. TRAIN artifact bytes were not exposed to diagnostics after D1;
+7. TEST artifact paths/bytes were not exposed after D1;
+8. optimizer steps remained zero;
+9. diagnostics/verification hashes were independently checked after Drive persistence;
+10. the error map selected **specialist musical-task decomposition** as the next architecture axis;
+11. explicit merge approval was obtained;
+12. PR #40 merged as `168c03755f0e06e8042fc0a391a357c71c6288fe`;
+13. post-merge main CI #146 succeeded with 483/483 tests and compile checks.
+
+## Accepted decision
+
+D3 rejects a simple "more epochs" response. Broad failures across pitch, rhythm, event type, chord grouping and event completeness require decomposition into small specialist perception tasks with deterministic musical fusion and validation.
+
+The follow-on contract is Stage 7-D4 — Specialist OMR Architecture Contract.
 
 ## Explicitly out of scope
 
-D3 does not retrain, fine-tune, change architecture, change tokenizer vocabulary, alter the synthetic corpus, use real data, open the sealed TEST split, define production quality by itself, or integrate a model into ScoreMosaic.
+D3 did not retrain, fine-tune, change architecture, change tokenizer vocabulary, alter the synthetic corpus, use real data, open the sealed TEST split, define production quality by itself, or integrate a model into ScoreMosaic.
