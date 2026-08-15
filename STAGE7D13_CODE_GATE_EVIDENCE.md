@@ -12,7 +12,7 @@ manifest SHA-256
 8cfb87b5c6135be14b4c9ad488868c0edb0d37bb3bb18ad1b5e79d04fdf24f7b
 
 artifact binding SHA-256
-c42c1f69e21d61d3eefdcafc40dabf2f0fcd6ac2ceb4d5cf88d8e158246dd33e
+c42c1f69e21d61d3eefdacfc40dabf2f0fcd6ac2ceb4d5cf88d8e158246dd33e
 
 TRAIN records       9840
 VALIDATION records  1224
@@ -46,13 +46,13 @@ The branch contains:
 - `stage7d13_training.py` — deterministic persisted-derivative loader, sequential independent optimizers, read-only validation, minimum-validation-loss checkpoint selection, exact step enforcement and persistence;
 - `stage7d13_run_verifier.py` — independent persisted-run verifier using `torch.load(..., weights_only=True)`, state-hash reproduction, metric/acceptance reproduction and optimizer-count verification;
 - `stage7d13_authoritative_training.py` — exact repository/runtime-bound orchestration; independent verification precedes `verification.json` / `COMPLETE` persistence;
-- `stage7d13_training_preflight.py` — full pre-optimizer scan of record/image/label hashes, family split isolation, target encodability/collision freedom and combined parameter budget.
+- `stage7d13_training_preflight.py` — full pre-optimizer scan of build/artifact identity, record/image/label hashes, family split isolation, target encodability/collision freedom and combined parameter budget.
 
 ## Fail-closed preflight requirements
 
 Before model optimizers are created, the authoritative launcher must prove:
 
-- exact D13 manifest/build identity;
+- exact D13 manifest/build identity, including artifact-binding SHA-256;
 - 9,840 TRAIN + 1,224 VALIDATION records;
 - 11,064 labels and 11,062 content-addressed images;
 - every referenced image and label SHA-256 matches persisted bytes;
