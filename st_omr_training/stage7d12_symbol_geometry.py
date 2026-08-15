@@ -123,7 +123,9 @@ class MeasureSymbolGeometry:
             for record in records:
                 if not _box_inside_box(record.bbox, self.measure_bbox):
                     raise Stage7D12SymbolGeometryError(
-                        "symbol bbox must be contained by owning measure"
+                        "symbol bbox must be contained by owning measure: "
+                        f"kind={record.kind} event={record.canonical_event_id} "
+                        f"symbol={record.bbox!r} measure={self.measure_bbox!r}"
                     )
 
 
