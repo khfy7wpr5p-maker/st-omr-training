@@ -2,9 +2,10 @@
 
 This module is executable infrastructure only; importing it performs no training.
 A caller must explicitly provide the exact reviewed repository SHA and external
-artifact roots. Training is followed by an independent persisted-run verification
-before verification.json and COMPLETE are written, then the completed surface is
-reopened once more.
+artifact roots. A full derivative/collision/parameter preflight runs before any
+optimizer is created. Training is then followed by independent persisted-run
+verification before verification.json and COMPLETE are written, then the
+completed surface is reopened once more.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from .stage7d13_run_verifier import (
     verify_stage7d13_run,
 )
 from .stage7d13_training import Stage7D13TrainingReceipt, run_stage7d13_training
+from .stage7d13_training_preflight import verify_stage7d13_training_preflight
 
 
 STAGE7D13_AUTHORITATIVE_VERSION: Final[str] = "stage7d13-authoritative-training-gate-v1"
@@ -104,6 +106,8 @@ class Stage7D13AuthoritativeReceipt:
     run_id: str
     repository_sha: str
     repository_origin: str
+    preflight_record_count: int
+    preflight_parameter_count_total: int
     checkpoint_sha256: str
     metrics_sha256: str
     run_sha256: str
@@ -133,6 +137,20 @@ def run_verified_stage7d13_training(
     if head_before != expected:
         _fail("repository HEAD differs from explicitly authorized D13 head")
     verify_stage7c_runtime()
+
+    preflight = verify_stage7d13_training_preflight(derivative_root)
+    if not preflight.preflight_passed or not preflight.collision_free or preflight.test_opened:
+        _fail("D13 preflight did not authorize optimizer creation")
+    if heartbeat is not None:
+        heartbeat(
+            "D13 PREFLIGHT PASS | "
+            f"records={preflight.record_count} | params={preflight.parameter_count_total} | TEST=False"
+        )
+
+    head_after_preflight, origin_after_preflight = _repo_identity(repo)
+    verify_stage7c_runtime()
+    if (head_after_preflight, origin_after_preflight) != (head_before, origin_before):
+        _fail("repository identity changed during D13 preflight")
 
     training = run_stage7d13_training(
         derivative_root=derivative_root,
@@ -187,6 +205,8 @@ def run_verified_stage7d13_training(
         run_id=final_verified.run_id,
         repository_sha=head_before,
         repository_origin=origin_before,
+        preflight_record_count=preflight.record_count,
+        preflight_parameter_count_total=preflight.parameter_count_total,
         checkpoint_sha256=final_verified.checkpoint_sha256,
         metrics_sha256=final_verified.metrics_sha256,
         run_sha256=final_verified.run_sha256,
