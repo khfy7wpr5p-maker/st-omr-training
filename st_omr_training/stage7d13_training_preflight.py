@@ -86,7 +86,11 @@ class Stage7D13PreflightReceipt:
     preflight_passed: bool
 
 
-def verify_stage7d13_training_preflight(derivative_root: str | Path) -> Stage7D13PreflightReceipt:
+def verify_stage7d13_training_preflight(
+    derivative_root: str | Path,
+    *,
+    heartbeat=print,
+) -> Stage7D13PreflightReceipt:
     """Hash/decode-label/collision/parameter scan before any optimizer is created."""
     root = Path(derivative_root)
     if root.is_symlink() or not root.is_dir():
@@ -113,6 +117,13 @@ def verify_stage7d13_training_preflight(derivative_root: str | Path) -> Stage7D1
     image_hashes: set[str] = set()
     label_hashes: set[str] = set()
     seen_records: set[str] = set()
+
+    if heartbeat is not None:
+        heartbeat(
+            f"D13 PREFLIGHT START | records={D13_RECORD_COUNT} | "
+            f"TRAIN={D13_RECORD_SPLIT_COUNTS['train']} | "
+            f"VALIDATION={D13_RECORD_SPLIT_COUNTS['validation']} | TEST=0"
+        )
 
     for index, row in enumerate(rows):
         if not isinstance(row, Mapping):
@@ -164,6 +175,14 @@ def verify_stage7d13_training_preflight(derivative_root: str | Path) -> Stage7D1
                 _fail(f"D13 preflight {specialist} targets malformed")
             encode_detector_targets(specialist, [target_rows])
 
+        completed = index + 1
+        if heartbeat is not None and (completed % 500 == 0 or completed == D13_RECORD_COUNT):
+            percent = 100.0 * completed / D13_RECORD_COUNT
+            heartbeat(
+                f"D13 PREFLIGHT {completed}/{D13_RECORD_COUNT} | {percent:5.1f}% | "
+                f"images={len(image_hashes)} | labels={len(label_hashes)}"
+            )
+
     if dict(split_counts) != D13_RECORD_SPLIT_COUNTS:
         _fail("D13 preflight split counts mismatch")
     if len(seen_records) != D13_RECORD_COUNT or len(label_hashes) != D13_LABEL_COUNT:
@@ -181,6 +200,17 @@ def verify_stage7d13_training_preflight(derivative_root: str | Path) -> Stage7D1
     total_parameters = sum(parameter_counts.values())
     if total_parameters > MAX_PARAMETERS_COMBINED:
         _fail("D13 combined specialist parameter cap exceeded")
+
+    if heartbeat is not None:
+        heartbeat(
+            "D13 PREFLIGHT MODEL BUDGET PASS | "
+            + " | ".join(
+                f"{specialist}={parameter_counts[specialist]}"
+                for specialist in SPECIALIST_CLASSES
+            )
+            + f" | total={total_parameters}/{MAX_PARAMETERS_COMBINED}"
+        )
+        heartbeat("D13 PREFLIGHT PASS | collision_free=True | TEST=False | optimizer=0")
 
     return Stage7D13PreflightReceipt(
         version=STAGE7D13_PREFLIGHT_VERSION,
