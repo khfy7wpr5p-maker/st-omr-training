@@ -12,12 +12,15 @@ from typing import Final, Mapping
 from .stage7d13_measure_derivatives import STAGE7D13_DERIVATIVE_VERSION, STAGE7D13_LABEL_SCHEMA
 from .stage7d13_symbol_models import build_symbol_model, encode_detector_targets
 from .stage7d13_symbol_training_contract import (
+    EXPECTED_SOURCE_FAMILY_COUNTS,
     MAX_PARAMETERS_COMBINED,
     SPECIALIST_CLASSES,
 )
 from .stage7d13_verified_surface import (
     D13_DERIVATIVE_BUILD_ID,
     D13_DERIVATIVE_MANIFEST_SHA256,
+    D13_IMAGE_COUNT,
+    D13_LABEL_COUNT,
     D13_RECORD_COUNT,
     D13_RECORD_SPLIT_COUNTS,
 )
@@ -157,8 +160,13 @@ def verify_stage7d13_training_preflight(derivative_root: str | Path) -> Stage7D1
 
     if dict(split_counts) != D13_RECORD_SPLIT_COUNTS:
         _fail("D13 preflight split counts mismatch")
-    if len(seen_records) != D13_RECORD_COUNT or len(label_hashes) != D13_RECORD_COUNT:
+    if len(seen_records) != D13_RECORD_COUNT or len(label_hashes) != D13_LABEL_COUNT:
         _fail("D13 preflight record/label cardinality mismatch")
+    if len(image_hashes) != D13_IMAGE_COUNT:
+        _fail("D13 preflight content-addressed image cardinality mismatch")
+    family_counts = dict(Counter(family_split.values()))
+    if family_counts != EXPECTED_SOURCE_FAMILY_COUNTS:
+        _fail("D13 preflight family split counts mismatch")
 
     parameter_counts = {
         specialist: count_trainable_parameters(build_symbol_model(specialist))
@@ -168,7 +176,6 @@ def verify_stage7d13_training_preflight(derivative_root: str | Path) -> Stage7D1
     if total_parameters > MAX_PARAMETERS_COMBINED:
         _fail("D13 combined specialist parameter cap exceeded")
 
-    family_counts = dict(Counter(family_split.values()))
     return Stage7D13PreflightReceipt(
         version=STAGE7D13_PREFLIGHT_VERSION,
         record_count=D13_RECORD_COUNT,
