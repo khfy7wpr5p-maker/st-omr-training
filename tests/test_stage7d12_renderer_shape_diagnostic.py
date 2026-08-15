@@ -28,13 +28,25 @@ def _href(element: ET.Element) -> str:
     return element.attrib.get("href", element.attrib.get(XLINK, ""))
 
 
+def _compact(element: ET.Element) -> dict[str, object]:
+    return {
+        "tag": _local(element.tag),
+        "id": element.attrib.get("id", ""),
+        "class": sorted(d5._class_tokens(element)),
+        "href": _href(element),
+        "transform": element.attrib.get("transform", ""),
+    }
+
+
 class Stage7D12RendererShapeDiagnostic(unittest.TestCase):
-    def test_inventory_notehead_glyph_definitions(self) -> None:
-        inventory = {}
-        examples = {}
+    def test_inventory_symbol_renderer_shape(self) -> None:
+        notehead_inventory = {}
+        notehead_examples = {}
+        accidental_rows = {}
         for name in GOLDEN_NAMES:
             musicxml = (GOLDEN / name).read_bytes()
             render = render_musicxml_geometry_svg(musicxml)
+            file_rows = []
             for page in render.pages:
                 root = ET.fromstring(page.svg)
                 coordinate_root, _ = d5._coordinate_root(root)
@@ -71,8 +83,8 @@ class Stage7D12RendererShapeDiagnostic(unittest.TestCase):
                                 (path.attrib.get("transform", ""), path.attrib.get("d", ""))
                                 for path in paths
                             )
-                            inventory[href] = definition
-                            examples.setdefault(
+                            notehead_inventory[href] = definition
+                            notehead_examples.setdefault(
                                 href,
                                 {
                                     "source": name,
@@ -80,9 +92,46 @@ class Stage7D12RendererShapeDiagnostic(unittest.TestCase):
                                     "use_transform": use.attrib.get("transform", ""),
                                 },
                             )
+
+                    accids = [
+                        element
+                        for element in note.iter()
+                        if element is not note
+                        and d5._is_visible_object_group(element, "accid")
+                    ]
+                    if accids:
+                        accid_report = []
+                        for accid in accids:
+                            descendants = []
+                            for element in accid.iter():
+                                if element is accid:
+                                    continue
+                                tokens = d5._class_tokens(element)
+                                if "bounding-box" in tokens or "content-bounding-box" in tokens:
+                                    continue
+                                descendants.append(_compact(element))
+                            accid_report.append(
+                                {
+                                    "group": _compact(accid),
+                                    "descendants": descendants,
+                                }
+                            )
+                        file_rows.append(
+                            {
+                                "note_id": note.attrib.get("id", ""),
+                                "accids": accid_report,
+                            }
+                        )
+            accidental_rows[name] = file_rows
         self.fail(
-            "D12_NOTEHEAD_GLYPHS="
-            + repr({"inventory": inventory, "examples": examples})
+            "D12_SYMBOL_SHAPE="
+            + repr(
+                {
+                    "notehead_inventory": notehead_inventory,
+                    "notehead_examples": notehead_examples,
+                    "accidental_rows": accidental_rows,
+                }
+            )
         )
 
 
