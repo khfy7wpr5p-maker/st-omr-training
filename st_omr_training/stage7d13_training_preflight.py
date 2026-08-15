@@ -17,6 +17,7 @@ from .stage7d13_symbol_training_contract import (
     SPECIALIST_CLASSES,
 )
 from .stage7d13_verified_surface import (
+    D13_DERIVATIVE_ARTIFACT_BINDING_SHA256,
     D13_DERIVATIVE_BUILD_ID,
     D13_DERIVATIVE_MANIFEST_SHA256,
     D13_IMAGE_COUNT,
@@ -108,6 +109,24 @@ def verify_stage7d13_training_preflight(
         _fail("D13 manifest.sha256 sidecar mismatch")
     if manifest.get("derivative_build_id") != D13_DERIVATIVE_BUILD_ID:
         _fail("D13 preflight build id mismatch")
+
+    build, _build_raw = _json(root / "build.json", "D13 build")
+    expected_build_identity = {
+        "derivative_build_id": D13_DERIVATIVE_BUILD_ID,
+        "manifest_sha256": D13_DERIVATIVE_MANIFEST_SHA256,
+        "artifact_binding_sha256": D13_DERIVATIVE_ARTIFACT_BINDING_SHA256,
+        "record_count": D13_RECORD_COUNT,
+        "image_count": D13_IMAGE_COUNT,
+        "label_count": D13_LABEL_COUNT,
+        "record_split_counts": D13_RECORD_SPLIT_COUNTS,
+        "test_specialist_records": 0,
+        "optimizer_steps": 0,
+        "complete_marker_written": False,
+    }
+    for name, expected in expected_build_identity.items():
+        if build.get(name) != expected:
+            _fail(f"D13 preflight build {name} mismatch")
+
     rows = manifest.get("records")
     if not isinstance(rows, list) or len(rows) != D13_RECORD_COUNT:
         _fail("D13 preflight record cardinality mismatch")
