@@ -1,22 +1,20 @@
 """Pinned-Verovio symbol geometry pilot for Stage 7-D12.
 
 This module extracts development-only SVG-space ground truth for NoteHeadSet,
-RestSet and AccidentalSet.  It consumes the already pinned D5 geometry render
-(surface with bbox instrumentation) and deterministic V1 MusicXML.  No learned
+RestSet and AccidentalSet. It consumes the already pinned D5 geometry render
+(surface with bbox instrumentation) and deterministic V1 MusicXML. No learned
 prediction participates in linkage or labeling.
 
-Canonical-to-renderer linkage is fail-closed:
-- canonical and renderer measure counts must match exactly;
-- within every measure, the flattened note/rest atom sequence must match exactly;
-- notehead/rest/accidental cardinalities must agree before labels are emitted;
-- each note must expose exactly one visible notehead group;
-- each canonical visible accidental must map to exactly one nested ``accid``
-  group, while a note without a visible accidental must expose none;
-- all symbol boxes must be finite, positive and contained by the owning measure.
+Pinned Verovio 6.2.1 has two renderer details that are explicit D12 invariants:
+anonymous ``g.notehead`` wrappers contain one glyph ``use`` reference, while
+``g.accid`` exists structurally on every note and is visible only when it
+contains a glyph ``use``. D12 therefore binds notehead identity to the owning
+renderer note id, derives the anonymous notehead box from its referenced glyph
+path, and ignores empty accidental placeholders.
 
-The event-order bridge is audit-only and cannot hide a missing/extra glyph:
-cardinality and atom-kind equality are checked first, and any mismatch rejects the
-sample instead of guessing by proximity or appearance.
+Canonical-to-renderer linkage is fail-closed: measure and note/rest atom order,
+symbol cardinality, V1 glyph families, bbox geometry and provenance must all
+agree exactly before a label is emitted.
 """
 
 from __future__ import annotations
@@ -24,6 +22,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from hashlib import sha256
 import math
+import re
 import xml.etree.ElementTree as ET
 from typing import Final
 
@@ -38,17 +37,33 @@ from .stage7d12_symbol_gt_contract import (
     require_link_cardinality,
     rest_class,
 )
-from .stage7d5_geometry import (
-    AxisAlignedBox,
-    GeometryRenderResult,
-    Point2D,
-)
+from .stage7d5_geometry import AxisAlignedBox, GeometryRenderResult, Point2D
 
 
 STAGE7D12_SYMBOL_GEOMETRY_VERSION: Final[str] = (
-    "stage7d12-pinned-verovio-symbol-geometry-v1"
+    "stage7d12-pinned-verovio-symbol-geometry-v2"
 )
 _CONTAINMENT_EPSILON: Final[float] = 1e-6
+_GEOMETRY_EPSILON: Final[float] = 1e-12
+_XLINK_HREF: Final[str] = "{http://www.w3.org/1999/xlink}href"
+
+_NOTEHEAD_GLYPH_BY_DURATION: Final[dict[str, str]] = {
+    "whole": "E0A2",
+    "half": "E0A3",
+    "quarter": "E0A4",
+    "eighth": "E0A4",
+}
+_ACCID_GLYPH_BY_CLASS: Final[dict[str, str]] = {
+    "flat": "E260",
+    "natural": "E261",
+    "sharp": "E262",
+}
+_NUMBER = r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?"
+_PATH_TOKEN_RE = re.compile(rf"\s*(?:,\s*)?([A-Za-z]|{_NUMBER})")
+_USE_TRANSFORM_RE = re.compile(
+    rf"^\s*translate\(\s*({_NUMBER})(?:[\s,]+({_NUMBER}))?\s*\)"
+    rf"\s*scale\(\s*({_NUMBER})(?:[\s,]+({_NUMBER}))?\s*\)\s*$"
+)
 
 
 class Stage7D12SymbolGeometryError(Stage7D12ContractError):
@@ -145,6 +160,7 @@ class _CanonicalAtom:
     kind: str
     canonical_event_id: str
     visual_class: str
+    renderer_glyph_code: str | None
     visible_accidental: str | None
 
 
@@ -163,6 +179,21 @@ class _RawRendererMeasure:
     measure_bbox: AxisAlignedBox
     coordinate_root: ET.Element
     parent_map: dict[ET.Element, ET.Element]
+    id_map: dict[str, ET.Element]
+
+
+@dataclass(frozen=True, slots=True)
+class _Line:
+    start: Point2D
+    end: Point2D
+
+
+@dataclass(frozen=True, slots=True)
+class _Cubic:
+    start: Point2D
+    control1: Point2D
+    control2: Point2D
+    end: Point2D
 
 
 def _local(element: ET.Element) -> str:
@@ -199,7 +230,7 @@ def _canonical_measures(musicxml: bytes) -> tuple[_CanonicalMeasure, ...]:
         )
     try:
         root = ET.fromstring(musicxml)
-    except ET.ParseError as exc:  # validator should already reject this
+    except ET.ParseError as exc:
         raise Stage7D12SymbolGeometryError("MusicXML parse failed") from exc
 
     parts = [element for element in root if _local(element) == "part"]
@@ -252,6 +283,7 @@ def _canonical_measures(musicxml: bytes) -> tuple[_CanonicalMeasure, ...]:
                             measure_number=number, event_index=event_index
                         ),
                         visual_class=rest_class(duration),
+                        renderer_glyph_code=None,
                         visible_accidental=None,
                     )
                 )
@@ -264,6 +296,12 @@ def _canonical_measures(musicxml: bytes) -> tuple[_CanonicalMeasure, ...]:
                         "pitched event cannot mix a rest member"
                     )
                 duration = _single_text(note, "type")
+                try:
+                    glyph_code = _NOTEHEAD_GLYPH_BY_DURATION[duration]
+                except KeyError as exc:
+                    raise Stage7D12SymbolGeometryError(
+                        "unsupported V1 notehead duration"
+                    ) from exc
                 accidental = _single_child(note, "accidental")
                 accidental_value = None
                 if accidental is not None:
@@ -281,6 +319,7 @@ def _canonical_measures(musicxml: bytes) -> tuple[_CanonicalMeasure, ...]:
                             chord_member_index=(member_index if chord else None),
                         ),
                         visual_class=notehead_fill_class(duration),
+                        renderer_glyph_code=glyph_code,
                         visible_accidental=accidental_value,
                     )
                 )
@@ -336,7 +375,9 @@ def _box_inside_box(inner: AxisAlignedBox, outer: AxisAlignedBox) -> bool:
     )
 
 
-def _renderer_measures(render_result: GeometryRenderResult) -> tuple[_RawRendererMeasure, ...]:
+def _renderer_measures(
+    render_result: GeometryRenderResult,
+) -> tuple[_RawRendererMeasure, ...]:
     raw: list[_RawRendererMeasure] = []
     seen_measure_ids: set[str] = set()
     for page in render_result.pages:
@@ -352,6 +393,16 @@ def _renderer_measures(render_result: GeometryRenderResult) -> tuple[_RawRendere
         parent_map = {
             child: parent for parent in coordinate_root.iter() for child in parent
         }
+        id_map: dict[str, ET.Element] = {}
+        for element in root.iter():
+            element_id = element.attrib.get("id")
+            if element_id:
+                if element_id in id_map:
+                    raise Stage7D12SymbolGeometryError(
+                        "geometry SVG ids must be globally unique within a page"
+                    )
+                id_map[element_id] = element
+
         systems = [
             element
             for element in coordinate_root.iter()
@@ -411,6 +462,7 @@ def _renderer_measures(render_result: GeometryRenderResult) -> tuple[_RawRendere
                         measure_bbox=measure_bbox,
                         coordinate_root=coordinate_root,
                         parent_map=parent_map,
+                        id_map=id_map,
                     )
                 )
     if not raw:
@@ -449,6 +501,355 @@ def _renderer_atoms(measure: _RawRendererMeasure) -> tuple[ET.Element, ...]:
     return tuple(atoms)
 
 
+def _href(element: ET.Element) -> str:
+    direct = element.attrib.get("href")
+    namespaced = element.attrib.get(_XLINK_HREF)
+    if direct and namespaced and direct != namespaced:
+        raise Stage7D12SymbolGeometryError(
+            "renderer glyph has conflicting href attributes"
+        )
+    return direct or namespaced or ""
+
+
+def _glyph_uses(group: ET.Element) -> tuple[ET.Element, ...]:
+    return tuple(element for element in group.iter() if _local(element) == "use")
+
+
+def _visible_accid_groups(note: ET.Element) -> tuple[ET.Element, ...]:
+    visible: list[ET.Element] = []
+    for group in _visible_descendants(note, "accid"):
+        uses = _glyph_uses(group)
+        if len(uses) > 1:
+            raise Stage7D12SymbolGeometryError(
+                "renderer accid group contains multiple glyph uses"
+            )
+        if uses:
+            visible.append(group)
+    return tuple(visible)
+
+
+def _parse_use_transform(text: str) -> tuple[float, float, float, float]:
+    match = _USE_TRANSFORM_RE.fullmatch(text)
+    if match is None:
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph use transform is outside pinned D12 shape"
+        )
+    tx = float(match.group(1))
+    ty = float(match.group(2) or 0.0)
+    sx = float(match.group(3))
+    sy = float(match.group(4) or match.group(3))
+    if not all(math.isfinite(value) for value in (tx, ty, sx, sy)):
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph use transform must be finite"
+        )
+    if sx <= 0.0 or sy <= 0.0:
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph use scale must be positive"
+        )
+    return tx, ty, sx, sy
+
+
+def _path_tokens(text: str) -> tuple[str, ...]:
+    if not text or not text.strip():
+        raise Stage7D12SymbolGeometryError("notehead glyph path is empty")
+    tokens: list[str] = []
+    position = 0
+    while position < len(text):
+        match = _PATH_TOKEN_RE.match(text, position)
+        if match is None:
+            if text[position:].strip(" ,\t\r\n") == "":
+                break
+            raise Stage7D12SymbolGeometryError(
+                "notehead glyph path contains unsupported syntax"
+            )
+        tokens.append(match.group(1))
+        position = match.end()
+    if not tokens:
+        raise Stage7D12SymbolGeometryError("notehead glyph path has no tokens")
+    return tuple(tokens)
+
+
+def _point(x: float, y: float) -> Point2D:
+    if not math.isfinite(x) or not math.isfinite(y):
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph path coordinate is non-finite"
+        )
+    return Point2D(x, y)
+
+
+def _parse_notehead_path(text: str) -> tuple[_Line | _Cubic, ...]:
+    tokens = _path_tokens(text)
+    index = 0
+    current: Point2D | None = None
+    subpath_start: Point2D | None = None
+    segments: list[_Line | _Cubic] = []
+
+    def number() -> float:
+        nonlocal index
+        if index >= len(tokens) or tokens[index].isalpha():
+            raise Stage7D12SymbolGeometryError(
+                "notehead glyph path is missing a numeric argument"
+            )
+        value = float(tokens[index])
+        index += 1
+        if not math.isfinite(value):
+            raise Stage7D12SymbolGeometryError(
+                "notehead glyph path contains non-finite number"
+            )
+        return value
+
+    while index < len(tokens):
+        command = tokens[index]
+        index += 1
+        if not command.isalpha():
+            raise Stage7D12SymbolGeometryError(
+                "notehead glyph path requires explicit commands"
+            )
+        if command == "M":
+            x, y = number(), number()
+            current = _point(x, y)
+            subpath_start = current
+        elif command == "l":
+            if current is None:
+                raise Stage7D12SymbolGeometryError(
+                    "relative line appears before move"
+                )
+            end = _point(current.x + number(), current.y + number())
+            segments.append(_Line(current, end))
+            current = end
+        elif command == "c":
+            if current is None:
+                raise Stage7D12SymbolGeometryError(
+                    "relative cubic appears before move"
+                )
+            dx1, dy1 = number(), number()
+            dx2, dy2 = number(), number()
+            dx3, dy3 = number(), number()
+            control1 = _point(current.x + dx1, current.y + dy1)
+            control2 = _point(current.x + dx2, current.y + dy2)
+            end = _point(current.x + dx3, current.y + dy3)
+            segments.append(_Cubic(current, control1, control2, end))
+            current = end
+        elif command == "s":
+            if current is None:
+                raise Stage7D12SymbolGeometryError(
+                    "relative smooth cubic appears before move"
+                )
+            if segments and isinstance(segments[-1], _Cubic) and segments[-1].end == current:
+                prior_control = segments[-1].control2
+                control1 = _point(
+                    2.0 * current.x - prior_control.x,
+                    2.0 * current.y - prior_control.y,
+                )
+            else:
+                control1 = current
+            dx2, dy2 = number(), number()
+            dx3, dy3 = number(), number()
+            control2 = _point(current.x + dx2, current.y + dy2)
+            end = _point(current.x + dx3, current.y + dy3)
+            segments.append(_Cubic(current, control1, control2, end))
+            current = end
+        elif command in {"z", "Z"}:
+            if current is None or subpath_start is None:
+                raise Stage7D12SymbolGeometryError(
+                    "closepath appears before move"
+                )
+            if current != subpath_start:
+                segments.append(_Line(current, subpath_start))
+            current = subpath_start
+        else:
+            raise Stage7D12SymbolGeometryError(
+                f"unsupported pinned notehead path command: {command}"
+            )
+    if not segments:
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph path contains no drawable segment"
+        )
+    return tuple(segments)
+
+
+def _transform_point(point: Point2D, matrix: tuple[float, ...]) -> Point2D:
+    try:
+        return _d5._apply_affine(point, matrix)
+    except _d5.Stage7D5GeometryError as exc:
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph affine transform failed"
+        ) from exc
+
+
+def _transform_segment(
+    segment: _Line | _Cubic,
+    matrix: tuple[float, ...],
+) -> _Line | _Cubic:
+    if isinstance(segment, _Line):
+        return _Line(
+            _transform_point(segment.start, matrix),
+            _transform_point(segment.end, matrix),
+        )
+    return _Cubic(
+        _transform_point(segment.start, matrix),
+        _transform_point(segment.control1, matrix),
+        _transform_point(segment.control2, matrix),
+        _transform_point(segment.end, matrix),
+    )
+
+
+def _cubic_value(p0: float, p1: float, p2: float, p3: float, t: float) -> float:
+    u = 1.0 - t
+    return (
+        u * u * u * p0
+        + 3.0 * u * u * t * p1
+        + 3.0 * u * t * t * p2
+        + t * t * t * p3
+    )
+
+
+def _cubic_extrema(
+    p0: float, p1: float, p2: float, p3: float
+) -> tuple[float, ...]:
+    a = -p0 + 3.0 * p1 - 3.0 * p2 + p3
+    b = 2.0 * (p0 - 2.0 * p1 + p2)
+    c = p1 - p0
+    roots: list[float] = []
+    if abs(a) <= _GEOMETRY_EPSILON:
+        if abs(b) > _GEOMETRY_EPSILON:
+            t = -c / b
+            if 0.0 < t < 1.0:
+                roots.append(t)
+        return tuple(roots)
+    discriminant = b * b - 4.0 * a * c
+    if discriminant < -_GEOMETRY_EPSILON:
+        return ()
+    discriminant = max(0.0, discriminant)
+    root = math.sqrt(discriminant)
+    for t in ((-b - root) / (2.0 * a), (-b + root) / (2.0 * a)):
+        if 0.0 < t < 1.0 and not any(
+            math.isclose(t, prior, abs_tol=1e-12) for prior in roots
+        ):
+            roots.append(t)
+    return tuple(roots)
+
+
+def _segments_bbox(segments: tuple[_Line | _Cubic, ...]) -> AxisAlignedBox:
+    xs: list[float] = []
+    ys: list[float] = []
+    for segment in segments:
+        if isinstance(segment, _Line):
+            xs.extend((segment.start.x, segment.end.x))
+            ys.extend((segment.start.y, segment.end.y))
+            continue
+        tx = (0.0, 1.0) + _cubic_extrema(
+            segment.start.x,
+            segment.control1.x,
+            segment.control2.x,
+            segment.end.x,
+        )
+        ty = (0.0, 1.0) + _cubic_extrema(
+            segment.start.y,
+            segment.control1.y,
+            segment.control2.y,
+            segment.end.y,
+        )
+        xs.extend(
+            _cubic_value(
+                segment.start.x,
+                segment.control1.x,
+                segment.control2.x,
+                segment.end.x,
+                t,
+            )
+            for t in tx
+        )
+        ys.extend(
+            _cubic_value(
+                segment.start.y,
+                segment.control1.y,
+                segment.control2.y,
+                segment.end.y,
+                t,
+            )
+            for t in ty
+        )
+    if not xs or not ys or not all(math.isfinite(value) for value in xs + ys):
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph produced invalid bounds"
+        )
+    try:
+        return AxisAlignedBox(min(xs), min(ys), max(xs), max(ys))
+    except _d5.Stage7D5GeometryError as exc:
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph bbox is degenerate"
+        ) from exc
+
+
+def _notehead_bbox(
+    head: ET.Element,
+    *,
+    expected_glyph_code: str,
+    measure: _RawRendererMeasure,
+) -> AxisAlignedBox:
+    uses = _glyph_uses(head)
+    if len(uses) != 1:
+        raise Stage7D12SymbolGeometryError(
+            "anonymous renderer notehead must contain exactly one glyph use"
+        )
+    use = uses[0]
+    href = _href(use)
+    if not href.startswith(f"#{expected_glyph_code}-"):
+        raise Stage7D12SymbolGeometryError(
+            "renderer notehead glyph disagrees with canonical duration"
+        )
+    definition = measure.id_map.get(href[1:])
+    if definition is None:
+        raise Stage7D12SymbolGeometryError(
+            "notehead glyph definition is missing from pinned SVG"
+        )
+    paths = [element for element in definition.iter() if _local(element) == "path"]
+    if len(paths) != 1:
+        raise Stage7D12SymbolGeometryError(
+            "V1 notehead glyph definition must contain exactly one path"
+        )
+    path = paths[0]
+    if path.attrib.get("transform", "").strip() != "scale(1,-1)":
+        raise Stage7D12SymbolGeometryError(
+            "V1 notehead glyph path transform drifted from pinned shape"
+        )
+    path_matrix = _d5._parse_transform(path)
+    tx, ty, sx, sy = _parse_use_transform(use.attrib.get("transform", ""))
+    use_matrix = (sx, 0.0, 0.0, sy, tx, ty)
+    parent_matrix = _d5._cumulative_transform(
+        head, measure.coordinate_root, measure.parent_map
+    )
+    combined = _d5._compose(
+        parent_matrix,
+        _d5._compose(use_matrix, path_matrix),
+    )
+    segments = tuple(
+        _transform_segment(segment, combined)
+        for segment in _parse_notehead_path(path.attrib.get("d", ""))
+    )
+    return _segments_bbox(segments)
+
+
+def _accid_href(group: ET.Element) -> str:
+    uses = _glyph_uses(group)
+    if len(uses) != 1:
+        raise Stage7D12SymbolGeometryError(
+            "visible renderer accidental must contain exactly one glyph use"
+        )
+    href = _href(uses[0])
+    if not href.startswith("#"):
+        raise Stage7D12SymbolGeometryError(
+            "renderer accidental glyph must be an internal fragment"
+        )
+    return href
+
+
+def _glyph_code_matches(href: str, expected_code: str) -> bool:
+    target = href[1:] if href.startswith("#") else href
+    return target == expected_code or target.startswith(expected_code + "-")
+
+
 def _extract_measure(
     canonical: _CanonicalMeasure,
     renderer: _RawRendererMeasure,
@@ -480,7 +881,7 @@ def _extract_measure(
         atom.visible_accidental is not None for atom in canonical.atoms
     )
     renderer_accidentals = sum(
-        len(_visible_descendants(group, "accid"))
+        len(_visible_accid_groups(group))
         for group, atom in zip(renderer_atoms, canonical.atoms, strict=True)
         if atom.kind == "note"
     )
@@ -521,16 +922,16 @@ def _extract_measure(
         heads = _visible_descendants(renderer_group, "notehead")
         if len(heads) != 1:
             raise Stage7D12SymbolGeometryError(
-                "each renderer note must expose exactly one visible notehead"
+                "each renderer note must expose exactly one notehead group"
             )
-        head = heads[0]
-        head_id = head.attrib.get("id", "")
-        if not head_id:
+        if canonical_atom.renderer_glyph_code is None:
             raise Stage7D12SymbolGeometryError(
-                "renderer notehead id must be non-empty"
+                "canonical note is missing its expected V1 glyph code"
             )
-        box = _bbox_for_visible_group(
-            head, renderer.coordinate_root, renderer.parent_map
+        box = _notehead_bbox(
+            heads[0],
+            expected_glyph_code=canonical_atom.renderer_glyph_code,
+            measure=renderer,
         )
         center = Point2D(
             (box.x_min + box.x_max) / 2.0,
@@ -539,7 +940,7 @@ def _extract_measure(
         note_record = SymbolGeometry(
             kind="notehead",
             canonical_event_id=canonical_atom.canonical_event_id,
-            renderer_id=head_id,
+            renderer_id=renderer_id,
             class_name=canonical_atom.visual_class,
             bbox=box,
             center=center,
@@ -547,23 +948,28 @@ def _extract_measure(
         noteheads.append(note_record)
         seen_kind_ids["notehead"].add(note_record.canonical_event_id)
 
-        accids = _visible_descendants(renderer_group, "accid")
+        accids = _visible_accid_groups(renderer_group)
         expected_accid = canonical_atom.visible_accidental
         if expected_accid is None:
             if accids:
                 raise Stage7D12SymbolGeometryError(
-                    "renderer note exposes accidental without canonical visible intent"
+                    "renderer note exposes visible accidental without canonical intent"
                 )
             continue
         if len(accids) != 1:
             raise Stage7D12SymbolGeometryError(
-                "canonical visible accidental requires exactly one nested accid group"
+                "canonical visible accidental requires exactly one visible accid group"
             )
         accid = accids[0]
         accid_id = accid.attrib.get("id", "")
         if not accid_id:
             raise Stage7D12SymbolGeometryError(
                 "renderer accidental id must be non-empty"
+            )
+        expected_accid_code = _ACCID_GLYPH_BY_CLASS[expected_accid]
+        if not _glyph_code_matches(_accid_href(accid), expected_accid_code):
+            raise Stage7D12SymbolGeometryError(
+                "renderer accidental glyph disagrees with canonical accidental class"
             )
         accid_record = SymbolGeometry(
             kind="accidental",
