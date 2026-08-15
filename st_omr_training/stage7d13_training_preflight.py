@@ -96,6 +96,12 @@ def verify_stage7d13_training_preflight(derivative_root: str | Path) -> Stage7D1
     manifest, raw = _json(root / "manifest.json", "D13 manifest")
     if sha256(raw).hexdigest() != D13_DERIVATIVE_MANIFEST_SHA256:
         _fail("D13 preflight manifest SHA mismatch")
+    checksum_path = root / "manifest.sha256"
+    if checksum_path.is_symlink() or not checksum_path.is_file():
+        _fail("D13 manifest.sha256 must be regular non-symlink file")
+    expected_checksum = f"{D13_DERIVATIVE_MANIFEST_SHA256}  manifest.json\n".encode("ascii")
+    if checksum_path.read_bytes() != expected_checksum:
+        _fail("D13 manifest.sha256 sidecar mismatch")
     if manifest.get("derivative_build_id") != D13_DERIVATIVE_BUILD_ID:
         _fail("D13 preflight build id mismatch")
     rows = manifest.get("records")
