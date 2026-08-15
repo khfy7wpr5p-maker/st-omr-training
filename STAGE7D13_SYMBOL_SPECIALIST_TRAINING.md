@@ -1,6 +1,6 @@
 # Stage 7-D13 — NoteHead + Rest + Accidental specialist training contract
 
-Status: **active — pre-training contract; optimizer not yet authorized**.
+Status: **active — D13-3 authoritative derivative PASS; D13-4 model/metric implementation in progress; optimizer not yet authorized**.
 
 Stage 7-D13 turns the accepted D12 deterministic symbol ground truth into a frozen training package for three separate learned specialists:
 
@@ -41,7 +41,7 @@ VALIDATION    153 source images /  51 families
 TEST            0 specialist records
 ```
 
-The D12 class inventory is frozen as input evidence to D13. D13 must re-open and independently verify the accepted D12 bundle before any training derivative is admitted.
+The D12 class inventory is frozen as input evidence to D13. D13 re-opens and independently verifies the accepted D12 bundle before any training derivative is admitted.
 
 ## Class-readiness gate
 
@@ -96,7 +96,71 @@ For every measure:
 
 No TEST derivative is permitted.
 
-The D13 derivative builder must be completed and independently verified before optimizer creation. Exact measure-record counts and exact optimizer-step counts are therefore derived from the verified D13 derivative bundle, not guessed in advance.
+### Authoritative D13-3 derivative evidence
+
+The authoritative D13 measure-derivative bundle was produced and independently verified on exact executable head:
+
+```text
+d5fe4d2c120202ec7f962ef6d849b6e36af224ef
+```
+
+Persisted identity:
+
+```text
+derivative build id:
+44f1932532fb511dfa59a164f94be6b899f3aa0594c0ac0a6f499a38e5fb5697
+
+manifest SHA-256:
+8cfb87b5c6135be14b4c9ad488868c0edb0d37bb3bb18ad1b5e79d04fdf24f7b
+
+artifact binding SHA-256:
+c42c1f69e21d61d3eefdcafc40dabf2f0fcd6ac2ceb4d5cf88d8e158246dd33e
+
+external receipt SHA-256:
+4e644c5a110c738fd99b905f093a9acb0ca07cd6bd1b7b52c4904aba7964466b
+```
+
+Verified cardinality:
+
+```text
+TRAIN records        9840
+VALIDATION records   1224
+TOTAL records       11064
+persisted images    11062
+persisted labels    11064
+TEST records            0
+optimizer executed      0
+independent verify    True
+COMPLETE present     False
+```
+
+The 11,062 image count is expected content-addressed deduplication: two independently identified measure records share exact PNG bytes while retaining separate record/label identities.
+
+Exact target-instance totals:
+
+```text
+TRAIN
+  NoteHeadSet     38334
+  RestSet         10602
+  AccidentalSet   22392
+
+VALIDATION
+  NoteHeadSet      5232
+  RestSet           969
+  AccidentalSet    3330
+```
+
+With the frozen batch size 16 and 10 epochs, independently verified TRAIN cardinality freezes:
+
+```text
+615 batches / epoch
+NoteHeadSet     6150 optimizer steps
+RestSet         6150 optimizer steps
+AccidentalSet   6150 optimizer steps
+TOTAL          18450 optimizer steps
+```
+
+No optimizer has executed yet. These are the required future exact counts for the authoritative training run.
 
 ## Frozen model architecture
 
@@ -130,7 +194,7 @@ RestSet       C=3
 AccidentalSet C=3
 ```
 
-The architecture is a small encoder/decoder CNN. Each specialist must remain at or below `1,500,000` trainable parameters; the three accepted specialist checkpoints combined must remain at or below `4,500,000` trainable parameters.
+The implemented D13-4 v1 encoder is a compact four-convolution stride-4 CNN with independent heatmap, bbox-size and center-offset heads. Bbox sizes are constrained positive by `softplus`; center offsets are constrained to `[0,1]` by sigmoid. Each specialist remains below `1,500,000` trainable parameters and the three accepted specialist checkpoints combined must remain at or below `4,500,000` trainable parameters.
 
 No pretrained external vision backbone is authorized in D13. No D7/D11 learned state is loaded into these specialists.
 
@@ -144,9 +208,7 @@ weighted positive focal heatmap loss
 + 1.0 * positive center-offset Smooth-L1
 ```
 
-The class weights above affect only positive heatmap terms. Background/negative terms are not multiplied by inverse-frequency class weights.
-
-Only target centers contribute bbox-size and center-offset regression loss.
+D13-4 v1 fixes focal gamma to `2.0`. The class weights above affect only positive heatmap terms. Background/negative terms are not multiplied by inverse-frequency class weights. Only target centers contribute bbox-size and center-offset regression loss. Because bbox/offset regression is class-agnostic, two targets mapping to the same stride-4 regression cell fail closed rather than silently overwriting one another.
 
 ## Frozen optimizer profile
 
@@ -166,8 +228,6 @@ execution            deterministic pinned CPU runtime
 ```
 
 The three specialists train sequentially with three separate optimizers. No optimizer state is shared across specialists.
-
-Exact optimizer steps are computed only after the verified measure-derivative record counts are known. A completed run must prove the exact expected count for every specialist.
 
 ## Frozen validation decoder
 
@@ -194,8 +254,6 @@ A prediction is correct only when:
 - predicted center is within Euclidean distance `<= 4.0` input pixels of the GT center;
 - the prediction and GT have not already been matched.
 
-This metric measures detection + class + center localization.
-
 ### 2. Class-aware bbox F1 @ IoU 0.50
 
 A prediction is correct only when:
@@ -209,8 +267,6 @@ A prediction is correct only when:
 Predictions and GT are first matched by center distance `<= 4.0` without requiring class equality; the matched class labels then produce per-class F1 and unweighted macro-F1. Unmatched GT and predictions count as class-specific false negatives/false positives.
 
 ## Frozen quality gates
-
-The first D13 synthetic validation gates are frozen before training:
 
 ```text
 NoteHeadSet
@@ -253,14 +309,16 @@ For each specialist:
 D13 must fail closed if any of the following occurs:
 
 - accepted D12 identity differs;
-- D12/D13 source or label hash changes;
+- authoritative D13 derivative identity differs;
+- D12/D13 source, image or label hash changes;
 - TEST is encountered beyond reading only `split`;
 - a family crosses TRAIN/VALIDATION;
 - class-readiness minimum is not met;
 - the derivative transform is ambiguous or clips a target;
+- two targets collide in one class-agnostic stride-4 regression cell;
 - a model exceeds its parameter cap;
 - a tensor/loss/gradient/model state becomes non-finite;
-- optimizer-step count differs from the derived frozen expectation;
+- optimizer-step count differs from exactly 6,150 for any specialist;
 - repository/runtime identity changes during an authoritative run;
 - persisted metrics/checkpoint/verification identities disagree;
 - independent verifier fails.
@@ -270,15 +328,15 @@ No ScoreMosaic runtime integration, real-data ingestion, teacher-correction auto
 ## Controlled implementation sequence
 
 ```text
-D13-0 training contract + invariant tests
+D13-0 training contract + invariant tests                    PASS
         ↓
-D13-1 deterministic measure-derivative builder
+D13-1 deterministic measure-derivative builder               PASS
         ↓
-D13-2 independent persisted derivative verifier
+D13-2 independent persisted derivative verifier              PASS
         ↓
-D13-3 freeze exact derivative counts + optimizer steps
+D13-3 freeze exact derivative counts + optimizer steps       PASS
         ↓
-D13-4 implement three compact specialists + metrics
+D13-4 implement three compact specialists + metrics          IN PROGRESS
         ↓
 D13-5 exact-head regression / architecture-safety review
         ↓
@@ -291,4 +349,4 @@ closure evidence
 explicit merge approval
 ```
 
-No optimizer may run before D13-1 through D13-5 are complete and the exact training profile is fingerprinted on the verified derivative identity.
+No optimizer may run before D13-4 and D13-5 are complete and the exact training profile is fingerprinted on the verified derivative identity.
