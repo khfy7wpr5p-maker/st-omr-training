@@ -50,6 +50,10 @@ class Receipt:
 
 class Stage7D13VerifiedSurfaceTests(unittest.TestCase):
     def test_exact_authoritative_receipt_passes(self) -> None:
+        self.assertEqual(
+            D13_DERIVATIVE_ARTIFACT_BINDING_SHA256,
+            "c42c1f69e21d61d3eefdacfc40dabf2f0fcd6ac2ceb4d5cf88d8e158246dd33e",
+        )
         result = assert_verified_surface(Receipt())
         self.assertEqual(result.record_count, 11_064)
         self.assertEqual(result.image_count, 11_062)
