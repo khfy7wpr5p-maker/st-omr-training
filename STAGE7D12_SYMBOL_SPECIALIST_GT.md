@@ -104,7 +104,7 @@ These IDs are not renderer IDs and are not learned outputs. They exist only to p
 
 For each measure and target family, canonical and renderer object cardinality must agree exactly before linkage is admitted.
 
-The concrete extractor must additionally prove:
+The concrete extractor additionally proves:
 
 - visible renderer object class is explicit and supported;
 - every bbox is finite and positive;
@@ -115,15 +115,39 @@ The concrete extractor must additionally prove:
 - no canonical target is silently left unlinked;
 - ambiguity rejects the affected specialist sample rather than guessing.
 
-The expected pinned Verovio visible-object classes are contract inputs only:
+Pinned Verovio 6.2.1 exposes an anonymous `g.notehead` wrapper without a stable object bbox. D12 therefore binds NoteHead identity to the owning renderer `g.note`, verifies the expected SMuFL notehead glyph family explicitly, and uses the renderer-authored owning-note bounding box as NoteHeadSet spatial authority. Empty `g.accid` containers are structural placeholders and are not counted as visible accidentals.
 
-```text
-notehead   -> notehead
-rest       -> rest
-accidental -> accid
-```
+## Deterministic derivative builder
 
-The extraction implementation must verify these against pilot SVGs before an authoritative derivative build is allowed.
+The D12 builder consumes the exact accepted D6 TRAIN/VALIDATION surface and:
+
+- re-verifies accepted D6 identity;
+- re-hashes every referenced source PNG and accepted D6 label;
+- replays pinned Verovio symbol geometry per family;
+- maps symbol geometry through the accepted final-PNG transform;
+- requires the resulting transform fingerprint to equal the accepted D6 fingerprint;
+- persists one canonical hash-addressed symbol label per development image;
+- emits manifest/build evidence and observed TRAIN/VALIDATION class inventory;
+- writes no model, checkpoint, optimizer state, or `COMPLETE` marker.
+
+## Independent persisted-bundle verifier
+
+D12-5 is implemented as a separate verifier that does not trust the builder's in-memory receipt. It independently reopens the persisted bundle, frozen source corpus, and accepted D6 sidecars and recomputes:
+
+- exact source/D6/sample identity;
+- every referenced source PNG, D6 label, and D12 label SHA-256;
+- manifest checksum and canonical JSON shape;
+- exact `1230 TRAIN + 153 VALIDATION` sample counts;
+- exact `410 + 51` family counts and family-exclusive split isolation;
+- label-file/manifest one-to-one cardinality;
+- source, renderer, D6 geometry, and final-PNG transform lineage;
+- bbox containment and notehead-center containment;
+- canonical-event and renderer-object uniqueness per target family;
+- per-class TRAIN/VALIDATION inventory;
+- target-instance counts, total label bytes, and artifact binding SHA-256;
+- `build.json` from independently recomputed evidence.
+
+At the D12-5 gate, the persisted root must contain exactly `manifest.json`, `manifest.sha256`, `build.json`, and `labels/`. A premature `COMPLETE` marker or unexpected file fails verification. The verifier itself does not write completion evidence.
 
 ## D12 acceptance gates
 
@@ -167,20 +191,22 @@ Therefore D12 shares deterministic data infrastructure but does not collapse the
 - no absolute-pitch prediction authority;
 - no unsupported V1 symbol class may be approximated or silently mapped.
 
-## Immediate implementation sequence inside D12
+## Current implementation sequence
 
 ```text
-contract + invariant tests
+contract + invariant tests                       PASS
         ↓
-pinned-Verovio symbol geometry pilot
+pinned-Verovio symbol geometry pilot            PASS
         ↓
-canonical-event linkage proof
+canonical-event linkage proof                    PASS
         ↓
-TRAIN/VALIDATION deterministic derivative builder
+TRAIN/VALIDATION deterministic derivative builder PASS
         ↓
-independent persisted-bundle verifier
+independent persisted-bundle verifier            PASS (code/test gate)
         ↓
-verified class inventory + D12 closure evidence
+authoritative bundle + verified class inventory PENDING
+        ↓
+closure review / merge gate                      PENDING
 ```
 
-Only after this sequence closes may the NoteHead, Rest and Accidental training package be authorized.
+Only after the authoritative D12 bundle is built and independently verified may the NoteHead, Rest and Accidental training package be authorized.
