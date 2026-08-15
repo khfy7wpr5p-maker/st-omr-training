@@ -194,19 +194,23 @@ Therefore D12 shares deterministic data infrastructure but does not collapse the
 ## Current implementation sequence
 
 ```text
-contract + invariant tests                       PASS
+contract + invariant tests                         PASS
         ↓
-pinned-Verovio symbol geometry pilot            PASS
+pinned-Verovio symbol geometry pilot              PASS
         ↓
-canonical-event linkage proof                    PASS
+canonical-event linkage proof                      PASS
         ↓
 TRAIN/VALIDATION deterministic derivative builder PASS
         ↓
-independent persisted-bundle verifier            PASS (code/test gate)
+independent persisted-bundle verifier              PASS
         ↓
-authoritative bundle + verified class inventory PENDING
+authoritative bundle + verified class inventory   PASS
         ↓
-closure review / merge gate                      PENDING
+closure evidence                                   PASS
+        ↓
+final exact-head regression / review               IN PROGRESS
+        ↓
+explicit merge approval                            PENDING
 ```
 
-Only after the authoritative D12 bundle is built and independently verified may the NoteHead, Rest and Accidental training package be authorized.
+The authoritative bundle identity, verified class inventory, and closure invariants are frozen in `STAGE7D12_CLOSURE_EVIDENCE.md`. No D12 training is authorized by this document; the later NoteHead, Rest, and Accidental training package must be scoped and approved separately.
