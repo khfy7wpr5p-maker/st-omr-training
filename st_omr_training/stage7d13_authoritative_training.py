@@ -138,7 +138,10 @@ def run_verified_stage7d13_training(
         _fail("repository HEAD differs from explicitly authorized D13 head")
     verify_stage7c_runtime()
 
-    preflight = verify_stage7d13_training_preflight(derivative_root)
+    preflight = verify_stage7d13_training_preflight(
+        derivative_root,
+        heartbeat=heartbeat,
+    )
     if not preflight.preflight_passed or not preflight.collision_free or preflight.test_opened:
         _fail("D13 preflight did not authorize optimizer creation")
     if heartbeat is not None:
