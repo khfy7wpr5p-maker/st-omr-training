@@ -72,6 +72,25 @@ def _json(path: Path, name: str) -> tuple[dict[str, object], bytes]:
     return value, raw
 
 
+def _assert_build_identity(build: Mapping[str, object]) -> None:
+    """Fail before record scanning when persisted derivative identity drifts."""
+    expected = {
+        "derivative_build_id": D13_DERIVATIVE_BUILD_ID,
+        "manifest_sha256": D13_DERIVATIVE_MANIFEST_SHA256,
+        "artifact_binding_sha256": D13_DERIVATIVE_ARTIFACT_BINDING_SHA256,
+        "record_count": D13_RECORD_COUNT,
+        "image_count": D13_IMAGE_COUNT,
+        "label_count": D13_LABEL_COUNT,
+        "record_split_counts": D13_RECORD_SPLIT_COUNTS,
+        "test_specialist_records": 0,
+        "optimizer_steps": 0,
+        "complete_marker_written": False,
+    }
+    for name, expected_value in expected.items():
+        if build.get(name) != expected_value:
+            _fail(f"D13 preflight build {name} mismatch")
+
+
 @dataclass(frozen=True, slots=True)
 class Stage7D13PreflightReceipt:
     version: str
@@ -111,21 +130,7 @@ def verify_stage7d13_training_preflight(
         _fail("D13 preflight build id mismatch")
 
     build, _build_raw = _json(root / "build.json", "D13 build")
-    expected_build_identity = {
-        "derivative_build_id": D13_DERIVATIVE_BUILD_ID,
-        "manifest_sha256": D13_DERIVATIVE_MANIFEST_SHA256,
-        "artifact_binding_sha256": D13_DERIVATIVE_ARTIFACT_BINDING_SHA256,
-        "record_count": D13_RECORD_COUNT,
-        "image_count": D13_IMAGE_COUNT,
-        "label_count": D13_LABEL_COUNT,
-        "record_split_counts": D13_RECORD_SPLIT_COUNTS,
-        "test_specialist_records": 0,
-        "optimizer_steps": 0,
-        "complete_marker_written": False,
-    }
-    for name, expected in expected_build_identity.items():
-        if build.get(name) != expected:
-            _fail(f"D13 preflight build {name} mismatch")
+    _assert_build_identity(build)
 
     rows = manifest.get("records")
     if not isinstance(rows, list) or len(rows) != D13_RECORD_COUNT:
