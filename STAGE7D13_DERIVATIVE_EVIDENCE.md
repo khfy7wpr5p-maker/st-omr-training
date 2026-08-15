@@ -22,11 +22,13 @@ manifest SHA-256:
 8cfb87b5c6135be14b4c9ad488868c0edb0d37bb3bb18ad1b5e79d04fdf24f7b
 
 artifact binding SHA-256:
-c42c1f69e21d61d3eefdcafc40dabf2f0fcd6ac2ceb4d5cf88d8e158246dd33e
+c42c1f69e21d61d3eefdacfc40dabf2f0fcd6ac2ceb4d5cf88d8e158246dd33e
 
 external receipt SHA-256:
 4e644c5a110c738fd99b905f093a9acb0ca07cd6bd1b7b52c4904aba7964466b
 ```
+
+The artifact binding above was reconfirmed before D13-6 by three matching values: the persisted Drive `build.json`, its local mirror, and an independent recomputation from all persisted manifest binding rows. The earlier transposed `...d3eefdcafc...` transcription is not authoritative.
 
 ## Independent verification result
 
