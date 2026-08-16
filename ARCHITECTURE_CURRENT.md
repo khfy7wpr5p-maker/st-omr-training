@@ -13,258 +13,266 @@ Pinned Verovio renderer
         ↓
 Controlled degradation
         ↓
-Stage 5 manifest + independent dataset validator
+Stage 5/6 validated synthetic persistence
         ↓
-Stage 6 hash-addressed persistence
+Stage 7-D0..D9 specialist decomposition history      ✅ CLOSED
         ↓
-Synthetic Curriculum v1 export
+Stage 7-D10 local ROI derivatives                    ✅ CLOSED
         ↓
-Stage 7-D0 canonical export-evidence gate       ✅ CLOSED
+Stage 7-D11 barline + meter refiners                  ✅ CLOSED / technical baseline
         ↓
-Stage 7-D1 archive/corpus byte acceptance       ✅ CLOSED
+Stage 7-D12 NoteHead/Rest/Accidental GT gate          ✅ CLOSED / TEST SEALED
         ↓
-Stage 7-D2 monolithic train + validation        ✅ CLOSED / diagnostic baseline
+Stage 7-D13-R1 first symbol-specialist training       ⛔ NOT ACCEPTED / BASELINE EVIDENCE
         ↓
-Stage 7-D3 validation error diagnostics         ✅ CLOSED
+Stage 7-D13-R2 specialist refinement                  🔄 ACTIVE ARCHITECTURE
         ↓
-Stage 7-D4 specialist architecture contract     ✅ CLOSED
+Rhythm / StaffPosition / Chord specialists            🔒
         ↓
-Stage 7-D5 StaffSet + StructureSet geometry     ✅ CLOSED
+Deterministic fusion + musical validators              🔒
         ↓
-Stage 7-D6 TRAIN/VAL specialist derivatives     ✅ CLOSED / TEST SEALED
-        ↓
-Stage 7-D7 StaffSet + StructureSet training     ✅ CLOSED / TEST SEALED
-        ↓
-Stage 7-D8 Structure validation diagnostics     ✅ CLOSED / optimizer 0 / TEST SEALED
-        ↓
-Stage 7-D9 Structure refinement contract        ✅ CLOSED / no training / TEST SEALED
-        ↓
-Stage 7-D10 local ROI derivatives               🔄 ACTIVE / optimizer 0 / TEST SEALED
-        ↓
-Barline + meter refiner training                🔒 D10 evidence-dependent
-        ↓
-NoteHead / Rest / Accidental specialists        🔒
-        ↓
-Rhythm / StaffPosition / Chord specialists      🔒
-        ↓
-Deterministic fusion + ContextSet validation    🔒
-        ↓
-Stage 9 sealed test benchmark/candidate gate    🔒 TEST SEALED
+Stage 9 sealed benchmark/candidate gate                🔒 TEST SEALED
 ```
 
-## Why Structure was decomposed
+## Current decision
 
-The accepted D2 monolithic baseline produced valid semantic sequences but recognition remained poor. D3 rejected a simple more-epochs response and selected specialist tasks.
+D13-R1 is retained as experimental evidence, not accepted as the final NoteHead/Rest/Accidental stage.
 
-D7 proved specialist learning could work: Staff geometry became strong and Structure learned `system_region`, `measure_region` and `clef_g2` well. The same whole-page Structure model remained weak on barlines and meter glyphs.
+The available run evidence is enough to reject a blind rerun of the same profile:
 
-D8 reproduced that checkpoint on VALIDATION with zero optimizer steps. Threshold sweeps and 1–2 pixel tolerant metrics did not materially repair barline/meter performance. Those targets occupy only a tiny fraction of page pixels, identifying sparse-object / representation pressure rather than a simple threshold error.
+- **NoteHead:** strong learning; visual architecture is provisionally kept. The main refinement question is optimizer/checkpoint stability because the minimum-validation-loss epoch and the strongest F1 epoch were not always identical.
+- **Rest:** failed materially. The observed ten-epoch run ended with zero center F1, zero bbox F1 and zero macro F1. Rest therefore requires root-cause analysis before another full optimizer run.
+- **Accidental:** meaningful learning was visible before interruption, but macro-class performance lagged localization. It is refined before being split automatically.
 
-D9 therefore froze a local higher-resolution refinement architecture before any new training. D10 now materializes that local data surface deterministically.
+D13-R2 is governed by `STAGE7D13_R2_REFINEMENT_PLAN.md`.
 
-## Current Structure graph
+## R2 architecture principle
+
+The specialist system follows one rule:
+
+> Ask learned models the smallest visual question that is useful; use deterministic composition and musical validation for structure that does not need to be learned.
+
+The target graph is therefore allowed to differ by symbol family rather than forcing every specialist into one identical detector shape.
 
 ```text
-score image
-    ↓
-Staff specialist
-    ↓
-accepted D7 Structure core (FROZEN)
-    ├─ system_region
-    ├─ measure_region
-    └─ clef_g2
-    │
-    ├─────────────── measure geometry + staff geometry ───────────────┐
-    │                                                                 │
-    ↓                                                                 ↓
-D10 measure-end ROI                                           D10 measure-start ROI
-192 x 128                                                     192 x 256
-    ↓                                                                 ↓
-future barline_refiner                                        future meter_refiner
-barline_segment                                               none|2/4|3/4|4/4 + bbox
-    └───────────────────────┬─────────────────────────────────────────┘
-                            ↓
-                 deterministic fail-closed fusion
-                            ↓
-                 unchanged external StructureSet
+Score / accepted measure geometry
+        ↓
+learned local observations
+        ├─ NoteHead detection + open|filled
+        ├─ Rest presence/localization → Rest type classification
+        └─ Accidental presence/localization → optional type classification
+        ↓
+deterministic association/composition
+        ↓
+musical validation
 ```
 
-D10 creates only the two ROI derivative families shown above. The future refiner models do not exist in D10 and no optimizer is authorized by this stage.
+## D13-R2 approved sequence
+
+```text
+R2-0  Freeze D13-R1 evidence
+        ↓
+R2-1  Rest root-cause audit
+        ↓
+R2-2  Rest architecture decision
+        ↓
+R2-3  Specialist-specific ROI / visual-scale decision
+        ↓
+R2-4  Short TRAIN-only diagnostic gate
+        ↓
+R2-5  Learning-rate scheduler A/B
+        ↓
+R2-6  Checkpoint-selection refinement
+        ↓
+R2-7  Accidental refinement
+        ↓
+R2-8  NoteHead optimizer/checkpoint refinement
+        ↓
+R2-9  Safe fast-resume contract
+        ↓
+R2-10 Product-oriented validation preparation
+```
+
+The first implementation package is **Rest Root-Cause Audit**. It is diagnostic/read-only with respect to model parameters. A second full Rest training run is blocked until the audit distinguishes data/label, representation/scale, decoder-threshold, localization and class-separation failure modes.
+
+## Rest R2 candidate graph
+
+The primary candidate, subject to R2-1 evidence, is:
+
+```text
+accepted measure / local high-resolution ROI
+        ↓
+RestPresence + RestLocalization
+        ↓
+normalized Rest crop
+        ↓
+RestTypeClassifier
+half | quarter | eighth
+        ↓
+deterministic Rest validator
+```
+
+This split is not automatic. If R2-1 finds incorrect labels or destructive scaling, that root cause is fixed before adding model complexity.
+
+## NoteHead R2 policy
+
+R1 demonstrated that the current detector can learn NoteHead strongly. Therefore the default R2 policy is:
+
+```text
+current NoteHead detector         KEEP
+learning-rate behavior            REFINE / controlled A/B
+checkpoint selection              REFINE
+open|filled class stability       REVIEW
+visual architecture redesign      BLOCKED without new evidence
+```
+
+A high specialist F1 remains a specialist metric only; it is not end-to-end PDF-reading accuracy.
+
+## Accidental R2 policy
+
+Accidental is refined before it is split because R1 showed substantial learning.
+
+First candidate:
+
+```text
+current Accidental detector
++ frozen scheduler candidate
++ refined checkpoint ranking
++ per-class metrics
+```
+
+If class-specific evidence remains weak, especially for the rare class, evaluate:
+
+```text
+AccidentalPresence/Localization
+        ↓
+normalized crop
+        ↓
+sharp | flat | natural classifier
+        ↓
+deterministic note-association validator
+```
+
+Glyph recognition and association to a note remain separate responsibilities.
+
+## Training-system refinements
+
+### Learning-rate scheduler
+
+R2 treats scheduler policy as part of the reproducible training contract. Candidate schedules are compared under a frozen A/B protocol. A scheduler is admitted only if it improves task stability/quality, not merely scalar validation loss.
+
+Any admitted scheduler must be checkpointed and independently verified together with model state, optimizer state, completed epoch, optimizer-step count, current LR and LR history.
+
+### Checkpoint selection
+
+R1 showed that minimum validation loss can disagree with the strongest F1 epoch. R2 therefore freezes a task-aware ranking rule before authoritative validation.
+
+Candidate order:
+
+1. specialist technical gates must pass;
+2. prefer higher macro-class F1;
+3. use center/bbox F1 as secondary quality evidence;
+4. use validation loss as tie-break/regularization evidence rather than the sole product proxy.
+
+The exact ranking formula must be fixed and tested before the result is known.
+
+### Short diagnostic gate
+
+R2 avoids another hours-long degenerate run. Before full training, a deterministic TRAIN-only diagnostic/dev partition may run a small fixed budget. A model that remains degenerate fails fast and cannot enter the authoritative full run.
+
+The authoritative validation split and sealed TEST must not become architecture-tuning loops.
+
+## Resume architecture
+
+R1 recovery was safe but expensive because restart repeated the complete derivative preflight. R2 should add a fail-closed fast-resume path for immutable artifacts.
+
+Fast resume may bypass the record-by-record scan only when a persisted preflight receipt remains bound to all of:
+
+```text
+derivative build id
+manifest SHA-256
+artifact-binding SHA-256
+preflight receipt SHA-256
+repository SHA
+runtime/dependency fingerprint
+training-profile fingerprint
+resume checkpoint SHA-256
+```
+
+Any mismatch falls back to the full preflight. TEST sealing, family isolation, exact optimizer-step accounting and checkpoint integrity are never weakened.
 
 ## Ground-truth authority
 
-Synthetic ground truth remains split into two deterministic authorities:
+Synthetic ground truth remains split into deterministic authorities:
 
-- **symbolic GT**: canonical ST music / deterministic MusicXML;
-- **spatial GT**: pinned Verovio geometry replayed through the exact accepted final-PNG transform.
+- **symbolic GT:** canonical ST music / deterministic MusicXML;
+- **spatial GT:** pinned Verovio geometry replayed through the exact accepted image transform.
 
-D10 does not manufacture new ground truth. It crops accepted D6 final-PNG spatial GT into the frozen D9 local coordinate systems.
+R2 does not manufacture labels from model predictions. Real geometry later requires separately admitted, human-verified annotation. ScoreMosaic uploads and teacher corrections remain excluded from automatic training.
 
-Real geometry later still requires separately admitted, human-verified annotation. ScoreMosaic uploads and teacher corrections remain excluded from automatic training.
+## D13 development surface
 
-## Closed D6 source surface
-
-D10 inherits the accepted D6 development surface through the verified D7 loader:
+The accepted D13 derivative surface used by R1 remains evidence, not disposable scratch data:
 
 ```text
-TRAIN        1,230 images / 410 families
-VALIDATION     153 images /  51 families
-TEST             0 D6 specialist labels exposed to D10
+TRAIN records        9840
+VALIDATION records   1224
+TOTAL records       11064
+persisted images    11062
+persisted labels    11064
+TEST records            0
 ```
 
-Accepted D6 identity:
+Target instances:
 
 ```text
-derivative build ID      0faafe229f3497b1147cf0f0ac0ce4b7efe6fa31f360a6a33a3b82c986c8c519
-manifest SHA-256          e8e415eb6ba9d91a1a880709c3f31d559aa20bf5149734f45b5f84ced16afee9
-artifact binding SHA-256  3b7558f0f927ad47a61ed5afb5faa8584dca8647cf8683d4043686eb7b077ea1
-receipt SHA-256           8fe85747b77f2282be3662f0c3d180a440c88028638bf1df7ddadfbb7650fff2
+TRAIN
+  NoteHeadSet     38334
+  RestSet         10602
+  AccidentalSet   22392
+
+VALIDATION
+  NoteHeadSet      5232
+  RestSet           969
+  AccidentalSet     3330
 ```
 
-## Closed D7/D8 evidence that selected D9
+R2 may reuse this surface only after the root-cause audit confirms that the relevant labels/transforms are valid for the selected R2 representation. Any new ROI derivative receives a new deterministic identity and independent verification.
 
-D7 Structure result:
+## Meter status
+
+D11 Meter remains a technical baseline, not the product-quality endpoint. Meter V2 is intentionally outside D13-R2 implementation scope. After D13-R2 closes, Meter returns to product-quality review and may be decomposed into presence/digit/composer stages if the frozen product thresholds are not met.
+
+## Product-quality direction
+
+The user-visible question is not "is F1 high?" but "did the PDF become correct music?" Later evaluation therefore needs to connect specialist observations to:
 
 ```text
-system_region Dice   0.9304674680
-measure_region Dice  0.8445145579
-clef_g2 Dice         0.8228637141
-barline Dice         0.2667824041
-meter_2_4 Dice       0.3439848856
-meter_3_4 Dice       0.3415115206
-meter_4_4 Dice       0.3092358359
+symbol detection correctness
+symbol class correctness
+staff-position / pitch correctness
+duration correctness
+accidental association correctness
+exact note-event correctness
+exact measure correctness
+critical errors per 10,000 symbols
+UNKNOWN / abstain behavior
 ```
 
-Accepted D8 report:
+No current specialist validation F1 is to be presented as end-to-end PDF-reading accuracy.
 
-```text
-repository head       e0e721bf5a6d13025546fdf5eeb755647eef383f
-report SHA-256         46de5f6766f78bb567f70794a364ccd44835d09af94ef29c3f1eab5cd13ce968
-barline Dice@0.50      0.2736204205
-barline tolerant@2px   0.3670878904
-meter tolerant@2px     about 0.35–0.40
-optimizer steps        0
-TEST records           0
-```
+## Safety boundary
 
-## Closed D9 local refinement contract
+D13-R2 does **not** authorize:
 
-### Barline ROI
-
-```text
-anchor                     measure end
-x before                    5.0 staff spacings
-x after                     1.5 staff spacings
-vertical margin             3.0 staff spacings above/below
-output                      192 x 128
-resize                      aspect-preserving fit/pad
-future parameter cap        500,000
-```
-
-### Meter ROI
-
-```text
-anchor                     measure start
-x before                    0.5 staff spacing
-x after                    12.0 staff spacings
-vertical margin             3.0 staff spacings above/below
-output                      192 x 256
-resize                      aspect-preserving fit/pad
-classes                     none | 2/4 | 3/4 | 4/4
-future parameter cap        750,000
-```
-
-The explicit `none` class is essential: an active meter may continue semantically while no current-measure meter glyph is displayed. Accepted D6 courtesy-meter geometry remains authoritative.
-
-Frozen future validation gates:
-
-```text
-TEST records                                  0
-accepted D7 Structure core mutation           forbidden
-new trainable params total                    <= 1,250,000
-barline strict Dice                           >= 0.500
-barline tolerant F1 @2px                      >= 0.700
-meter 4-class macro F1                        >= 0.800
-meter positive localization tolerant F1 @2px  >= 0.600
-```
-
-## Active D10 derivative gate
-
-For every accepted source measure D10 deterministically derives:
-
-```text
-1 barline record
-1 meter record
-```
-
-The source PNG and D6 sidecar are re-hashed before use. ROI transforms are computed in the native final-PNG coordinate system from accepted measure/staff geometry and staff spacing. The crop is fit/padded to the frozen local size, and the identical transform is replayed on target coordinates.
-
-Each record identity binds:
-
-```text
-D10 version
-D9 contract fingerprint
-source sample id
-source PNG SHA-256
-accepted D6 label SHA-256
-split
-kind
-measure number
-ROI policy id
-```
-
-The authoritative runner rejects any source surface other than exactly `1230 TRAIN + 153 VALIDATION` with `410 + 51` family-exclusive groups.
-
-### Persisted-output authority
-
-D10 output remains outside Git and is not trusted merely because writes succeeded. Before `COMPLETE`, an independent verifier reopens the bundle and validates:
-
-- manifest/receipt canonical bytes and hashes;
-- exact source/family split cardinality;
-- TEST=0 and optimizer=0;
-- every ROI PNG SHA/mode/dimensions;
-- every label SHA/schema/identity/source binding;
-- record-id provenance recomputation;
-- target and transform bounds;
-- exactly one barline + one meter record per source measure;
-- explicit meter class/bbox coherence;
-- artifact-binding SHA;
-- absence of unexpected persisted image/label files.
-
-Only after that pass is `COMPLETE` emitted and the completed bundle verified again.
-
-## Specialist OMR graph after Structure closes
-
-```text
-PDF / score image
-        ↓
-StaffSet
-        ↓
-StructureSet
-        ↓
-NoteHeadSet / RestSet / AccidentalSet
-        ↓
-RhythmSet / PitchSet(staff position) / ChordSet
-        ↓
-Deterministic association + pitch resolution
-        ↓
-ContextSet + hard musical validators
-        ↓
-Canonical candidate music
-        ↓
-Deterministic MusicXML writer + round-trip validation
-```
-
-Absolute pitch is still resolved deterministically from `G2 + staff position + accidental state`; a learned absolute pitch may not override that resolver.
-
-## V1 boundary
-
-V1 remains single part, one logical staff, single voice, treble G2, key 0, meters `2/4|3/4|4/4`, whole/half/quarter/eighth notes, half/quarter/eighth rests, 2–4-note chords, and controlled sharp/flat/natural.
-
-Deferred: multiple voices, grand staff, multiple instruments, cross-staff, tuplets, ties, slurs, dotted values, full-measure/multi-measure rests and non-zero key signatures.
+- sealed TEST access;
+- automatic ScoreMosaic/teacher-correction learning;
+- RhythmSet/PitchSet/ChordSet training;
+- Meter V2 implementation;
+- production integration;
+- deletion or rewriting of D13-R1 evidence;
+- architecture tuning from sealed-test outcomes.
 
 ## Next gate
 
-Finish D10 exact-head review/CI, then materialize the authoritative external D10 bundle from the accepted D6 development surface. Record its manifest/artifact-binding/receipt evidence with TEST=0 and optimizer=0. Only after D10 closes may a separate package implement and train the bounded barline/meter refiners.
-
-See `STAGE7D10_LOCAL_ROI_DERIVATIVES.md` for the active D10 contract.
+Implement **Rest Root-Cause Audit** as the first R2 package. Produce read-only diagnostic evidence for label correctness, target scale, decoder behavior, localization and class separation. Only after that evidence selects the failure mode may the next package freeze the Rest R2 architecture and authorize a bounded diagnostic optimizer run.
