@@ -40,7 +40,9 @@ def _canonical(payload: object) -> bytes:
     ).encode("ascii")
 
 
-def _staff_lines(lefts: tuple[float, ...] = (20.0, 20.0, 20.0, 20.0, 20.0)):
+def _staff_lines(
+    lefts: tuple[float, ...] = (20.0, 20.0, 20.0, 20.0, 20.0),
+):
     assert len(lefts) == 5
     return tuple(
         {
@@ -126,7 +128,10 @@ def _d10_source() -> D10SourceRecord:
 class M4E3IPolicyTests(unittest.TestCase):
     def test_frozen_dependencies_and_thresholds_are_unchanged(self) -> None:
         self.assertEqual(D11_PROPOSAL_THRESHOLD, 0.90)
-        self.assertEqual(SPECIALIST_THRESHOLDS, (("2", 0.48), ("3", 0.60), ("4", 0.47)))
+        self.assertEqual(
+            SPECIALIST_THRESHOLDS,
+            (("2", 0.48), ("3", 0.60), ("4", 0.47)),
+        )
         self.assertEqual(
             FROZEN_D11_CHECKPOINT_SHA256,
             "cd2d6192411371628518f4a8327cb0169910425494fa4a82082cd268d85254f3",
@@ -143,6 +148,10 @@ class M4E3IPolicyTests(unittest.TestCase):
         self.assertEqual(
             FROZEN_TRAIN_ANCHOR_POLICY.source_result_sha256,
             "db9536b983c7aabee30243696fb88e8ea74016b4600a70b93ad630562b8b86ec",
+        )
+        self.assertEqual(
+            FROZEN_TRAIN_ANCHOR_POLICY.candidate_methods,
+            ("median_five_line_left", "staff_region_component_left"),
         )
         self.assertTrue(
             math.isclose(
@@ -163,50 +172,80 @@ class M4E3IPolicyTests(unittest.TestCase):
                     first_measure_offset_staff_spaces=0.0,
                     candidate_methods=(
                         "median_five_line_left",
-                        "coverage_min_five_line_left",
+                        "staff_region_component_left",
                     ),
                     max_candidates=2,
                 )
 
 
 class M4E3ICandidateTests(unittest.TestCase):
-    def test_identical_staff_lefts_deduplicate_to_one_candidate(self) -> None:
-        candidates = recover_measure_start_candidates(_staff_lines())
+    def test_same_line_and_component_left_deduplicate_to_one_candidate(self) -> None:
+        candidates = recover_measure_start_candidates(
+            _staff_lines(),
+            staff_region_x_min=20.0,
+        )
         self.assertEqual(len(candidates), 1)
-        expected = 20.0 + 5.0 * FROZEN_TRAIN_ANCHOR_POLICY.first_measure_offset_staff_spaces
-        self.assertTrue(math.isclose(candidates[0].anchor_x, expected, rel_tol=0.0, abs_tol=1e-12))
+        expected = (
+            20.0
+            + 5.0
+            * FROZEN_TRAIN_ANCHOR_POLICY.first_measure_offset_staff_spaces
+        )
+        self.assertTrue(
+            math.isclose(
+                candidates[0].anchor_x,
+                expected,
+                rel_tol=0.0,
+                abs_tol=1e-12,
+            )
+        )
         self.assertEqual(candidates[0].method, "median_five_line_left")
         self.assertEqual(candidates[0].staff_spacing, 5.0)
 
-    def test_late_majority_line_fragments_get_bounded_coverage_fallback(self) -> None:
+    def test_all_late_line_fragments_get_staff_region_fallback(self) -> None:
         candidates = recover_measure_start_candidates(
-            _staff_lines((20.0, 200.0, 200.0, 200.0, 200.0))
+            _staff_lines((200.0, 200.0, 200.0, 200.0, 200.0)),
+            staff_region_x_min=20.0,
         )
         self.assertEqual(len(candidates), 2)
         self.assertEqual(
             [candidate.method for candidate in candidates],
-            ["median_five_line_left", "coverage_min_five_line_left"],
+            ["median_five_line_left", "staff_region_component_left"],
         )
         self.assertGreater(candidates[0].anchor_x, candidates[1].anchor_x)
         self.assertLessEqual(len(candidates), MAX_CANDIDATES_PER_SYSTEM)
 
     def test_wrong_line_count_and_degenerate_spacing_fail_closed(self) -> None:
         with self.assertRaises(M4E3IAdapterError):
-            recover_measure_start_candidates(_staff_lines()[:4])
+            recover_measure_start_candidates(
+                _staff_lines()[:4],
+                staff_region_x_min=20.0,
+            )
         degenerate = list(_staff_lines())
         degenerate[1] = {
             "start": {"x": 20.0, "y": 70.0},
             "end": {"x": 380.0, "y": 70.0},
         }
         with self.assertRaises(M4E3IAdapterError):
-            recover_measure_start_candidates(tuple(degenerate))
+            recover_measure_start_candidates(
+                tuple(degenerate),
+                staff_region_x_min=20.0,
+            )
+
+    def test_nonfinite_staff_region_left_fails_closed(self) -> None:
+        with self.assertRaises(M4E3IAdapterError):
+            recover_measure_start_candidates(
+                _staff_lines(),
+                staff_region_x_min=float("nan"),
+            )
 
 
 class M4E3ICanonicalParityTests(unittest.TestCase):
     def test_manual_anchor_is_byte_identical_to_canonical_d10_meter_roi(self) -> None:
         source = _d10_source()
         canonical = next(
-            artifact for artifact in derive_source_record(source) if artifact.kind == "meter"
+            artifact
+            for artifact in derive_source_record(source)
+            if artifact.kind == "meter"
         )
         candidate = MeasureStartCandidate(
             anchor_x=40.0,
@@ -221,13 +260,19 @@ class M4E3ICanonicalParityTests(unittest.TestCase):
         )
         self.assertEqual(recovered.image_bytes, canonical.image_bytes)
         self.assertEqual(recovered.image_sha256, canonical.image_sha256)
-        self.assertEqual(asdict(recovered.transform), canonical.label["roi_transform"])
+        self.assertEqual(
+            asdict(recovered.transform),
+            canonical.label["roi_transform"],
+        )
 
     def test_end_to_end_recovery_never_emits_more_than_two_canonical_rois(self) -> None:
         rois = recover_canonical_meter_roi_candidates(
             _png(),
             staff_bbox=_staff_bbox(),
-            five_staff_lines=_staff_lines((20.0, 200.0, 200.0, 200.0, 200.0)),
+            five_staff_lines=_staff_lines(
+                (200.0, 200.0, 200.0, 200.0, 200.0)
+            ),
+            staff_region_x_min=20.0,
         )
         self.assertEqual(len(rois), 2)
         self.assertTrue(all(len(item.image_bytes) > 0 for item in rois))
@@ -237,7 +282,10 @@ class M4E3ICanonicalParityTests(unittest.TestCase):
         image = Image.new("RGB", (400, 180), (255, 255, 255))
         buffer = BytesIO()
         image.save(buffer, format="PNG")
-        candidate = recover_measure_start_candidates(_staff_lines())[0]
+        candidate = recover_measure_start_candidates(
+            _staff_lines(),
+            staff_region_x_min=20.0,
+        )[0]
         with self.assertRaises(M4E3IAdapterError):
             render_canonical_meter_roi(
                 buffer.getvalue(),
