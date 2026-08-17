@@ -1,17 +1,17 @@
 """M4-E3I bounded two-candidate canonical D10 meter ROI recovery.
 
-This module is development-only adapter infrastructure.  It does not train a
-model, tune a threshold, open TEST, or promote a checkpoint.  Its two jobs are:
+This module is development-only adapter infrastructure. It does not train a
+model, tune a threshold, open TEST, or promote a checkpoint. Its two jobs are:
 
 1. recover at most two deterministic page-space measure-start candidates from
-   already-decoded five-line staff geometry; and
+   already-decoded D7 staff geometry; and
 2. render every candidate through the *existing* Stage 7-D10 crop/resize/pad
    implementation so inference ROIs cannot silently drift from D10 training
    ROIs.
 
 The only learned scalar used by candidate recovery is the first-measure offset
-frozen from the TRAIN-only M4-E3G/V6 audit.  VALIDATION is not an input to this
-module.  M3-C2 local meter-zone modes are intentionally not interpreted as
+frozen from the TRAIN-only M4-E3G/V6 audit. VALIDATION is not an input to this
+module. M3-C2 local meter-zone modes are intentionally not interpreted as
 page-space measure-start anchors.
 """
 
@@ -89,7 +89,7 @@ class FrozenTrainAnchorPolicy:
             raise M4E3IAdapterError("TRAIN anchor offset is outside bounded geometry range")
         if self.candidate_methods != (
             "median_five_line_left",
-            "coverage_min_five_line_left",
+            "staff_region_component_left",
         ):
             raise M4E3IAdapterError("candidate methods differ from frozen E3I policy")
         if self.max_candidates != MAX_CANDIDATES_PER_SYSTEM:
@@ -105,7 +105,7 @@ FROZEN_TRAIN_ANCHOR_POLICY: Final[FrozenTrainAnchorPolicy] = FrozenTrainAnchorPo
     first_measure_offset_staff_spaces=-0.06619667590040451,
     candidate_methods=(
         "median_five_line_left",
-        "coverage_min_five_line_left",
+        "staff_region_component_left",
     ),
     max_candidates=MAX_CANDIDATES_PER_SYSTEM,
 )
@@ -175,8 +175,12 @@ def _five_line_geometry(
 
     ordered_y = sorted(centers_y)
     gaps = [right - left for left, right in zip(ordered_y, ordered_y[1:])]
-    if len(gaps) != 4 or any(not math.isfinite(gap) or gap <= 0 for gap in gaps):
-        raise M4E3IAdapterError("five staff lines must have strictly increasing Y centers")
+    if len(gaps) != 4 or any(
+        not math.isfinite(gap) or gap <= 0 for gap in gaps
+    ):
+        raise M4E3IAdapterError(
+            "five staff lines must have strictly increasing Y centers"
+        )
     spacing = float(median(gaps))
     if not math.isfinite(spacing) or spacing <= 0:
         raise M4E3IAdapterError("decoded staff spacing must be finite and positive")
@@ -186,13 +190,17 @@ def _five_line_geometry(
 def recover_measure_start_candidates(
     five_staff_lines: Sequence[object],
     *,
+    staff_region_x_min: float,
     policy: FrozenTrainAnchorPolicy = FROZEN_TRAIN_ANCHOR_POLICY,
 ) -> tuple[MeasureStartCandidate, ...]:
     """Recover one or two deterministic measure-start anchors.
 
     Candidate 0 preserves V6's robust median five-line left edge. Candidate 1
-    adds a bounded coverage fallback using the minimum real left endpoint among
-    the same five decoded lines. Both receive the same TRAIN-only frozen offset.
+    uses the independent D7 staff-region component left edge as a bounded
+    coverage fallback. This specifically covers the failure mode where all five
+    decoded line fragments begin late, so taking the minimum decoded line would
+    still be late. Both candidates receive the same TRAIN-only frozen offset.
+
     No D11 score, specialist score, VALIDATION label, or TEST data participates
     in candidate generation.
     """
@@ -200,9 +208,10 @@ def recover_measure_start_candidates(
         raise M4E3IAdapterError("policy must be FrozenTrainAnchorPolicy")
 
     lefts, staff_spacing = _five_line_geometry(five_staff_lines)
+    component_left = _finite("staff_region_x_min", staff_region_x_min)
     staff_lefts = (
         float(median(lefts)),
-        float(min(lefts)),
+        component_left,
     )
     offset_pixels = policy.first_measure_offset_staff_spaces * staff_spacing
 
@@ -215,7 +224,16 @@ def recover_measure_start_candidates(
             staff_left_x=staff_left_x,
             staff_spacing=staff_spacing,
         )
-        if any(math.isclose(candidate.anchor_x, prior.anchor_x, rel_tol=0.0, abs_tol=1e-9) for prior in result):
+        duplicate = any(
+            math.isclose(
+                candidate.anchor_x,
+                prior.anchor_x,
+                rel_tol=0.0,
+                abs_tol=1e-9,
+            )
+            for prior in result
+        )
+        if duplicate:
             continue
         result.append(candidate)
 
@@ -274,10 +292,15 @@ def recover_canonical_meter_roi_candidates(
     *,
     staff_bbox: Mapping[str, object],
     five_staff_lines: Sequence[object],
+    staff_region_x_min: float,
     policy: FrozenTrainAnchorPolicy = FROZEN_TRAIN_ANCHOR_POLICY,
 ) -> tuple[CanonicalMeterRoiCandidate, ...]:
     """Recover at most two anchors and render each through canonical D10."""
-    anchors = recover_measure_start_candidates(five_staff_lines, policy=policy)
+    anchors = recover_measure_start_candidates(
+        five_staff_lines,
+        staff_region_x_min=staff_region_x_min,
+        policy=policy,
+    )
     rois = tuple(
         render_canonical_meter_roi(
             image_bytes,
