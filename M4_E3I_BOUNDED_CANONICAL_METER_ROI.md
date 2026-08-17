@@ -34,15 +34,20 @@ input surface.
 ## Candidate recovery
 
 E3G/V6 used one candidate derived from the median left endpoint of five decoded
-staff lines. E3I preserves that candidate and adds one bounded geometry-only
-coverage fallback from the minimum real left endpoint among the same five
-lines. Both receive the identical frozen TRAIN offset. Duplicate anchors are
-collapsed, so each system emits one or two candidates only.
+staff lines. E3I preserves that candidate and adds one bounded fallback from
+the independent D7 staff-region component left edge. Both receive the identical
+frozen TRAIN offset. Duplicate anchors are collapsed, so each system emits one
+or two candidates only.
 
-This fallback addresses the E3H failure mode where some decoded staff-line
-fragments begin far to the right of the actual staff start. It introduces no
-score search, threshold sweep, validation-derived scalar, or unbounded anchor
-scan.
+The staff-region fallback is deliberately different from taking the minimum of
+the five decoded line endpoints. E3H/V6 evidence contains failure cases where
+all five decoded line fragments begin at the same late X position while the D7
+staff-region component still starts far to the left. In that case a min-line
+fallback would be identical to the failed median candidate; the independent
+staff-region edge preserves the missing coverage signal.
+
+This introduces no score search, threshold sweep, validation-derived scalar, or
+unbounded anchor scan.
 
 M3-C2's two local meter-zone modes are **not** reused as page-space measure
 anchors; those coordinate spaces have different semantics.
