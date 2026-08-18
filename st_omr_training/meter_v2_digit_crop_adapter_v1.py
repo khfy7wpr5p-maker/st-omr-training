@@ -14,7 +14,8 @@ Historical transform for valid boxes:
 - result is centered on a white 64x64 canvas.
 
 No model/checkpoint, optimizer, sealed TEST split, or runtime Resolver is loaded
-or connected here.
+or connected here. The adapter is Pillow-only so it does not expand the pinned
+runtime dependency surface.
 """
 
 from __future__ import annotations
@@ -24,7 +25,6 @@ import json
 import math
 from typing import Final, Sequence
 
-import numpy as np
 from PIL import Image
 
 METER_V2_DIGIT_CROP_SIZE: Final[int] = 64
@@ -101,11 +101,12 @@ def meter_v2_digit_pixel_box_v1(
 def crop_meter_digit_to_64_v1(
     image: Image.Image,
     box: Sequence[float],
-) -> np.ndarray:
-    """Return the training-equivalent 64x64 grayscale uint8 crop.
+) -> Image.Image:
+    """Return the training-equivalent 64x64 grayscale Pillow image.
 
-    This function intentionally performs no thresholding, morphology, denoise,
-    staff-line removal, contrast manipulation, or upscaling.
+    The returned image has the same pixel bytes as the historical NumPy uint8
+    training crop. This function intentionally performs no thresholding,
+    morphology, denoise, staff-line removal, contrast manipulation, or upscaling.
     """
     pixel_box = meter_v2_digit_pixel_box_v1(image, box)
     crop = image.crop(pixel_box).convert("L")
@@ -122,7 +123,7 @@ def crop_meter_digit_to_64_v1(
     offset_x = (METER_V2_DIGIT_CROP_SIZE - crop.width) // 2
     offset_y = (METER_V2_DIGIT_CROP_SIZE - crop.height) // 2
     canvas.paste(crop, (offset_x, offset_y))
-    return np.asarray(canvas, dtype=np.uint8)
+    return canvas
 
 
 def runtime_digit_bbox_localization_frozen() -> bool:
