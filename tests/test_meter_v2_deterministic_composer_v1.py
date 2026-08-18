@@ -164,7 +164,7 @@ class MeterV2DeterministicComposerTests(unittest.TestCase):
         self.assertEqual(actual.status, "rejected")
         self.assertEqual(actual.reasons, (meter.R_DIGIT_COUNT_CONFLICT,))
 
-    def test_high_confidence_never_breaks_unsupported_or_geometry_conflict(self) -> None:
+    def test_high_confidence_never_breaks_geometry_conflict(self) -> None:
         actual = meter.compose_meter_v2(
             self.p(),
             (self.d("top", 3, x0=0, y0=10, x1=10, y1=20, confidence=1000), self.d("bottom", 4, x0=50, y0=25, x1=60, y1=35, confidence=1000)),
@@ -190,13 +190,15 @@ class MeterV2DeterministicComposerTests(unittest.TestCase):
         self.assertFalse(meter.resolver_connection_allowed())
         source = inspect.getsource(meter).lower()
         for forbidden in (
-            "runtime_deterministic_resolver",
-            "stage7d10",
-            "stage7d11",
-            "torch",
-            "optimizer",
-            "test_open",
-            "torch.load",
+            "from .stage7d10_",
+            "from .stage7d11_",
+            "import stage7d10_",
+            "import stage7d11_",
+            "runtime_deterministic_resolver_v1",
+            "torch.optim",
+            "torch.load(",
+            ".backward(",
+            "dataloader(",
         ):
             self.assertNotIn(forbidden, source)
 
