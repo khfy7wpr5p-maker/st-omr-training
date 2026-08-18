@@ -1,6 +1,6 @@
 # M4-E3I — Bounded Two-Candidate Canonical D10 ROI Recovery
 
-Status: **DEVELOPMENT IMPLEMENTATION — NOT PROMOTED**
+Status: **DEVELOPMENT IMPLEMENTATION — GEOMETRY PREFLIGHT FAIL — NOT PROMOTED**
 
 M4-E3I repairs the meter adapter boundary identified by the E3H parity audit.
 It does not retrain 2/4, 3/4, 4/4 specialists and does not modify frozen model
@@ -64,10 +64,44 @@ A regression test constructs the same page-space measure-start anchor through
 D10 and E3I and requires byte-identical ROI PNG bytes, identical SHA-256, and
 identical ROI transform metadata.
 
+## Frozen development geometry preflight
+
+Before paying for D11 + specialist inference, E3I runs a stricter optimistic
+preflight: for every development system it computes the error of both frozen
+candidate rules and lets an oracle choose the better candidate. This is an
+optimistic lower bound. A real selector cannot have lower anchor error than the
+oracle best-of-two surface.
+
+The audit is hash-bound to the already-persisted V4/V5/V6 development records:
+
+- V4: `98de47c01c4f83eef1f30c6be143c9cfb19a5c63f8f6f6b5745da6d6808ce826`
+- V5: `0b6a3229a97150597ffc54b81774a12810237ba0f40ea1f21f5f10745d3dde04`
+- V6: `7a734bc9d08369da1e0592e22a167777ef587c490e6c3489de6b32d98cf44e06`
+
+Result over 285 validation systems:
+
+- geometry-scored systems: **283 / 285 = 99.298%**
+- candidate-1 anchor P95: **21.619 staff-spaces**
+- candidate-2 anchor P95: **17.916 staff-spaces**
+- oracle best-of-two anchor P95: **16.293 staff-spaces**
+- frozen gate: **<= 2.0 staff-spaces**
+- oracle systems still above 2.0: **29 / 283**
+- oracle systems still above 10.0: **26 / 283**
+
+Therefore `ORACLE_ANCHOR_P95_PASS = FALSE`.
+
+Because even an oracle selector cannot satisfy the frozen anchor gate, full
+D11/specialist inference cannot make this E3I candidate surface pass the full
+adapter gate. Model scoring is intentionally stopped before execution. No
+threshold is tuned and no checkpoint is changed.
+
+Detailed machine-readable evidence is frozen in
+`M4_E3I_V1_GEOMETRY_PREFLIGHT.json` and the computation is implemented by
+`st_omr_training/m4_e3i_geometry_preflight.py`.
+
 ## Acceptance gate
 
-Implementation is not considered adapter success until frozen development
-scoring independently satisfies all of the following without tuning:
+The original adapter gate remains unchanged:
 
 - system match coverage >= 98%
 - anchor error P95 <= 2.0 staff-spaces
@@ -79,5 +113,6 @@ scoring independently satisfies all of the following without tuning:
 - recall for each class >= 90%
 - `ADAPTER PASS = TRUE`
 
-Failure preserves the frozen models and returns to diagnosis. It does not open
-TEST and does not trigger specialist retraining automatically.
+Current state: **EARLY FAIL PRESERVED** at the anchor geometry gate. TEST remains
+closed, specialist weights remain frozen, and PR #57 must not be promoted or
+merged as an accepted adapter implementation.
