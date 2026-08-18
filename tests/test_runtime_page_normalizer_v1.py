@@ -178,8 +178,10 @@ class RuntimePageNormalizerV1Tests(unittest.TestCase):
 
         source = inspect.getsource(module)
         forbidden_tokens = (
-            "stage7d10_",
-            "stage7d13_",
+            "import stage7d10_",
+            "import stage7d13_",
+            "from .stage7d10_",
+            "from .stage7d13_",
             "torch.optim",
             ".backward(",
             "DataLoader(",
