@@ -22,17 +22,19 @@ E3K V1 implements only the deterministic proposal source:
 
 ```text
 grayscale page
-+ accepted staff/system geometry
++ accepted five-line staff/system geometry
         ↓
 deterministic Otsu threshold inside staff band
         ↓
-vertical support through first→fifth staff-line span
+recover common staff slope from the five accepted lines
         ↓
-vertical continuity around both outer staff-line endpoints
+scan perpendicular to the local staff direction
         ↓
-x clustering
+first→fifth-line support + vertical endpoint continuity
         ↓
-bounded vertical-stroke proposals
+x clustering in the staff-centre reference frame
+        ↓
+bounded barline-like stroke proposals
 ```
 
 The proposal stage intentionally favors recall. Note stems or other vertical
@@ -40,20 +42,28 @@ strokes may survive and are not silently reclassified as barlines. A later
 package may crop each proposal with the frozen D9/D10 measure-end geometry and
 use the frozen D11 barline refiner to validate/refine it.
 
+The staff-angle-aware path is frozen **before external E3K VALIDATION scoring**.
+It is required because accepted D6 final-PNG geometry preserves rotation: a
+rendered trailing barline is a line segment and need not remain vertically
+aligned in image coordinates. No validation label statistics were used to add
+this correction.
+
 ## Frozen V1 geometry policy
 
 ```text
-horizontal probe radius       0.10 staff-space
-endpoint half-window          0.30 staff-space
-minimum vertical coverage     0.45
-minimum endpoint coverage     0.50 of each endpoint window
-cluster gap                   0.20 staff-space
-maximum proposals/system      128
+horizontal path-probe radius        0.10 staff-space
+endpoint half-window                0.30 staff-space
+minimum full-span coverage          0.45
+minimum endpoint coverage           0.50 of each endpoint window
+cluster gap                         0.20 staff-space
+maximum absolute staff slope        0.35 dy/dx
+maximum five-line slope spread      0.05 dy/dx
+maximum proposals/system            128
 ```
 
-The endpoint coverage requirement is vertical, not a one-pixel touch test. This
-prevents a horizontal staff line from making a short note stem appear to reach
-the top or bottom of the full staff span.
+The endpoint coverage requirement is vertical/along-path continuity, not a
+one-pixel touch test. This prevents a horizontal staff line from making a short
+note stem appear to reach the top or bottom of the full staff span.
 
 These values are frozen before external E3K validation scoring. The grayscale
 ink threshold is not tuned from labels; it is computed deterministically with
