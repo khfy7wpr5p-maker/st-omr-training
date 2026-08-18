@@ -65,7 +65,7 @@ def _two_system_single_staff_musicxml() -> str:
         <pitch><step>C</step><octave>5</octave></pitch>
         <duration>4</duration><voice>1</voice><type>whole</type><staff>1</staff>
       </note>
-      <barline location="right"><bar-style>light</bar-style></barline>
+      <barline location="right"><bar-style>regular</bar-style></barline>
     </measure>
     <measure number="2">
       <print new-system="yes"/>
@@ -98,14 +98,14 @@ def _visible_groups(root: ET.Element, class_name: str) -> list[ET.Element]:
     return found
 
 
-def _render_fixture(xml_text: str) -> str:
+def _render_fixture(xml_text: str, *, breaks: str = "auto") -> str:
     verovio, package_version = _load_verovio_runtime()
     toolkit = verovio.toolkit()
     if not str(toolkit.getVersion()).startswith(package_version):
         raise AssertionError("pinned Verovio runtime mismatch")
     if toolkit.setInputFrom("xml") is False:
         raise AssertionError("Verovio rejected fixture input mode")
-    options = dict(RendererConfig().verovio_options())
+    options = dict(RendererConfig(breaks=breaks).verovio_options())
     options.update({"svgBoundingBoxes": True, "svgContentBoundingBoxes": True})
     if toolkit.setOptions(options) is False:
         raise AssertionError("Verovio rejected fixture options")
@@ -188,7 +188,8 @@ class SystemGeometryEvidenceV1Tests(unittest.TestCase):
 
     def test_forced_system_break_produces_negative_different_system_relation(self) -> None:
         page = _extract_fixture_page(
-            "two-systems", _render_fixture(_two_system_single_staff_musicxml())
+            "two-systems",
+            _render_fixture(_two_system_single_staff_musicxml(), breaks="encoded"),
         )
         self.assertEqual(len(page.systems), 2)
         self.assertEqual([len(system.staff_instance_ids) for system in page.systems], [1, 1])
