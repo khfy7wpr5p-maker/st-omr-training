@@ -33,12 +33,12 @@ class SpecialistShadowAcceptanceTests(unittest.TestCase):
         self.assertEqual(item.completed_epochs, 5)
         self.assertEqual(item.shadow_decision, "HOLD")
 
-    def test_rest_r2_class_gates_pass_but_integrated_adapter_is_held(self) -> None:
+    def test_rest_r2_class_gates_and_integrated_arbitration_pass_shadow_gate(self) -> None:
         item = shadow.REST_R2_SHADOW
         self.assertTrue(item.proposal_smoke.passed)
         self.assertTrue(item.class_gates_pass)
-        self.assertFalse(item.integrated_arbitration_ready)
-        self.assertEqual(item.shadow_decision, "HOLD")
+        self.assertTrue(item.integrated_arbitration_ready)
+        self.assertEqual(item.shadow_decision, "PASS")
         self.assertEqual(
             tuple(verifier.class_name for verifier in item.verifiers),
             ("half", "quarter", "eighth"),
