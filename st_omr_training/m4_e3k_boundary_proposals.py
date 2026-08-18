@@ -10,7 +10,7 @@ The proposal surface is intentionally geometry-first:
     grayscale page + accepted staff geometry
         -> deterministic Otsu ink threshold
         -> vertical support through the first-to-fifth staff-line band
-        -> top/bottom endpoint support
+        -> vertical continuity around both outer staff-line endpoints
         -> x clustering
         -> bounded candidate list
 
@@ -42,6 +42,7 @@ class BoundaryProposalConfig:
     horizontal_probe_radius_staff_spaces: float = 0.10
     endpoint_half_window_staff_spaces: float = 0.30
     minimum_vertical_coverage: float = 0.45
+    minimum_endpoint_coverage: float = 0.50
     cluster_gap_staff_spaces: float = 0.20
     maximum_proposals_per_system: int = 128
 
@@ -53,11 +54,12 @@ class BoundaryProposalConfig:
         )
         if any(not math.isfinite(value) or value <= 0 for value in finite_positive):
             raise ValueError("E3K normalized geometry values must be finite and positive")
-        if (
-            not math.isfinite(self.minimum_vertical_coverage)
-            or not 0.0 < self.minimum_vertical_coverage <= 1.0
+        for name, value in (
+            ("minimum_vertical_coverage", self.minimum_vertical_coverage),
+            ("minimum_endpoint_coverage", self.minimum_endpoint_coverage),
         ):
-            raise ValueError("minimum_vertical_coverage must be in (0,1]")
+            if not math.isfinite(value) or not 0.0 < value <= 1.0:
+                raise ValueError(f"{name} must be in (0,1]")
         if (
             not isinstance(self.maximum_proposals_per_system, int)
             or isinstance(self.maximum_proposals_per_system, bool)
@@ -74,23 +76,30 @@ class BoundaryProposal:
     x: float
     score: float
     vertical_coverage: float
-    top_supported: bool
-    bottom_supported: bool
+    top_endpoint_coverage: float
+    bottom_endpoint_coverage: float
     cluster_left: int
     cluster_right: int
 
     def __post_init__(self) -> None:
-        if not all(
-            math.isfinite(value)
-            for value in (self.x, self.score, self.vertical_coverage)
-        ):
+        numeric = (
+            self.x,
+            self.score,
+            self.vertical_coverage,
+            self.top_endpoint_coverage,
+            self.bottom_endpoint_coverage,
+        )
+        if not all(math.isfinite(value) for value in numeric):
             raise ValueError("boundary proposal numeric values must be finite")
         if not 0.0 <= self.score <= 1.0:
             raise ValueError("boundary proposal score must be in [0,1]")
-        if not 0.0 <= self.vertical_coverage <= 1.0:
-            raise ValueError("vertical coverage must be in [0,1]")
-        if not isinstance(self.top_supported, bool) or not isinstance(self.bottom_supported, bool):
-            raise ValueError("endpoint support flags must be bool")
+        for name, value in (
+            ("vertical_coverage", self.vertical_coverage),
+            ("top_endpoint_coverage", self.top_endpoint_coverage),
+            ("bottom_endpoint_coverage", self.bottom_endpoint_coverage),
+        ):
+            if not 0.0 <= value <= 1.0:
+                raise ValueError(f"{name} must be in [0,1]")
         if self.cluster_left > self.cluster_right:
             raise ValueError("boundary proposal cluster is inverted")
 
@@ -196,6 +205,26 @@ def _any_ink(
     return any(pixels[x, y] <= threshold for x in range(x0, x1 + 1))
 
 
+def _vertical_window_coverage(
+    pixels: object,
+    *,
+    x0: int,
+    x1: int,
+    y0: int,
+    y1: int,
+    threshold: int,
+) -> float:
+    if y1 < y0:
+        _fail("vertical endpoint window is inverted")
+    count = y1 - y0 + 1
+    supported = sum(
+        1
+        for y in range(y0, y1 + 1)
+        if _any_ink(pixels, x0=x0, x1=x1, y=y, threshold=threshold)
+    )
+    return supported / count
+
+
 def _column_evidence(
     image: Image.Image,
     *,
@@ -207,7 +236,7 @@ def _column_evidence(
     staff_spacing: float,
     threshold: int,
     config: BoundaryProposalConfig,
-) -> tuple[float, bool, bool, float]:
+) -> tuple[float, float, float, float]:
     radius = max(1, int(round(staff_spacing * config.horizontal_probe_radius_staff_spaces)))
     probe_left = max(x_left, x - radius)
     probe_right = min(x_right - 1, x + radius)
@@ -236,33 +265,27 @@ def _column_evidence(
     bottom0 = max(0, int(round(staff_bottom)) - endpoint_half)
     bottom1 = min(image.height - 1, int(round(staff_bottom)) + endpoint_half)
 
-    top_supported = any(
-        _any_ink(
-            pixels,
-            x0=probe_left,
-            x1=probe_right,
-            y=y,
-            threshold=threshold,
-        )
-        for y in range(top0, top1 + 1)
+    top_coverage = _vertical_window_coverage(
+        pixels,
+        x0=probe_left,
+        x1=probe_right,
+        y0=top0,
+        y1=top1,
+        threshold=threshold,
     )
-    bottom_supported = any(
-        _any_ink(
-            pixels,
-            x0=probe_left,
-            x1=probe_right,
-            y=y,
-            threshold=threshold,
-        )
-        for y in range(bottom0, bottom1 + 1)
+    bottom_coverage = _vertical_window_coverage(
+        pixels,
+        x0=probe_left,
+        x1=probe_right,
+        y0=bottom0,
+        y1=bottom1,
+        threshold=threshold,
     )
     score = min(
         1.0,
-        0.8 * coverage
-        + 0.1 * float(top_supported)
-        + 0.1 * float(bottom_supported),
+        0.8 * coverage + 0.1 * top_coverage + 0.1 * bottom_coverage,
     )
-    return coverage, top_supported, bottom_supported, score
+    return coverage, top_coverage, bottom_coverage, score
 
 
 def _clusters(active: Sequence[int], maximum_gap: int) -> tuple[tuple[int, ...], ...]:
@@ -326,7 +349,7 @@ def propose_measure_boundaries(
         _fail("E3K Otsu staff surface is too short")
     threshold = _otsu_threshold(image, (x_left, otsu_top, x_right, otsu_bottom))
 
-    evidence: dict[int, tuple[float, bool, bool, float]] = {}
+    evidence: dict[int, tuple[float, float, float, float]] = {}
     active: list[int] = []
     for x in range(x_left, x_right):
         item = _column_evidence(
@@ -341,11 +364,11 @@ def propose_measure_boundaries(
             config=config,
         )
         evidence[x] = item
-        coverage, top_supported, bottom_supported, _ = item
+        coverage, top_coverage, bottom_coverage, _ = item
         if (
             coverage >= config.minimum_vertical_coverage
-            and top_supported
-            and bottom_supported
+            and top_coverage >= config.minimum_endpoint_coverage
+            and bottom_coverage >= config.minimum_endpoint_coverage
         ):
             active.append(x)
 
@@ -358,14 +381,14 @@ def propose_measure_boundaries(
             cluster,
             key=lambda x: (-evidence[x][3], abs(x - center), x),
         )
-        coverage, top_supported, bottom_supported, score = evidence[peak]
+        coverage, top_coverage, bottom_coverage, score = evidence[peak]
         proposals.append(
             BoundaryProposal(
                 x=float(peak),
                 score=score,
                 vertical_coverage=coverage,
-                top_supported=top_supported,
-                bottom_supported=bottom_supported,
+                top_endpoint_coverage=top_coverage,
+                bottom_endpoint_coverage=bottom_coverage,
                 cluster_left=cluster[0],
                 cluster_right=cluster[-1],
             )
