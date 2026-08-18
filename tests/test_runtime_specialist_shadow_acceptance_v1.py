@@ -25,13 +25,27 @@ class SpecialistShadowAcceptanceTests(unittest.TestCase):
         self.assertEqual(item.shadow_decision, "PASS")
         self.assertEqual(item.classes, ("open", "filled"))
 
-    def test_accidental_real_checkpoint_is_held(self) -> None:
+    def test_accidental_epoch10_real_checkpoint_passes_shadow_gate(self) -> None:
         item = shadow.ACCIDENTAL_SHADOW
         self.assertTrue(item.smoke.passed)
-        self.assertFalse(item.metrics_pass)
-        self.assertLess(item.macro_f1, item.macro_gate)
-        self.assertEqual(item.completed_epochs, 5)
-        self.assertEqual(item.shadow_decision, "HOLD")
+        self.assertTrue(item.metrics_pass)
+        self.assertGreaterEqual(item.center_f1, item.center_gate)
+        self.assertGreaterEqual(item.bbox_f1, item.bbox_gate)
+        self.assertGreaterEqual(item.macro_f1, item.macro_gate)
+        self.assertEqual(item.completed_epochs, 10)
+        self.assertEqual(item.shadow_decision, "PASS")
+        self.assertEqual(
+            item.smoke.artifact_sha256,
+            "dd207a460cea4d826eba742aeb31fccac6f65c31aaac867d472182bceca0a171",
+        )
+        self.assertEqual(
+            item.smoke.output_digest_sha256,
+            "f5b0385afa7d78026b0f61092914c746bee216caccdb7239d4b404063effd56c",
+        )
+        self.assertEqual(
+            shadow.ACCIDENTAL_EPOCH10_REPOSITORY_SHA,
+            "cf82ecbc0ef8df3d635e6e1923b4c4000c40da5b",
+        )
 
     def test_rest_r2_class_gates_and_integrated_arbitration_pass_shadow_gate(self) -> None:
         item = shadow.REST_R2_SHADOW
