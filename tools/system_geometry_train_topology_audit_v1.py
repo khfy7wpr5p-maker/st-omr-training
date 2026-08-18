@@ -14,13 +14,10 @@ SYNTH_BUILD = "d9320e362f162cd2ace2a830a7b93e0c21ceba2d51a4e95ef1c7a9b11a108352"
 
 def _discover() -> Path:
     candidates = (
-        # Canonical mounted Drive layout used by the accepted D6/D10 preflight.
         Path("/content/gdrive_r2/MyDrive/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
         Path("/content/gdrive_r2/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
         Path("/content/drive/MyDrive/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
         Path("/content/drive/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
-        # Legacy/direct layouts remain accepted only when the exact D6 manifest
-        # and labels directory are present.
         Path("/content/gdrive_r2/MyDrive/ST-OMR-SYNTHETIC") / FOLDER,
         Path("/content/gdrive_r2/ST-OMR-SYNTHETIC") / FOLDER,
         Path("/content/drive/MyDrive/ST-OMR-SYNTHETIC") / FOLDER,
@@ -34,6 +31,10 @@ def _discover() -> Path:
     )
 
 
+def _progress(done: int, total: int) -> None:
+    print(f"TRAIN LABELS    : {done}/{total}", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--d6-root", type=Path, default=None)
@@ -44,12 +45,13 @@ def main() -> None:
     )
     args = parser.parse_args()
     root = args.d6_root if args.d6_root is not None else _discover()
-    report = audit_d6_train_topology(root)
+    print("D6 ROOT         :", root, flush=True)
+    print("READ MODE       : 8-WORKER READ-ONLY SHA-VERIFIED", flush=True)
+    report = audit_d6_train_topology(root, progress=_progress)
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     print("SYSTEM GEOMETRY TRAIN TOPOLOGY AUDIT COMPLETE")
-    print("D6 ROOT        :", root)
     print("DECISION       :", report["decision"])
     print("TRAIN PAGES    :", report["train_pages"])
     print("SYSTEMS TOTAL  :", report["systems_total"])
