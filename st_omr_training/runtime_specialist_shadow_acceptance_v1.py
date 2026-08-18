@@ -22,6 +22,10 @@ D13_TOP_K: Final[int] = 256
 D13_CENTER_TOLERANCE_PX: Final[float] = 4.0
 D13_BBOX_IOU_THRESHOLD: Final[float] = 0.50
 
+ACCIDENTAL_EPOCH10_REPOSITORY_SHA: Final[str] = (
+    "cf82ecbc0ef8df3d635e6e1923b4c4000c40da5b"
+)
+
 
 def _unit(name: str, value: object) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
@@ -190,17 +194,17 @@ ACCIDENTAL_SHADOW: Final[D13Candidate] = D13Candidate(
     specialist="accidental",
     classes=("sharp", "flat", "natural"),
     smoke=RealCheckpointSmoke(
-        artifact_sha256="39d8c812ab793aaf318bb92881f94d4d286bbe6783a6319e4c326759994e3bf9",
-        output_digest_sha256="d5f7c37bd0ca578fee0d5309b1c1918b734fc5e36d9ceb0dcf1402f4aefbc954",
+        artifact_sha256="dd207a460cea4d826eba742aeb31fccac6f65c31aaac867d472182bceca0a171",
+        output_digest_sha256="f5b0385afa7d78026b0f61092914c746bee216caccdb7239d4b404063effd56c",
         identical_runs=10,
     ),
-    center_f1=0.9037118,
-    bbox_f1=0.9034379,
-    macro_f1=0.7938513,
+    center_f1=0.973754,
+    bbox_f1=0.973754,
+    macro_f1=0.956454,
     center_gate=0.80,
     bbox_gate=0.70,
     macro_gate=0.85,
-    completed_epochs=5,
+    completed_epochs=10,
     required_epochs=10,
 )
 
