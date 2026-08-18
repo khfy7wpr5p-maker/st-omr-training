@@ -12,13 +12,10 @@ Never reads TEST records and never trains.
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import asdict
 from hashlib import sha256
 import json
 from pathlib import Path
-import sys
 
-import numpy as np
 from PIL import Image
 import torch
 from torch import nn
@@ -104,8 +101,14 @@ def load_specialist(digit: int) -> TinyBinaryCNN:
 
 
 def score_slot(models, image: Image.Image, row):
-    array = crop_meter_digit_to_64_v1(image, row["bbox"])
-    tensor = torch.from_numpy(np.asarray(array).copy()).to(dtype=torch.float32).unsqueeze(0).unsqueeze(0) / 255.0
+    crop = crop_meter_digit_to_64_v1(image, row["bbox"])
+    tensor = (
+        torch.frombuffer(bytearray(crop.tobytes()), dtype=torch.uint8)
+        .clone()
+        .reshape(1, 1, 64, 64)
+        .to(dtype=torch.float32)
+        / 255.0
+    )
     scores = {}
     with torch.no_grad():
         for digit in (2, 3, 4):
@@ -191,7 +194,6 @@ def main() -> None:
         presence = presence_from_m3b_score_v1(float(cache["presence_score"]))
 
         observations = []
-        # Presence is a gate. Only a visual-present proposal invokes digit specialists.
         if presence.status == "accepted" and presence.present:
             image_path = D10 / record["image_path"]
             if not image_path.is_file():
