@@ -1,14 +1,13 @@
 """Authoritative development scoring for M4-E3K boundary proposals.
 
-The scorer is read-only. It reuses the accepted D7/D6 development-record gate,
-opens only the requested TRAIN or VALIDATION image/label payloads, generates
-E3K proposals from D6 staff geometry for the E3K-A feasibility surface, and
-scores only topology-relevant *interior* measure boundaries.
+E3K-A is a read-only *geometry upper-bound* test. It reuses the accepted D6/D7
+development-record gate, opens only the requested TRAIN or VALIDATION payloads,
+uses authoritative D6 staff geometry to align the deterministic proposal probe,
+and scores topology-relevant interior measure boundaries.
 
-E3K-A is deliberately an upper-bound geometry test: D6 staff geometry is ground
-truth. It does not prove deployment readiness. If E3K-A passes, a separate
+Passing E3K-A does not authorize D11 integration or deployment. A separate
 E3K-B package must replace D6 staff geometry with frozen D7-predicted staff
-geometry before the proposal source can enter the meter adapter.
+geometry and pass its own development gate first.
 """
 
 from __future__ import annotations
@@ -33,10 +32,7 @@ from .m4_e3k_boundary_proposals import (
     M4E3KBoundaryProposalError,
     propose_measure_boundaries,
 )
-from .stage7d6_specialist_derivatives import (
-    STAGE7D6_LABEL_SCHEMA,
-    STAGE7D6_VERSION,
-)
+from .stage7d6_specialist_derivatives import STAGE7D6_LABEL_SCHEMA, STAGE7D6_VERSION
 from .stage7d7_specialist_training import (
     EXPECTED_D6_ARTIFACT_BINDING_SHA256,
     EXPECTED_D6_DERIVATIVE_BUILD_ID,
@@ -196,7 +192,9 @@ def _read_image(record: Stage7D7Record, label: Mapping[str, object]) -> Image.Im
         raise M4E3KScoringError("E3K-A source PNG decode failed") from exc
 
 
-def _middle_staff_line(five_staff_lines: Sequence[object]) -> tuple[tuple[float, float], tuple[float, float]]:
+def _middle_staff_line(
+    five_staff_lines: Sequence[object],
+) -> tuple[tuple[float, float], tuple[float, float]]:
     if len(five_staff_lines) != 5:
         _fail("E3K-A requires exactly five staff lines")
     parsed: list[tuple[tuple[float, float], tuple[float, float], float]] = []
@@ -206,8 +204,7 @@ def _middle_staff_line(five_staff_lines: Sequence[object]) -> tuple[tuple[float,
         end = _point(f"five_staff_lines[{index}].end", line.get("end"))
         if math.isclose(start[0], end[0], abs_tol=1e-12):
             _fail("staff line cannot be vertical")
-        center_y = (start[1] + end[1]) / 2.0
-        parsed.append((start, end, center_y))
+        parsed.append((start, end, (start[1] + end[1]) / 2.0))
     parsed.sort(key=lambda item: item[2])
     return parsed[2][0], parsed[2][1]
 
@@ -228,7 +225,6 @@ def _line_intersection_x_at_middle_staff(
     denominator = bdx * sdy - bdy * sdx
     if abs(denominator) < 1e-9:
         _fail("barline is parallel to the middle staff line")
-    # b0 + t*(b1-b0) = s0 + u*(s1-s0)
     qx = s0[0] - b0[0]
     qy = s0[1] - b0[1]
     t = (qx * sdy - qy * sdx) / denominator
@@ -240,15 +236,34 @@ def _line_intersection_x_at_middle_staff(
     return x
 
 
-def _percentile(values: Sequence[float], fraction: float) -> float:
+def _percentile(values: Sequence[float | int], fraction: float) -> float:
     if not values:
         _fail("cannot compute percentile of an empty sequence")
-    ordered = sorted(values)
+    ordered = sorted(float(value) for value in values)
     if len(ordered) == 1:
-        return float(ordered[0])
+        return ordered[0]
     position = (len(ordered) - 1) * fraction
     lower = int(math.floor(position))
     upper = int(math.ceil(position))
+    if lower == upper:
+        return ordered[lower]
+    weight = position - lower
+    return ordered[lower] * (1.0 - weight) + ordered[upper] * weight
+
+
+def _percentile_or_none(values: Sequence[float], fraction: float) -> float | None:
+    """Treat missing proposals as +infinity without serializing non-finite JSON."""
+
+    if not values:
+        _fail("cannot compute error percentile of an empty sequence")
+    ordered = sorted(values)
+    if len(ordered) == 1:
+        return ordered[0] if math.isfinite(ordered[0]) else None
+    position = (len(ordered) - 1) * fraction
+    lower = int(math.floor(position))
+    upper = int(math.ceil(position))
+    if not math.isfinite(ordered[lower]) or not math.isfinite(ordered[upper]):
+        return None
     if lower == upper:
         return float(ordered[lower])
     weight = position - lower
@@ -305,23 +320,17 @@ def _system_objects(label: Mapping[str, object]) -> tuple[Mapping[str, object], 
 
     result: list[Mapping[str, object]] = []
     for system_id, system in systems.items():
-        measure_numbers_raw = _sequence("system.measure_numbers", system.get("measure_numbers"))
-        measure_numbers = [_positive_int("system.measure_number", value) for value in measure_numbers_raw]
-        if not measure_numbers or len(set(measure_numbers)) != len(measure_numbers):
+        numbers_raw = _sequence("system.measure_numbers", system.get("measure_numbers"))
+        numbers = [_positive_int("system.measure_number", value) for value in numbers_raw]
+        if not numbers or len(set(numbers)) != len(numbers):
             _fail("system measure-number sequence is empty or duplicated")
         try:
-            measures = [measures_by_number[number] for number in measure_numbers]
+            measures = [measures_by_number[number] for number in numbers]
         except KeyError as exc:
             raise M4E3KScoringError("system references missing measure") from exc
         if any(measure.get("system_id") != system_id for measure in measures):
             _fail("system measure identity mismatch")
-        result.append(
-            {
-                "system": system,
-                "staff": staffs[system_id],
-                "measures": tuple(measures),
-            }
-        )
+        result.append({"system": system, "staff": staffs[system_id], "measures": tuple(measures)})
     return tuple(result)
 
 
@@ -377,9 +386,8 @@ def score_e3k_a_split(
             if not proposals:
                 no_proposal_systems += 1
 
-            # To reconstruct measure starts, only boundaries before a following
-            # measure are required. The final trailing barline of a system is not
-            # a next-measure start and is excluded from this topology gate.
+            # Only a trailing barline with a following measure becomes a new
+            # measure-start boundary. The final barline of a system is excluded.
             interior = measures[:-1]
             if not interior:
                 continue
@@ -407,9 +415,8 @@ def score_e3k_a_split(
         str(tolerance): sum(error <= tolerance for error in total_errors) / boundary_count
         for tolerance in EVALUATION_TOLERANCES_STAFF_SPACES
     }
-    finite_errors = [value for value in total_errors if math.isfinite(value)]
-    p50_error = math.inf if not finite_errors else _percentile(finite_errors, 0.50)
-    p95_error = math.inf if not finite_errors else _percentile(finite_errors, 0.95)
+    p50_error = _percentile_or_none(total_errors, 0.50)
+    p95_error = _percentile_or_none(total_errors, 0.95)
     recall_one = recall["1.0"]
     gate_pass = recall_one >= MINIMUM_RECALL_AT_ONE_STAFF_SPACE
 
@@ -440,7 +447,8 @@ def score_e3k_a_split(
             "minimum_boundary_recall_at_1_staff_space": MINIMUM_RECALL_AT_ONE_STAFF_SPACE,
             "boundary_recall_at_1_staff_space": recall_one,
             "pass": gate_pass,
-            "authorizes_d11_validator": bool(gate_pass and split == "validation"),
+            "authorizes_e3k_b": gate_pass,
+            "authorizes_d11_validator": False,
         },
         "safety": {
             "staff_geometry_source": "authoritative_D6_ground_truth_upper_bound_only",
