@@ -229,7 +229,7 @@ REST_R2_SHADOW: Final[RestR2Candidate] = RestR2Candidate(
             0.792713567839196, True, False, False,
         ),
     ),
-    integrated_arbitration_ready=False,
+    integrated_arbitration_ready=True,
 )
 
 
