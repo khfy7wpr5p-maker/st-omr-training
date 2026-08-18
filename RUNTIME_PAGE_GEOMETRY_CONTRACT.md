@@ -1,147 +1,170 @@
-# ST-OMR — Isolated Runtime Page + Geometry Contracts
+# ST-OMR — Isolated Runtime Page → Deterministic Resolver Lane
 
-Status: **isolated runtime development package; no D10/D13/Rest R2 integration**.
-
-This package defines two future runtime boundaries without changing the active D10/D13 identities or the Rest R2 lane.
+Status: **isolated draft runtime lane; not merged; no D10/D13 specialist checkpoint integration**.
 
 ```text
-Raster page
+Raster image
    ↓
-ST Page Normalizer
+ST Page Normalizer v1
    ↓
-Normalized page + reversible transform
+Multi-Staff Geometry v2
    ↓
-ST Geometry Engine
+A01–A07 deterministic ambiguity resolver
    ↓
-System / staff / measure proposals
+Measure Geometry v1
+   ↓
+Runtime Local ROI v1
+   ↓
+Model-agnostic specialist evidence boundary
+   ↓
+Deterministic Resolver v1
    ↓
 STOP
 ```
 
-No specialist model is connected by this package.
+The lane is intentionally separate from the active training identities. It does not import or mutate Stage 7-D10 or Stage 7-D13, does not load checkpoints, does not run an optimizer and does not access the sealed TEST split.
 
-## 1. ST Page Normalizer boundary
+## 1. Page Normalizer
 
-The Page Normalizer receives one already-rasterized page. PDF rasterization is intentionally outside V1 so the rasterizer cannot silently change the normalizer's deterministic identity.
+The runtime normalizer receives an already-rasterized PNG/JPEG page. PDF rasterization remains a separate upstream concern.
 
-Allowed responsibilities:
+Implemented bounded behavior:
 
-- orientation normalization;
-- deskew;
-- safe crop;
-- illumination normalization;
-- contrast normalization;
-- bounded perspective correction;
-- bounded resolution normalization.
+- verify raster SHA/dimensions/pixel mode;
+- apply supported non-mirrored EXIF orientation;
+- reject mirrored orientations rather than guessing;
+- convert to staff-preserving gray8;
+- deterministic global autocontrast;
+- deterministic metadata-free PNG output;
+- reversible source↔normalized coordinate transform.
 
-The accepted output must remain a staff-preserved grayscale page and must carry both original→normalized and normalized→original transforms.
+It does not yet auto-deskew, crop, dewarp or apply perspective correction.
 
-The normalizer must not recognize staff, measure, meter, notehead, rest, accidental, pitch, duration, or MusicXML. Staff-line removal and other destructive symbol removal are forbidden.
+## 2. Multi-Staff Geometry
 
-If the page cannot be normalized safely, the contract requires `ambiguous` or `rejected` instead of invented certainty.
+Geometry v2 detects multiple clearly separated horizontal five-line staffs and returns stable top-to-bottom identities (`staff-1`, `staff-2`, ...).
 
-### First Page Normalizer implementation slice
+A staff remains geometry only. This layer does not infer meter, notes, rests, accidentals, pitch, duration or MusicXML.
 
-The current bounded V1 implementation only:
+### A01–A07 ambiguity priority
 
-- validates raster byte SHA, dimensions and declared pixel mode;
-- accepts PNG/JPEG raster bytes;
-- applies non-mirrored EXIF orientation 1/3/6/8 with reversible coordinate mapping;
-- rejects mirrored EXIF orientation 2/4/5/7 instead of guessing;
-- converts RGB/RGBA/gray input to staff-preserving gray8;
-- applies deterministic global linear autocontrast;
-- emits deterministic metadata-free PNG bytes.
+The canonical primary/secondary ordering is frozen:
 
-It deliberately does **not** auto-detect skew, deskew, crop, dewarp, change resolution, or recognize music symbols yet.
+1. `A04_PAGE_CROPPED`
+2. `A03_LOW_VISIBILITY`
+3. `A01_INCOMPLETE_STAFF`
+4. `A05_OVERLAPPING_CANDIDATES`
+5. `A02_STAFFS_TOO_CLOSE`
+6. `A07_EXTRA_LINE_CANDIDATES`
+7. `A06_IRREGULAR_SPACING`
 
-## 2. ST Geometry Engine boundary
+The same active code set must produce the same primary reason, ordered secondary reasons and report fingerprint on every run.
 
-The Geometry Engine accepts only an accepted Normalized Page identity plus its reversible transform.
+## 3. Measure Geometry
 
-Allowed observations:
+Measure Geometry v1 searches for strong vertical separators spanning each accepted staff. These are **measure-boundary proposals**, not semantic barline recognition.
 
-- system bounding boxes;
-- five staff lines;
-- staff bounding boxes;
-- staff spacing;
-- measure bounding-box proposals;
-- measure left/right boundary proposals.
+The first bounded gates require:
 
-The engine does not decide meter, notehead class, rest class, accidental class, pitch, duration, chord, voice, or MusicXML semantics.
+- at least two separator candidates per staff;
+- positive measure widths;
+- cross-staff separator alignment inside one system;
+- fail-closed output when boundaries are missing or incoherent.
 
-Measure outputs are deliberately called **proposals**. Ambiguous geometry must remain ambiguous instead of being silently promoted to a confident measure.
+## 4. Runtime Local ROI
 
-### First Geometry Engine implementation slice
+Runtime Local ROI v1 is a new in-memory inference crop layer. It is explicitly **not D10**.
 
-The current V1 implementation answers only one narrow question:
+It emits deterministic hash-bound:
 
-> Does this normalized page contain exactly one clear horizontal five-line staff?
+- `measure-full` crops for future NoteHead/Rest/Accidental adapters;
+- `measure-start` crops for future Meter adapters;
+- source→ROI reversible transforms;
+- stable ROI identities and PNG hashes.
 
-It uses deterministic row/run geometry only. It:
+No dataset derivative is written.
 
-- finds long dark horizontal line candidates;
-- merges line thickness into one row center;
-- accepts only five near-equidistant candidate lines;
-- reports staff spacing and five line segments;
-- emits no measure proposals;
-- emits no musical-symbol semantics;
-- treats four-line input as ambiguous;
-- treats multiple plausible staffs as ambiguous in this first slice rather than guessing a grouping.
+## 5. Specialist evidence boundary
 
-Multi-staff/system grouping is intentionally a later package.
+The runtime lane defines a model-agnostic evidence contract for:
 
-## 3. Isolation from the active training lane
+- Meter: `none | 2/4 | 3/4 | 4/4`
+- NoteHead: `open | filled`
+- Rest: `half | quarter | eighth`
+- Accidental: `sharp | flat | natural`
 
-Both runtime surfaces remain isolated from the active training lane:
+Each observation is bound to one measure/staff and has status, confidence, optional bbox and class.
+
+**Important:** this boundary does not mean the D13 specialist checkpoints are production-connected. D13-R2 remains authoritative for specialist recovery/acceptance. Shadow fixtures can exercise the resolver without promoting an unaccepted model.
+
+## 6. Deterministic Resolver v1
+
+The resolver consumes accepted measure geometry plus explicit specialist observations. It performs deterministic validation/ordering and accidental→following-notehead association on the same staff/measure.
+
+Fail-closed reasons include:
+
+- conflicting meter evidence;
+- accidental association tie;
+- multiple accidentals competing for one notehead;
+- unassociated accidental;
+- upstream specialist ambiguity.
+
+The resolver does **not** yet compose pitch, duration, voice or MusicXML. Those remain later deterministic composer/validator layers.
+
+## 7. Shadow orchestrator
+
+The isolated orchestrator provides the tested runtime seam:
 
 ```text
-Stage 7-D10 read       false
-Stage 7-D10 write      false
-Stage 7-D13 read       false
-Stage 7-D13 write      false
-checkpoint access      false
-optimizer access       false
-TEST split access      false
+raster bytes
+→ normalized page
+→ multi-staff geometry
+→ measure proposals
+→ runtime ROI batch
+→ explicit specialist evidence
+→ deterministic resolver
 ```
 
-The runtime implementation imports neither D10 nor D13 modules. It introduces no model, optimizer, checkpoint loader, training runner, or dataset derivative writer.
+It stops there. No production specialist model is auto-loaded.
 
-## 4. Current test gates
+## 8. Safety / isolation evidence
 
-The tests check user-visible safety ideas:
+The branch-level isolation gates require:
 
-1. **Do not damage the score.** A low-contrast synthetic score keeps its five staff lines and notehead after normalization.
-2. **Respect page orientation.** Standard camera/phone EXIF orientation is applied with reversible coordinates.
-3. **Do not guess unsupported transforms.** Mirrored orientation is rejected.
-4. **Find one simple staff correctly.** A synthetic five-line staff is detected with the expected spacing.
-5. **Do not invent a staff.** Four lines remain ambiguous.
-6. **Do not overreach yet.** Two plausible staffs remain ambiguous until multi-staff grouping gets its own bounded package.
-7. **Stay deterministic.** Repeating identical input produces identical normalized bytes and geometry output.
+```text
+D10 import/write          0
+D13 import/write          0
+checkpoint load           0
+optimizer                 0
+sealed TEST access        0
+training derivative write 0
+```
 
-Additional technical gates verify:
+The branch comparison against `main` must contain only isolated runtime/documentation/test additions. Existing training files and Rest R2 evidence remain untouched.
 
-- canonical deterministic fingerprints;
-- bounded raster dimensions and pixel modes;
-- finite, invertible forward/inverse transforms;
-- coordinate round-trip replay;
-- finite positive staff spacing;
-- page-bound geometry;
-- explicit D10/D13/checkpoint/optimizer/TEST isolation.
+## 9. What is proven vs not proven
 
-## 5. Explicit non-goals
+Proven in deterministic synthetic/in-memory fixtures:
 
-This package does **not**:
+- Page Normalizer repeatability;
+- single and multi-staff separation;
+- A01–A07 report ordering and 10/10 repeatability;
+- aligned measure-boundary proposals;
+- deterministic runtime ROI extraction;
+- model-agnostic Meter/NoteHead/Rest/Accidental evidence validation;
+- deterministic accidental→notehead association;
+- fail-closed resolver conflicts;
+- full isolated raster→resolver orchestration.
 
-- add OpenCV;
-- rasterize PDFs;
-- execute a real-image runtime pilot;
-- build local ROIs;
-- detect measures in the first Geometry V1 slice;
-- call Meter/NoteHead/Rest/Accidental specialists;
-- alter D10/D13 manifests, derivative identities, checkpoints, or Rest R2 evidence;
-- open sealed TEST;
-- authorize training or production integration.
+Not yet proven:
 
-## 6. Next gate
+- production accuracy on scanned/photographed real scores;
+- robust deskew/perspective/dewarp;
+- complex multi-system score geometry;
+- semantic barline accuracy in real notation;
+- accepted Rest R2 / Accidental / NoteHead runtime checkpoint adapters;
+- end-to-end pitch/duration/MusicXML correctness.
 
-After review, the next bounded geometry package may expand from one-staff detection to safe multi-staff/system grouping. Measure-boundary proposals remain a separate later gate. Merge remains explicitly approval-gated.
+## 10. Promotion boundary
+
+Passing this draft lane does not authorize automatic model integration or merge. Before specialist runtime promotion, each specialist adapter must be independently bound to an accepted checkpoint/evidence lineage and exercised first in read-only shadow mode. Merge remains an explicit user approval gate.
