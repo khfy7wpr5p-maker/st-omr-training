@@ -1,6 +1,6 @@
 # ST-OMR — Isolated Runtime Page + Geometry Contracts
 
-Status: **contract-only development package**.
+Status: **contract package + first isolated Page Normalizer implementation slice**.
 
 This package defines two future runtime boundaries without changing the active D10/D13 identities or the Rest R2 lane.
 
@@ -24,9 +24,10 @@ No specialist model is connected by this package.
 
 The Page Normalizer receives one already-rasterized page. PDF rasterization is intentionally outside V1 so the rasterizer cannot silently change the normalizer's deterministic identity.
 
-Allowed future responsibilities:
+Allowed responsibilities:
 
 - orientation normalization;
+- grayscale conversion;
 - deskew;
 - safe crop;
 - illumination normalization;
@@ -39,6 +40,23 @@ The accepted output must remain a staff-preserved grayscale page and must carry 
 The normalizer must not recognize staff, measure, meter, notehead, rest, accidental, pitch, duration, or MusicXML. Staff-line removal and other destructive symbol removal are forbidden.
 
 If the page cannot be normalized safely, the contract requires `ambiguous` or `rejected` instead of invented certainty.
+
+### First implementation slice
+
+`runtime_page_normalizer_v1.py` implements only a deliberately small subset:
+
+- one already-rasterized PNG or JPEG page;
+- exact input-byte SHA / dimensions / pixel-mode verification;
+- pinned Pillow `12.3.0` runtime;
+- normal EXIF orientation values `1`, `3`, `6`, `8` with reversible coordinate transforms;
+- mirrored EXIF orientations `2`, `4`, `5`, `7` rejected fail-closed in this first slice;
+- staff-preserving conversion to gray8;
+- deterministic global linear autocontrast (`cutoff=0`);
+- deterministic metadata-free PNG output.
+
+This slice does **not** implement automatic skew-angle detection, deskew, crop, dewarp, perspective correction, resolution changes, or semantic recognition.
+
+Test score images are generated in memory by the unit tests. No binary image corpus is added to Git.
 
 ## 2. ST Geometry Engine boundary
 
@@ -59,7 +77,7 @@ Measure outputs are deliberately called **proposals**. Ambiguous geometry must r
 
 ## 3. Isolation from the active training lane
 
-Both contracts freeze the following values to false:
+Both contracts and the first normalizer slice preserve the following boundaries:
 
 ```text
 Stage 7-D10 read       false
@@ -71,23 +89,26 @@ optimizer access       false
 TEST split access      false
 ```
 
-The package imports neither D10 nor D13 modules. It introduces no model, optimizer, checkpoint loader, training runner, or dataset derivative writer.
+They import neither D10 nor D13 modules. They introduce no model, optimizer, checkpoint loader, training runner, or dataset derivative writer.
 
-## 4. First contract gates
+## 4. First gates
 
-The first tests check three user-visible safety ideas:
+The tests check three user-visible safety ideas:
 
-1. **Do not damage the score.** A contract operation cannot authorize destructive symbol removal.
-2. **Only describe page geometry.** A staff must contain exactly five ordered lines and a measure remains a geometry proposal, not a musical interpretation.
-3. **Do not invent certainty.** Ambiguous/rejected outputs must state a reason; accepted outputs cannot carry hidden rejection reasons.
+1. **Do not damage the score.** Five synthetic staff lines and a notehead remain visible after the first grayscale/contrast normalization slice.
+2. **Keep direction traceable.** A page carrying standard phone/camera orientation metadata is reoriented and its coordinate mapping can be replayed back to the source.
+3. **Do not invent certainty.** An orientation this slice does not safely support is rejected rather than guessed.
 
 Additional technical gates verify:
 
-- canonical deterministic contract fingerprints;
+- canonical deterministic fingerprints;
+- identical normalized PNG bytes for repeated identical inputs;
+- exact raster byte SHA, dimensions, and pixel-mode binding;
 - bounded raster dimensions and pixel modes;
 - finite, invertible forward/inverse transforms;
 - coordinate round-trip replay;
-- finite positive staff spacing;
+- transparent RGBA pages composite onto white before grayscale conversion;
+- finite positive staff spacing in the Geometry contract;
 - unique system/staff/measure identities;
 - page-bound geometry;
 - explicit D10/D13/checkpoint/optimizer/TEST isolation.
@@ -96,7 +117,7 @@ Additional technical gates verify:
 
 This package does **not**:
 
-- implement OpenCV processing;
+- add OpenCV or another heavy image-processing dependency;
 - rasterize PDFs;
 - execute a real-image runtime pilot;
 - build local ROIs;
@@ -107,4 +128,4 @@ This package does **not**:
 
 ## 6. Next gate
 
-After focused tests and the repository CI pass, the next package may implement the smallest deterministic Page Normalizer behavior against isolated fixtures. A real-image shadow/runtime pilot remains a later, separately bounded step and must still stop before D10/D13 or specialist inference.
+After focused tests and repository CI pass for this first image slice, the next bounded implementation package may begin the smallest deterministic Geometry Engine observation on isolated fixtures. A real-image shadow/runtime pilot remains later and must still stop before D10/D13 or specialist inference.
