@@ -212,6 +212,7 @@ class NormalizedPageContract:
 
 NORMALIZER_ALLOWED_OPERATIONS: Final[tuple[str, ...]] = (
     "orientation",
+    "grayscale_conversion",
     "deskew",
     "safe_crop",
     "illumination_normalization",
