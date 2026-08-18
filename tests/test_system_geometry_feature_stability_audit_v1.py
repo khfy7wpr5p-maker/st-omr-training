@@ -128,7 +128,7 @@ class SystemGeometryFeatureStabilityAuditV1Tests(unittest.TestCase):
         )
         self.assertEqual(len(dataset.records), 7)
 
-    def test_feature_stability_audit_proves_non_spatial_counts_are_not_sufficient(self) -> None:
+    def test_feature_stability_audit_proves_coarse_raw_features_are_not_sufficient(self) -> None:
         dataset = build_system_geometry_evidence_dataset_v1(
             dataset_id="expanded-system-geometry-fixture-v1",
             reports=_expanded_reports(),
@@ -137,8 +137,14 @@ class SystemGeometryFeatureStabilityAuditV1Tests(unittest.TestCase):
 
         self.assertEqual(audit.hard_positive_count, 3)
         self.assertEqual(audit.hard_adjacent_negative_count, 4)
-        self.assertIn("staff_count_pair", audit.overlapping_features)
-        self.assertIn("measure_count_pair", audit.overlapping_features)
+        for feature_name in (
+            "staff_count_pair",
+            "measure_count_pair",
+            "grouping_token_presence_pair",
+            "grouping_token_signature_pair",
+            "barline_group_count_pair",
+        ):
+            self.assertIn(feature_name, audit.overlapping_features)
         self.assertEqual(
             audit.claim_boundary,
             "FIXTURE_ONLY_NO_RUNTIME_GROUPING_RULE",
