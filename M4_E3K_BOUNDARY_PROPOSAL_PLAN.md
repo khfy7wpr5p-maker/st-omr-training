@@ -28,7 +28,7 @@ deterministic Otsu threshold inside staff band
         ↓
 vertical support through first→fifth staff-line span
         ↓
-outer-line endpoint support
+vertical continuity around both outer staff-line endpoints
         ↓
 x clustering
         ↓
@@ -46,9 +46,14 @@ use the frozen D11 barline refiner to validate/refine it.
 horizontal probe radius       0.10 staff-space
 endpoint half-window          0.30 staff-space
 minimum vertical coverage     0.45
+minimum endpoint coverage     0.50 of each endpoint window
 cluster gap                   0.20 staff-space
 maximum proposals/system      128
 ```
+
+The endpoint coverage requirement is vertical, not a one-pixel touch test. This
+prevents a horizontal staff line from making a short note stem appear to reach
+the top or bottom of the full staff span.
 
 These values are frozen before external E3K validation scoring. The grayscale
 ink threshold is not tuned from labels; it is computed deterministically with
