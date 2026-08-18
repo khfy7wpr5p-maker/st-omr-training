@@ -1,17 +1,18 @@
 """M4-E3K deterministic measure-boundary proposal recovery.
 
-This development-only module generates high-recall vertical-stroke proposals
+This development-only module generates high-recall barline-like stroke proposals
 inside one known staff/system span. It does not classify a proposal as a
-barline, does not load D7/D11 checkpoints, and does not touch TEST. The next
+barline, does not load D7/D11 checkpoints, and does not touch TEST. A later
 stage may feed these bounded proposals to the frozen D11 local barline refiner.
 
 The proposal surface is intentionally geometry-first:
 
-    grayscale page + accepted staff geometry
+    grayscale page + accepted five-line staff geometry
         -> deterministic Otsu ink threshold
-        -> vertical support through the first-to-fifth staff-line band
-        -> vertical continuity around both outer staff-line endpoints
-        -> x clustering
+        -> recover common staff slope from the five accepted staff lines
+        -> scan along the direction perpendicular to the staff
+        -> full first-to-fifth-line support + endpoint continuity
+        -> x clustering in the staff-centre reference frame
         -> bounded candidate list
 
 False-positive stems are acceptable at this stage; false-negative measure
@@ -44,6 +45,8 @@ class BoundaryProposalConfig:
     minimum_vertical_coverage: float = 0.45
     minimum_endpoint_coverage: float = 0.50
     cluster_gap_staff_spaces: float = 0.20
+    maximum_absolute_staff_slope: float = 0.35
+    maximum_staff_slope_spread: float = 0.05
     maximum_proposals_per_system: int = 128
 
     def __post_init__(self) -> None:
@@ -51,6 +54,8 @@ class BoundaryProposalConfig:
             self.horizontal_probe_radius_staff_spaces,
             self.endpoint_half_window_staff_spaces,
             self.cluster_gap_staff_spaces,
+            self.maximum_absolute_staff_slope,
+            self.maximum_staff_slope_spread,
         )
         if any(not math.isfinite(value) or value <= 0 for value in finite_positive):
             raise ValueError("E3K normalized geometry values must be finite and positive")
@@ -69,6 +74,18 @@ class BoundaryProposalConfig:
 
 
 FROZEN_E3K_CONFIG: Final[BoundaryProposalConfig] = BoundaryProposalConfig()
+
+
+@dataclass(frozen=True, slots=True)
+class _StaffLine:
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    slope: float
+
+    def y_at(self, x: float) -> float:
+        return self.y0 + self.slope * (x - self.x0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,9 +127,10 @@ class BoundaryProposalResult:
     otsu_threshold: int
     system_left_x: float
     system_right_x: float
-    staff_top_y: float
-    staff_bottom_y: float
+    staff_top_y_at_reference: float
+    staff_bottom_y_at_reference: float
     staff_spacing: float
+    staff_slope: float
     proposals: tuple[BoundaryProposal, ...]
 
 
@@ -152,6 +170,58 @@ def _bbox(name: str, value: Mapping[str, object]) -> tuple[float, float, float, 
     if not x0 < x1 or not y0 < y1:
         _fail(f"{name} must have positive extent")
     return x0, y0, x1, y1
+
+
+def _point(name: str, value: object) -> tuple[float, float]:
+    if not isinstance(value, Mapping):
+        _fail(f"{name} must be a mapping")
+    return (
+        _finite_number(f"{name}.x", value.get("x")),
+        _finite_number(f"{name}.y", value.get("y")),
+    )
+
+
+def _staff_lines(
+    value: Sequence[object],
+    *,
+    config: BoundaryProposalConfig,
+) -> tuple[tuple[_StaffLine, ...], float, float, float]:
+    if (
+        not isinstance(value, Sequence)
+        or isinstance(value, (str, bytes, bytearray))
+        or len(value) != 5
+    ):
+        _fail("five_staff_lines must contain exactly five line mappings")
+    parsed: list[_StaffLine] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, Mapping):
+            _fail("five_staff_lines entry must be a mapping")
+        x0, y0 = _point(f"five_staff_lines[{index}].start", item.get("start"))
+        x1, y1 = _point(f"five_staff_lines[{index}].end", item.get("end"))
+        if math.isclose(x0, x1, abs_tol=1e-9):
+            _fail("staff line cannot be vertical")
+        if x1 < x0:
+            x0, x1 = x1, x0
+            y0, y1 = y1, y0
+        slope = (y1 - y0) / (x1 - x0)
+        if abs(slope) > config.maximum_absolute_staff_slope:
+            _fail("staff slope exceeds E3K safety bound")
+        parsed.append(_StaffLine(x0=x0, y0=y0, x1=x1, y1=y1, slope=slope))
+
+    common_left = max(line.x0 for line in parsed)
+    common_right = min(line.x1 for line in parsed)
+    if not common_left < common_right:
+        _fail("five staff lines have no common x span")
+    reference_x = (common_left + common_right) / 2.0
+    parsed.sort(key=lambda line: line.y_at(reference_x))
+    slopes = sorted(line.slope for line in parsed)
+    median_slope = slopes[len(slopes) // 2]
+    if max(abs(line.slope - median_slope) for line in parsed) > config.maximum_staff_slope_spread:
+        _fail("five staff lines disagree on common slope")
+    y_values = [line.y_at(reference_x) for line in parsed]
+    if any(y_values[index + 1] <= y_values[index] for index in range(4)):
+        _fail("five staff lines are not strictly ordered")
+    return tuple(parsed), median_slope, common_left, common_right
 
 
 def _otsu_threshold(image: Image.Image, bounds: tuple[int, int, int, int]) -> int:
@@ -194,24 +264,64 @@ def _otsu_threshold(image: Image.Image, bounds: tuple[int, int, int, int]) -> in
     return int(best_threshold)
 
 
-def _any_ink(
+def _path_probe_bounds(
+    *,
+    anchor_x: float,
+    center_y: float,
+    staff_slope: float,
+    y: int,
+    radius: int,
+    x_left: int,
+    x_right: int,
+) -> tuple[int, int] | None:
+    # A rotated barline is perpendicular to the staff direction. If the staff
+    # has dy/dx=m, the perpendicular line has dx/dy=-m.
+    path_x = anchor_x - staff_slope * (float(y) - center_y)
+    probe_left = max(x_left, int(math.floor(path_x - radius)))
+    probe_right = min(x_right - 1, int(math.ceil(path_x + radius)))
+    if probe_left > probe_right:
+        return None
+    return probe_left, probe_right
+
+
+def _row_has_ink(
     pixels: object,
     *,
-    x0: int,
-    x1: int,
+    anchor_x: float,
+    center_y: float,
+    staff_slope: float,
     y: int,
+    radius: int,
+    x_left: int,
+    x_right: int,
     threshold: int,
 ) -> bool:
-    return any(pixels[x, y] <= threshold for x in range(x0, x1 + 1))
+    bounds = _path_probe_bounds(
+        anchor_x=anchor_x,
+        center_y=center_y,
+        staff_slope=staff_slope,
+        y=y,
+        radius=radius,
+        x_left=x_left,
+        x_right=x_right,
+    )
+    if bounds is None:
+        return False
+    probe_left, probe_right = bounds
+    return any(pixels[x, y] <= threshold for x in range(probe_left, probe_right + 1))
 
 
 def _vertical_window_coverage(
     pixels: object,
     *,
-    x0: int,
-    x1: int,
+    anchor_x: float,
+    center_y: float,
+    staff_slope: float,
     y0: int,
     y1: int,
+    radius: int,
+    x_left: int,
+    x_right: int,
     threshold: int,
 ) -> float:
     if y1 < y0:
@@ -220,7 +330,17 @@ def _vertical_window_coverage(
     supported = sum(
         1
         for y in range(y0, y1 + 1)
-        if _any_ink(pixels, x0=x0, x1=x1, y=y, threshold=threshold)
+        if _row_has_ink(
+            pixels,
+            anchor_x=anchor_x,
+            center_y=center_y,
+            staff_slope=staff_slope,
+            y=y,
+            radius=radius,
+            x_left=x_left,
+            x_right=x_right,
+            threshold=threshold,
+        )
     )
     return supported / count
 
@@ -228,57 +348,72 @@ def _vertical_window_coverage(
 def _column_evidence(
     image: Image.Image,
     *,
-    x: int,
+    anchor_x: int,
     x_left: int,
     x_right: int,
-    staff_top: float,
-    staff_bottom: float,
+    staff_lines: tuple[_StaffLine, ...],
+    staff_slope: float,
     staff_spacing: float,
     threshold: int,
     config: BoundaryProposalConfig,
 ) -> tuple[float, float, float, float]:
     radius = max(1, int(round(staff_spacing * config.horizontal_probe_radius_staff_spaces)))
-    probe_left = max(x_left, x - radius)
-    probe_right = min(x_right - 1, x + radius)
-    core_top = max(0, int(math.floor(staff_top)))
-    core_bottom = min(image.height, int(math.ceil(staff_bottom)) + 1)
-    if core_bottom - core_top < 3:
+    top_y = staff_lines[0].y_at(float(anchor_x))
+    bottom_y = staff_lines[-1].y_at(float(anchor_x))
+    if not top_y < bottom_y:
+        _fail("local staff span is inverted")
+    center_y = (top_y + bottom_y) / 2.0
+    core_top = max(0, int(math.floor(top_y)))
+    core_bottom = min(image.height - 1, int(math.ceil(bottom_y)))
+    if core_bottom - core_top < 2:
         _fail("staff band is too short for E3K vertical evidence")
 
     pixels = image.load()
     supported_rows = sum(
         1
-        for y in range(core_top, core_bottom)
-        if _any_ink(
+        for y in range(core_top, core_bottom + 1)
+        if _row_has_ink(
             pixels,
-            x0=probe_left,
-            x1=probe_right,
+            anchor_x=float(anchor_x),
+            center_y=center_y,
+            staff_slope=staff_slope,
             y=y,
+            radius=radius,
+            x_left=x_left,
+            x_right=x_right,
             threshold=threshold,
         )
     )
-    coverage = supported_rows / (core_bottom - core_top)
+    coverage = supported_rows / (core_bottom - core_top + 1)
 
     endpoint_half = max(1, int(round(staff_spacing * config.endpoint_half_window_staff_spaces)))
-    top0 = max(0, int(round(staff_top)) - endpoint_half)
-    top1 = min(image.height - 1, int(round(staff_top)) + endpoint_half)
-    bottom0 = max(0, int(round(staff_bottom)) - endpoint_half)
-    bottom1 = min(image.height - 1, int(round(staff_bottom)) + endpoint_half)
+    top0 = max(0, int(round(top_y)) - endpoint_half)
+    top1 = min(image.height - 1, int(round(top_y)) + endpoint_half)
+    bottom0 = max(0, int(round(bottom_y)) - endpoint_half)
+    bottom1 = min(image.height - 1, int(round(bottom_y)) + endpoint_half)
 
     top_coverage = _vertical_window_coverage(
         pixels,
-        x0=probe_left,
-        x1=probe_right,
+        anchor_x=float(anchor_x),
+        center_y=center_y,
+        staff_slope=staff_slope,
         y0=top0,
         y1=top1,
+        radius=radius,
+        x_left=x_left,
+        x_right=x_right,
         threshold=threshold,
     )
     bottom_coverage = _vertical_window_coverage(
         pixels,
-        x0=probe_left,
-        x1=probe_right,
+        anchor_x=float(anchor_x),
+        center_y=center_y,
+        staff_slope=staff_slope,
         y0=bottom0,
         y1=bottom1,
+        radius=radius,
+        x_left=x_left,
+        x_right=x_right,
         threshold=threshold,
     )
     score = min(
@@ -304,16 +439,18 @@ def propose_measure_boundaries(
     image: Image.Image,
     *,
     staff_bbox: Mapping[str, object],
+    five_staff_lines: Sequence[object],
     staff_spacing: float,
     system_bbox: Mapping[str, object] | None = None,
     config: BoundaryProposalConfig = FROZEN_E3K_CONFIG,
 ) -> BoundaryProposalResult:
-    """Generate deterministic vertical boundary proposals for one staff/system.
+    """Generate deterministic boundary proposals for one staff/system.
 
-    `staff_bbox.y_min/y_max` are interpreted as the first/fifth staff-line y
-    coordinates, matching the accepted D5/D6 aggregated staff geometry.
-    `system_bbox` may narrow the x search surface; when absent, staff x bounds
-    are used. No candidate is dropped by ranking.
+    The accepted five staff lines define both local staff y positions and the
+    shared staff slope. Candidate x is expressed at the local staff-centre
+    reference frame; the ink probe follows the direction perpendicular to the
+    staff, so the same code supports clean and rotated final-PNG geometry.
+    No candidate is dropped by ranking.
     """
 
     if not isinstance(image, Image.Image) or image.mode != "L":
@@ -327,24 +464,36 @@ def propose_measure_boundaries(
         _fail("staff_spacing must be positive")
 
     staff_x0, staff_y0, staff_x1, staff_y1 = _bbox("staff_bbox", staff_bbox)
+    lines, staff_slope, common_line_left, common_line_right = _staff_lines(
+        five_staff_lines,
+        config=config,
+    )
     if system_bbox is None:
         search_x0, search_x1 = staff_x0, staff_x1
     else:
         system_x0, _, system_x1, _ = _bbox("system_bbox", system_bbox)
         search_x0 = max(staff_x0, system_x0)
         search_x1 = min(staff_x1, system_x1)
+    search_x0 = max(search_x0, common_line_left)
+    search_x1 = min(search_x1, common_line_right)
     if not search_x0 < search_x1:
-        _fail("staff/system x intersection is empty")
+        _fail("staff/system/five-line x intersection is empty")
     if not 0 <= staff_y0 < staff_y1 <= image.height:
-        _fail("staff y geometry lies outside the image")
+        _fail("staff bbox y geometry lies outside the image")
 
     x_left = max(0, int(math.floor(search_x0)))
     x_right = min(image.width, int(math.ceil(search_x1)))
     if x_right - x_left < 3:
         _fail("E3K x search surface is too narrow")
 
-    otsu_top = max(0, int(math.floor(staff_y0 - spacing * 0.5)))
-    otsu_bottom = min(image.height, int(math.ceil(staff_y1 + spacing * 0.5)))
+    reference_x = (search_x0 + search_x1) / 2.0
+    reference_top = lines[0].y_at(reference_x)
+    reference_bottom = lines[-1].y_at(reference_x)
+    otsu_top = max(0, int(math.floor(min(staff_y0, reference_top) - spacing * 0.5)))
+    otsu_bottom = min(
+        image.height,
+        int(math.ceil(max(staff_y1, reference_bottom) + spacing * 0.5)),
+    )
     if otsu_bottom - otsu_top < 3:
         _fail("E3K Otsu staff surface is too short")
     threshold = _otsu_threshold(image, (x_left, otsu_top, x_right, otsu_bottom))
@@ -354,11 +503,11 @@ def propose_measure_boundaries(
     for x in range(x_left, x_right):
         item = _column_evidence(
             image,
-            x=x,
+            anchor_x=x,
             x_left=x_left,
             x_right=x_right,
-            staff_top=staff_y0,
-            staff_bottom=staff_y1,
+            staff_lines=lines,
+            staff_slope=staff_slope,
             staff_spacing=spacing,
             threshold=threshold,
             config=config,
@@ -406,9 +555,10 @@ def propose_measure_boundaries(
         otsu_threshold=threshold,
         system_left_x=float(search_x0),
         system_right_x=float(search_x1),
-        staff_top_y=staff_y0,
-        staff_bottom_y=staff_y1,
+        staff_top_y_at_reference=reference_top,
+        staff_bottom_y_at_reference=reference_bottom,
         staff_spacing=spacing,
+        staff_slope=staff_slope,
         proposals=tuple(proposals),
     )
 
