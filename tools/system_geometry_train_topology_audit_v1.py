@@ -9,10 +9,18 @@ from pathlib import Path
 from st_omr_training.system_geometry_train_topology_audit_v1 import audit_d6_train_topology
 
 FOLDER = "stage7d6-staff-structure-derivatives-f33e70ec24a60ebab547ed7d4a395902129b0e23"
+SYNTH_BUILD = "d9320e362f162cd2ace2a830a7b93e0c21ceba2d51a4e95ef1c7a9b11a108352"
 
 
 def _discover() -> Path:
     candidates = (
+        # Canonical mounted Drive layout used by the accepted D6/D10 preflight.
+        Path("/content/gdrive_r2/MyDrive/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
+        Path("/content/gdrive_r2/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
+        Path("/content/drive/MyDrive/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
+        Path("/content/drive/ST-OMR-SYNTHETIC") / SYNTH_BUILD / FOLDER,
+        # Legacy/direct layouts remain accepted only when the exact D6 manifest
+        # and labels directory are present.
         Path("/content/gdrive_r2/MyDrive/ST-OMR-SYNTHETIC") / FOLDER,
         Path("/content/gdrive_r2/ST-OMR-SYNTHETIC") / FOLDER,
         Path("/content/drive/MyDrive/ST-OMR-SYNTHETIC") / FOLDER,
