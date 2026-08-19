@@ -1,7 +1,7 @@
 """Accepted deterministic runtime lane from raster bytes to Resolver v1.
 
 This module intentionally replaces the legacy shadow preparation dependency on
-runtime_measure_geometry_v1.  Learned Meter execution remains an external
+runtime_measure_geometry_v1. Learned Meter execution remains an external
 producer boundary; its supplied score records must be bound to the exact
 Runtime Local ROI bytes generated in the same invocation before they can enter
 Meter Integration v3.
@@ -204,11 +204,11 @@ def prepare_runtime_resolver_e2e_v2(
         policy=system_policy,
     )
     if grouped.page.status != "accepted" or grouped.report.status != "accepted":
-        _stop("system-grouper-v1", grouped.page.reasons or grouped.report.reasons, "system-grouping-not-accepted")
+        _stop("system-grouper-v1", grouped.page.reasons or grouped.report.active_reasons, "system-grouping-not-accepted")
 
     measured = propose_measure_system_boundaries_v2(normalized.normalized_png, grouped.page)
     if measured.page.status != "accepted" or measured.report.status != "accepted":
-        _stop("measure-system-boundaries-v2", measured.page.reasons or measured.report.reasons, "measure-boundaries-not-accepted")
+        _stop("measure-system-boundaries-v2", measured.page.reasons or measured.report.active_reasons, "measure-boundaries-not-accepted")
 
     roi_batch = extract_runtime_rois_v1(normalized.normalized_png, measured.page)
     return RuntimeResolverPreparedV2(
@@ -328,10 +328,7 @@ def resolve_runtime_resolver_e2e_v2(
             "grouped_geometry": page_geometry_fingerprint_v1(prepared.grouped_geometry),
             "measure_geometry": page_geometry_fingerprint_v1(prepared.measure_geometry),
             "roi_config_fingerprint": prepared.roi_batch.config_fingerprint,
-            "roi_hashes": [
-                [item.roi_id, item.roi_image_sha256]
-                for item in prepared.roi_batch.artifacts
-            ],
+            "roi_hashes": [[item.roi_id, item.roi_image_sha256] for item in prepared.roi_batch.artifacts],
             "meter_fingerprint": meter_result.fingerprint(),
             "provider_fingerprint": bound_meter_evidence.provider_fingerprint,
             "evidence_origin": bound_meter_evidence.evidence_origin,
