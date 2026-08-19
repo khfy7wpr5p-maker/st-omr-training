@@ -17,9 +17,9 @@ from st_omr_training.system_geometry_spatial_evidence_v1 import (
 
 
 # This is deliberately a test-only observation surface.  SVG topology is used
-# only to locate the known synthetic staff geometry.  Every candidate value
-# below is measured from a clean grayscale raster, not from SVG class metadata.
-# No candidate threshold or grouping decision is implemented here.
+# only to locate the known synthetic staff/system geometry.  Every candidate
+# value below is measured from a clean grayscale raster, not from SVG class
+# metadata.  No candidate threshold or grouping decision is implemented here.
 _VARIANTS = (
     {
         "name": "same-system-brace",
@@ -259,6 +259,7 @@ def _pair_raster_observation(report, image, viewbox, pair) -> dict[str, object]:
         for system in report.systems
         for staff in system.staffs
     }
+    systems = {system.system_id: system for system in report.systems}
     first = staffs[pair.staff_a_id]
     second = staffs[pair.staff_b_id]
     upper, lower = sorted((first, second), key=lambda staff: staff.center_y)
@@ -266,12 +267,14 @@ def _pair_raster_observation(report, image, viewbox, pair) -> dict[str, object]:
     if spacing <= 0:
         raise AssertionError("fixture staff spacing must be positive")
 
-    # Left-of-staff raster observation window.  Its geometry is a fixed
-    # measurement protocol expressed in staff-space units; it is not a
-    # SAME/DIFFERENT decision threshold.
-    anchor_x = min(upper.bbox.x_min, lower.bbox.x_min)
-    left_x0 = anchor_x - (6.0 * spacing)
-    left_x1 = anchor_x + (1.5 * spacing)
+    # Observe a system-start corridor from raster pixels.  The x anchor comes
+    # from fixture truth only so we do not fit a detector to the answer.  The
+    # runtime would still have to discover any such connector from pixels.
+    upper_system = systems[upper.system_id]
+    lower_system = systems[lower.system_id]
+    anchor_x = min(upper_system.bbox.x_min, lower_system.bbox.x_min)
+    left_x0 = anchor_x - (3.0 * spacing)
+    left_x1 = anchor_x + (3.0 * spacing)
     pair_y0 = min(upper.bbox.y_min, lower.bbox.y_min) - spacing
     pair_y1 = max(upper.bbox.y_max, lower.bbox.y_max) + spacing
 
@@ -304,6 +307,7 @@ def _pair_raster_observation(report, image, viewbox, pair) -> dict[str, object]:
         "relation": pair.relation.value,
         "staff_a_id": pair.staff_a_id,
         "staff_b_id": pair.staff_b_id,
+        "system_start_x": round(anchor_x, 9),
         "pair_left_mean_darkness_fraction": pair_metrics["mean_darkness_fraction"],
         "pair_left_max_column_darkness_fraction": pair_metrics[
             "max_column_darkness_fraction"
