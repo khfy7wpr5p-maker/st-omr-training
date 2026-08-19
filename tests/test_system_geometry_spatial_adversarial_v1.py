@@ -18,9 +18,9 @@ from st_omr_training.system_geometry_spatial_evidence_v1 import (
 # never runtime thresholds or grouping rules.
 _VARIANTS = (
     {
-        "name": "same-system-no-group-symbol",
+        "name": "same-system-no-brace-or-bracket",
         "measure_count": 1,
-        "break_before": None,
+        "breaks_before": (),
         "repeat_attributes_after_break": False,
         "part_symbol": "none",
         "page_width": 2400,
@@ -30,13 +30,16 @@ _VARIANTS = (
         "spacing_system": 8,
     },
     {
-        "name": "different-system-symmetric-one-measure-each",
-        "measure_count": 2,
-        "break_before": 2,
+        # Three one-measure systems are deliberate: the first two are both
+        # non-final systems, which attacks the possibility that a short last
+        # system alone explains cross-system x/meter-boundary differences.
+        "name": "different-system-symmetric-three-one-measure-systems",
+        "measure_count": 3,
+        "breaks_before": (2, 3),
         "repeat_attributes_after_break": True,
         "part_symbol": "none",
         "page_width": 2400,
-        "page_height": 4200,
+        "page_height": 5200,
         "scale": 100,
         "spacing_staff": 12,
         "spacing_system": 8,
@@ -78,12 +81,12 @@ def _measure(
 
 def _score(variant: dict[str, object]) -> str:
     measure_count = int(variant["measure_count"])
-    break_before = variant["break_before"]
+    breaks_before = tuple(int(value) for value in variant["breaks_before"])
     repeat_attributes = bool(variant["repeat_attributes_after_break"])
     part_symbol = str(variant["part_symbol"])
     measures = []
     for number in range(1, measure_count + 1):
-        new_system = break_before == number
+        new_system = number in breaks_before
         include_attributes = number == 1 or (new_system and repeat_attributes)
         measures.append(
             _measure(
@@ -152,7 +155,7 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
         self.assertEqual(len(positive.systems[0].staffs), 2)
         self.assertEqual(len(positive.systems[0].measures), 1)
 
-        self.assertEqual(len(negative.systems), 2)
+        self.assertEqual(len(negative.systems), 3)
         self.assertTrue(all(len(system.staffs) == 2 for system in negative.systems))
         self.assertTrue(all(len(system.measures) == 1 for system in negative.systems))
 
@@ -169,7 +172,7 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
         self.assertEqual(len(same), 1)
         self.assertGreaterEqual(len(different), 1)
 
-    def test_no_group_symbol_attacks_grouping_span_candidate(self) -> None:
+    def test_no_brace_or_bracket_records_renderer_group_metadata(self) -> None:
         positive = _report(_VARIANTS[0])
         same = [
             pair
@@ -177,9 +180,29 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
             if pair.relation is StaffSystemRelation.SAME_SYSTEM
         ]
         self.assertEqual(len(same), 1)
-        # This assertion is about the fixture attack itself, not about a
-        # grouping rule.  A positive pair must exist with no brace/bracket span.
-        self.assertEqual(same[0].grouping_span_cover_count, 0)
+
+        tokens = tuple(
+            token
+            for span in positive.systems[0].grouping_spans
+            for token in span.tokens
+        )
+        lowered = tuple(token.lower() for token in tokens)
+        self.assertFalse(any("brace" in token or "bracket" in token for token in lowered))
+
+        # Verovio 6.2.1 still exposes generic grpSym metadata for a two-staff
+        # part whose MusicXML part-symbol is "none".  Preserve that finding
+        # instead of pretending the SVG evidence disappears with the glyph.
+        self.assertEqual(same[0].grouping_span_cover_count, 1)
+        print(
+            "SYSTEM_GEOMETRY_NO_BRACE_BRACKET_GROUP_METADATA",
+            json.dumps(
+                {
+                    "grouping_span_cover_count": same[0].grouping_span_cover_count,
+                    "grouping_tokens": list(tokens),
+                },
+                sort_keys=True,
+            ),
+        )
 
     def test_symmetric_negative_is_observed_without_requiring_separation(self) -> None:
         negative = _report(_VARIANTS[1])
@@ -189,7 +212,8 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
             if pair.relation is StaffSystemRelation.DIFFERENT_SYSTEM
         ]
         self.assertGreaterEqual(len(different), 1)
-        # Record the exact candidate values but do not encode a desired result.
+        # Record exact candidate values; overlap or continued separation are
+        # both evidence.  Neither outcome is encoded as a pass criterion.
         print(
             "SYSTEM_GEOMETRY_ADVERSARIAL_DIFFERENT_SYSTEM",
             json.dumps(
@@ -198,7 +222,7 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
             ),
         )
 
-    def test_adversarial_audit_records_candidate_overlap_without_authorizing_rule(self) -> None:
+    def test_adversarial_audit_records_ranges_without_authorizing_rule(self) -> None:
         audit = audit_system_geometry_spatial_stability_v1(_reports())
         self.assertGreater(audit.relation_counts["SAME_SYSTEM"], 0)
         self.assertGreater(audit.relation_counts["DIFFERENT_SYSTEM"], 0)
