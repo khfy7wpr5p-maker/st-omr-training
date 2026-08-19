@@ -9,6 +9,10 @@ from st_omr_training.system_geometry_evidence_v1 import StaffSystemRelation
 from st_omr_training.system_geometry_spatial_evidence_v1 import extract_system_geometry_spatial_evidence_v1
 from test_system_geometry_raster_broad_robustness_v1 import _clean_raster, _render_svg, _variants
 from test_system_geometry_raster_observable_audit_v1 import _pixel_box, _viewbox
+from test_system_geometry_spatial_adversarial_v1 import (
+    _VARIANTS as _ADVERSARIAL_VARIANTS,
+    _report as _adversarial_report,
+)
 
 
 # Diagnostic bridge between the merged fixture-only System Geometry evidence and
@@ -160,6 +164,36 @@ class SystemGrouperEndpointProbeV1Tests(unittest.TestCase):
             "FIXTURE_ONLY_STAFF_ENDPOINT_RASTER_PROBE_NO_GROUPING_RULE",
         )
         print("SYSTEM_GROUPER_ENDPOINT_PROBE", json.dumps(audit, sort_keys=True))
+
+    def test_left_endpoint_alignment_is_falsified_by_repeated_middle_systems(self) -> None:
+        # Broad fixtures make SAME_SYSTEM left endpoints look perfectly aligned
+        # and DIFFERENT_SYSTEM endpoints offset.  The repeated-middle-system
+        # adversary removes that layout accident: systems 2 and 3 have the same
+        # staff-line left x, despite being different systems.  Therefore x-left
+        # alignment is explicitly rejected as a standalone auto-grouping cue.
+        report = _adversarial_report(_ADVERSARIAL_VARIANTS[2])
+        second, third = report.systems[1], report.systems[2]
+        self.assertEqual(len(second.staffs), 2)
+        self.assertEqual(len(third.staffs), 2)
+        cross_deltas = tuple(
+            abs(left.bbox.x_min - right.bbox.x_min)
+            for left in second.staffs
+            for right in third.staffs
+        )
+        self.assertIn(0.0, cross_deltas)
+        print(
+            "SYSTEM_GROUPER_ENDPOINT_ADVERSARIAL_REJECTION",
+            json.dumps(
+                {
+                    "relation": "DIFFERENT_SYSTEM",
+                    "second_system_lefts": [staff.bbox.x_min for staff in second.staffs],
+                    "third_system_lefts": [staff.bbox.x_min for staff in third.staffs],
+                    "minimum_cross_delta": min(cross_deltas),
+                    "decision": "REJECT_LEFT_ENDPOINT_ALIGNMENT_STANDALONE",
+                },
+                sort_keys=True,
+            ),
+        )
 
     def test_probe_sentinel_is_deterministic_5_of_5(self) -> None:
         variants = _variants()
