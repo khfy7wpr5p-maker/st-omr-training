@@ -45,18 +45,18 @@ _VARIANTS = (
         "spacing_system": 8,
     },
     {
-        # Systems 1 and 2 each contain two identical measures and are both
-        # non-final.  Repeated attributes at the second system start attack
-        # exact cross-system measure-boundary alignment as a standalone cue.
-        # The fifth measure creates a third system so the first two are not a
-        # special final-system comparison.
-        "name": "different-system-repeated-two-measure-layouts",
-        "measure_count": 5,
-        "breaks_before": (3, 5),
+        # Systems 2 and 3 each contain two identical measures.  They are both
+        # non-first and non-final systems and both repeat the same attributes,
+        # so first-system and final-system layout effects cannot explain a
+        # measure-boundary mismatch between them.  Systems 1 and 4 are
+        # sacrificial edge systems only.
+        "name": "different-system-repeated-two-measure-middle-systems",
+        "measure_count": 6,
+        "breaks_before": (2, 4, 6),
         "repeat_attributes_after_break": True,
         "part_symbol": "none",
         "page_width": 2400,
-        "page_height": 7000,
+        "page_height": 9000,
         "scale": 100,
         "spacing_staff": 12,
         "spacing_system": 8,
@@ -180,11 +180,11 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
             all(len(system.measures) == 1 for system in symmetric_negative.systems)
         )
 
-        self.assertEqual(len(repeated_negative.systems), 3)
+        self.assertEqual(len(repeated_negative.systems), 4)
         self.assertTrue(all(len(system.staffs) == 2 for system in repeated_negative.systems))
         self.assertEqual(
             [len(system.measures) for system in repeated_negative.systems],
-            [2, 2, 1],
+            [1, 2, 2, 1],
         )
 
         same = [
@@ -263,6 +263,22 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
             "SYSTEM_GEOMETRY_REPEATED_MEASURE_DIFFERENT_SYSTEM",
             json.dumps(
                 [pair.canonical_payload() for pair in different],
+                sort_keys=True,
+            ),
+        )
+        print(
+            "SYSTEM_GEOMETRY_REPEATED_MEASURE_SYSTEM_SPANS",
+            json.dumps(
+                [
+                    {
+                        "system_index": index,
+                        "staff_measure_x_spans": [
+                            [list(span) for span in staff.measure_x_spans]
+                            for staff in system.staffs
+                        ],
+                    }
+                    for index, system in enumerate(negative.systems, start=1)
+                ],
                 sort_keys=True,
             ),
         )
