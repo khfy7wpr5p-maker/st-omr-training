@@ -32,7 +32,7 @@ _VARIANTS = (
     {
         # Three one-measure systems are deliberate: the first two are both
         # non-final systems, which attacks the possibility that a short last
-        # system alone explains cross-system x/meter-boundary differences.
+        # system alone explains cross-system x-overlap differences.
         "name": "different-system-symmetric-three-one-measure-systems",
         "measure_count": 3,
         "breaks_before": (2, 3),
@@ -40,6 +40,23 @@ _VARIANTS = (
         "part_symbol": "none",
         "page_width": 2400,
         "page_height": 5200,
+        "scale": 100,
+        "spacing_staff": 12,
+        "spacing_system": 8,
+    },
+    {
+        # Systems 1 and 2 each contain two identical measures and are both
+        # non-final.  Repeated attributes at the second system start attack
+        # exact cross-system measure-boundary alignment as a standalone cue.
+        # The fifth measure creates a third system so the first two are not a
+        # special final-system comparison.
+        "name": "different-system-repeated-two-measure-layouts",
+        "measure_count": 5,
+        "breaks_before": (3, 5),
+        "repeat_attributes_after_break": True,
+        "part_symbol": "none",
+        "page_width": 2400,
+        "page_height": 7000,
         "scale": 100,
         "spacing_staff": 12,
         "spacing_system": 8,
@@ -149,15 +166,26 @@ def _reports():
 
 class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
     def test_adversarial_surface_has_intended_topology(self) -> None:
-        positive, negative = _reports()
+        positive, symmetric_negative, repeated_negative = _reports()
 
         self.assertEqual(len(positive.systems), 1)
         self.assertEqual(len(positive.systems[0].staffs), 2)
         self.assertEqual(len(positive.systems[0].measures), 1)
 
-        self.assertEqual(len(negative.systems), 3)
-        self.assertTrue(all(len(system.staffs) == 2 for system in negative.systems))
-        self.assertTrue(all(len(system.measures) == 1 for system in negative.systems))
+        self.assertEqual(len(symmetric_negative.systems), 3)
+        self.assertTrue(
+            all(len(system.staffs) == 2 for system in symmetric_negative.systems)
+        )
+        self.assertTrue(
+            all(len(system.measures) == 1 for system in symmetric_negative.systems)
+        )
+
+        self.assertEqual(len(repeated_negative.systems), 3)
+        self.assertTrue(all(len(system.staffs) == 2 for system in repeated_negative.systems))
+        self.assertEqual(
+            [len(system.measures) for system in repeated_negative.systems],
+            [2, 2, 1],
+        )
 
         same = [
             pair
@@ -166,7 +194,8 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
         ]
         different = [
             pair
-            for pair in negative.pair_observations
+            for report in (symmetric_negative, repeated_negative)
+            for pair in report.pair_observations
             if pair.relation is StaffSystemRelation.DIFFERENT_SYSTEM
         ]
         self.assertEqual(len(same), 1)
@@ -216,6 +245,22 @@ class SystemGeometrySpatialAdversarialV1Tests(unittest.TestCase):
         # both evidence.  Neither outcome is encoded as a pass criterion.
         print(
             "SYSTEM_GEOMETRY_ADVERSARIAL_DIFFERENT_SYSTEM",
+            json.dumps(
+                [pair.canonical_payload() for pair in different],
+                sort_keys=True,
+            ),
+        )
+
+    def test_repeated_measure_layout_negative_is_observed_without_fitting_rule(self) -> None:
+        negative = _report(_VARIANTS[2])
+        different = [
+            pair
+            for pair in negative.pair_observations
+            if pair.relation is StaffSystemRelation.DIFFERENT_SYSTEM
+        ]
+        self.assertGreaterEqual(len(different), 1)
+        print(
+            "SYSTEM_GEOMETRY_REPEATED_MEASURE_DIFFERENT_SYSTEM",
             json.dumps(
                 [pair.canonical_payload() for pair in different],
                 sort_keys=True,
