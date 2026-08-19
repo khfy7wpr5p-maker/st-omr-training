@@ -174,7 +174,8 @@ class RuntimeResolverE2EV2Tests(unittest.TestCase):
 
         source = inspect.getsource(module)
         for token in (
-            "runtime_measure_geometry_v1",
+            "from .runtime_measure_geometry_v1",
+            "propose_measure_geometry_v1(",
             "stage7d10_",
             "stage7d13_",
             "torch.load(",
