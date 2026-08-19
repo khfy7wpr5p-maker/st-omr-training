@@ -201,13 +201,22 @@ def _clean_raster(svg: str):
     import cairosvg  # type: ignore
     from PIL import Image  # type: ignore
 
+    # Verovio SVG pages have a transparent page background.  Rendering that
+    # surface without an explicit background and then dropping alpha turns the
+    # transparent page black, which would make every darkness observation 1.0.
+    # Composite on white at rasterization time so this audit observes the same
+    # black-ink-on-white-page convention as the runtime image pipeline.
     png = cairosvg.svg2png(
         bytestring=svg.encode("utf-8"),
         output_width=_RASTER_WIDTH,
+        background_color="#ffffff",
     )
     image = Image.open(BytesIO(png)).convert("L")
     if image.width != _RASTER_WIDTH or image.height < 1:
         raise AssertionError("unexpected clean raster geometry")
+    low, high = image.getextrema()
+    if low >= high or high != 255:
+        raise AssertionError("clean raster must contain dark ink on white background")
     return image
 
 
@@ -231,7 +240,7 @@ def _pixel_box(
 def _darkness_metrics(image, pixel_box: tuple[int, int, int, int]) -> dict[str, float]:
     crop = image.crop(pixel_box)
     width, height = crop.size
-    pixels = list(crop.getdata())
+    pixels = list(crop.get_flattened_data())
     darkness = [255 - int(value) for value in pixels]
     mean_darkness = sum(darkness) / (255.0 * width * height)
     column_fractions = []
