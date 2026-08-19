@@ -1,8 +1,8 @@
 """Deterministic resolver for runtime specialist observations.
 
 The resolver combines model-agnostic Meter/NoteHead/Rest/Accidental evidence
-with accepted runtime measure/staff geometry.  It performs only deterministic
-validation, ordering and accidental-to-notehead association.  Pitch, duration,
+with accepted runtime measure/staff geometry. It performs only deterministic
+validation, ordering and accidental-to-notehead association. Pitch, duration,
 voice and MusicXML composition remain out of scope.
 """
 
@@ -95,6 +95,7 @@ def deterministic_resolver_v1_config_fingerprint(geometry_fingerprint: str) -> s
         "geometry_fingerprint": geometry_fingerprint,
         "max_accidental_note_distance_spacings_milli": MAX_ACCIDENTAL_NOTE_DISTANCE_SPACINGS_MILLI,
         "association": "same-measure-same-staff-nearest-following-notehead-fail-on-tie-v1",
+        "measure_order": "geometry-system-order-x-then-system-staff-order-v1",
         "pitch_composition": False,
         "duration_composition": False,
         "musicxml_generation": False,
@@ -126,6 +127,32 @@ def _reason_sort_key(reason: str) -> tuple[int, str]:
         if reason.startswith(prefix):
             return index, reason
     return len(_REASON_PREFIX_ORDER), reason
+
+
+def _canonical_measure_order(geometry: PageGeometryContract):
+    system_order = {system.system_id: index for index, system in enumerate(geometry.systems)}
+    if len(system_order) != len(geometry.systems):
+        raise ValueError("resolver geometry has duplicate system ids")
+    staff_order: dict[str, tuple[int, int]] = {}
+    for system_index, system in enumerate(geometry.systems):
+        for member_index, staff_id in enumerate(system.staff_ids):
+            if staff_id in staff_order:
+                raise ValueError("resolver geometry assigns a staff to multiple systems")
+            staff_order[staff_id] = (system_index, member_index)
+    if set(staff_order) != {staff.staff_id for staff in geometry.staffs}:
+        raise ValueError("resolver geometry system/staff membership is incomplete")
+    fallback = len(system_order) + 1
+    return tuple(
+        sorted(
+            geometry.measure_proposals,
+            key=lambda item: (
+                system_order.get(item.system_id, fallback),
+                item.bbox.x_min,
+                staff_order.get(item.staff_id, (fallback, fallback))[1],
+                item.measure_id,
+            ),
+        )
+    )
 
 
 def _resolve_measure(
@@ -253,7 +280,11 @@ def resolve_specialist_evidence_v1(
         raise ValueError("deterministic resolver requires accepted measure geometry")
 
     measure_by_id = {item.measure_id: item for item in geometry.measure_proposals}
+    if len(measure_by_id) != len(geometry.measure_proposals):
+        raise ValueError("resolver geometry has duplicate measure ids")
     staff_by_id = {item.staff_id: item for item in geometry.staffs}
+    if len(staff_by_id) != len(geometry.staffs):
+        raise ValueError("resolver geometry has duplicate staff ids")
     for observation in evidence.observations:
         measure = measure_by_id.get(observation.measure_id)
         if measure is None:
@@ -262,10 +293,11 @@ def resolve_specialist_evidence_v1(
             raise ValueError("specialist observation references wrong staff for measure")
 
     measures: list[ResolvedMeasureEvidence] = []
-    for measure in sorted(
-        geometry.measure_proposals,
-        key=lambda item: (item.system_id, item.staff_id, item.bbox.x_min, item.measure_id),
-    ):
+    for measure in _canonical_measure_order(geometry):
+        if measure.system_id not in {system.system_id for system in geometry.systems}:
+            raise ValueError("resolver measure references unknown system")
+        if measure.staff_id not in staff_by_id:
+            raise ValueError("resolver measure references unknown staff")
         observations = evidence.for_measure(measure.measure_id)
         measures.append(_resolve_measure(measure, staff_by_id[measure.staff_id], observations))
 
