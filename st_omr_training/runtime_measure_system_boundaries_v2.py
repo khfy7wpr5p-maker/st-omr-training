@@ -31,6 +31,7 @@ from .runtime_system_grouper_v1 import page_geometry_fingerprint_v1
 MEASURE_SYSTEM_BOUNDARIES_V2_VERSION: Final[str] = "runtime-measure-system-boundaries-v2"
 VERTICAL_DARK_THRESHOLD: Final[int] = 128
 MIN_VERTICAL_COVERAGE_MILLI: Final[int] = 800
+VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX: Final[int] = 1
 MAX_BARLINE_CLUSTER_GAP_SPACINGS_MILLI: Final[int] = 1000
 EDGE_SNAP_SPACINGS_MILLI: Final[int] = 1000
 MAX_CROSS_STAFF_BOUNDARY_DELTA_SPACINGS_MILLI: Final[int] = 500
@@ -204,6 +205,7 @@ def measure_system_boundaries_v2_config_fingerprint(parent_geometry_fingerprint:
             "parent_geometry_fingerprint": parent_geometry_fingerprint,
             "vertical_dark_threshold": VERTICAL_DARK_THRESHOLD,
             "min_vertical_coverage_milli": MIN_VERTICAL_COVERAGE_MILLI,
+            "vertical_endpoint_anchor_tolerance_px": VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX,
             "max_barline_cluster_gap_spacings_milli": MAX_BARLINE_CLUSTER_GAP_SPACINGS_MILLI,
             "edge_snap_spacings_milli": EDGE_SNAP_SPACINGS_MILLI,
             "max_cross_staff_boundary_delta_spacings_milli": MAX_CROSS_STAFF_BOUNDARY_DELTA_SPACINGS_MILLI,
@@ -270,6 +272,12 @@ def _membership_is_exact(geometry: PageGeometryContract) -> bool:
     staff_ids = tuple(staff.staff_id for staff in geometry.staffs)
     if len(set(staff_ids)) != len(staff_ids):
         return False
+    staff_keys = tuple(
+        (staff.staff_bbox.y_min, staff.staff_bbox.y_max, staff.staff_id)
+        for staff in geometry.staffs
+    )
+    if staff_keys != tuple(sorted(staff_keys)):
+        return False
     if len({system.system_id for system in geometry.systems}) != len(geometry.systems):
         return False
 
@@ -324,9 +332,19 @@ def _vertical_runs(image: Image.Image, staff: StaffGeometryContract) -> tuple[tu
     right = min(image.width - 1, int(math.ceil(staff.staff_bbox.x_max)) - 1)
     pixels = image.load()
     columns: list[int] = []
+    top_anchor_end = min(bottom, top + VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX)
+    bottom_anchor_start = max(top, bottom - VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX)
     for x in range(left, right + 1):
         dark_count = sum(1 for y in range(top, bottom + 1) if int(pixels[x, y]) <= VERTICAL_DARK_THRESHOLD)
-        if dark_count >= minimum_dark:
+        touches_top = any(
+            int(pixels[x, y]) <= VERTICAL_DARK_THRESHOLD
+            for y in range(top, top_anchor_end + 1)
+        )
+        touches_bottom = any(
+            int(pixels[x, y]) <= VERTICAL_DARK_THRESHOLD
+            for y in range(bottom_anchor_start, bottom + 1)
+        )
+        if dark_count >= minimum_dark and touches_top and touches_bottom:
             columns.append(x)
     if not columns:
         return ()
