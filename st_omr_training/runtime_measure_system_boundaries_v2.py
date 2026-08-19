@@ -31,7 +31,7 @@ from .runtime_system_grouper_v1 import page_geometry_fingerprint_v1
 MEASURE_SYSTEM_BOUNDARIES_V2_VERSION: Final[str] = "runtime-measure-system-boundaries-v2"
 VERTICAL_DARK_THRESHOLD: Final[int] = 128
 MIN_VERTICAL_COVERAGE_MILLI: Final[int] = 800
-VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX: Final[int] = 1
+MAX_VERTICAL_WHITE_GAP_PX: Final[int] = 1
 MAX_BARLINE_CLUSTER_GAP_SPACINGS_MILLI: Final[int] = 1000
 EDGE_SNAP_SPACINGS_MILLI: Final[int] = 1000
 MAX_CROSS_STAFF_BOUNDARY_DELTA_SPACINGS_MILLI: Final[int] = 500
@@ -205,7 +205,7 @@ def measure_system_boundaries_v2_config_fingerprint(parent_geometry_fingerprint:
             "parent_geometry_fingerprint": parent_geometry_fingerprint,
             "vertical_dark_threshold": VERTICAL_DARK_THRESHOLD,
             "min_vertical_coverage_milli": MIN_VERTICAL_COVERAGE_MILLI,
-            "vertical_endpoint_anchor_tolerance_px": VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX,
+            "max_vertical_white_gap_px": MAX_VERTICAL_WHITE_GAP_PX,
             "max_barline_cluster_gap_spacings_milli": MAX_BARLINE_CLUSTER_GAP_SPACINGS_MILLI,
             "edge_snap_spacings_milli": EDGE_SNAP_SPACINGS_MILLI,
             "max_cross_staff_boundary_delta_spacings_milli": MAX_CROSS_STAFF_BOUNDARY_DELTA_SPACINGS_MILLI,
@@ -321,6 +321,17 @@ def _system_order_is_canonical(geometry: PageGeometryContract) -> bool:
     return keys == tuple(sorted(keys))
 
 
+def _max_white_gap(column_dark: tuple[bool, ...]) -> int:
+    longest = current = 0
+    for is_dark in column_dark:
+        if is_dark:
+            current = 0
+        else:
+            current += 1
+            longest = max(longest, current)
+    return longest
+
+
 def _vertical_runs(image: Image.Image, staff: StaffGeometryContract) -> tuple[tuple[int, int, float], ...]:
     top = int(round(staff.five_staff_lines[0].start.y))
     bottom = int(round(staff.five_staff_lines[-1].start.y))
@@ -332,20 +343,19 @@ def _vertical_runs(image: Image.Image, staff: StaffGeometryContract) -> tuple[tu
     right = min(image.width - 1, int(math.ceil(staff.staff_bbox.x_max)) - 1)
     pixels = image.load()
     columns: list[int] = []
-    top_anchor_end = min(bottom, top + VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX)
-    bottom_anchor_start = max(top, bottom - VERTICAL_ENDPOINT_ANCHOR_TOLERANCE_PX)
     for x in range(left, right + 1):
-        dark_count = sum(1 for y in range(top, bottom + 1) if int(pixels[x, y]) <= VERTICAL_DARK_THRESHOLD)
-        touches_top = any(
+        column_dark = tuple(
             int(pixels[x, y]) <= VERTICAL_DARK_THRESHOLD
-            for y in range(top, top_anchor_end + 1)
+            for y in range(top, bottom + 1)
         )
-        touches_bottom = any(
-            int(pixels[x, y]) <= VERTICAL_DARK_THRESHOLD
-            for y in range(bottom_anchor_start, bottom + 1)
-        )
-        if dark_count >= minimum_dark and touches_top and touches_bottom:
-            columns.append(x)
+        dark_count = sum(column_dark)
+        if dark_count < minimum_dark:
+            continue
+        if not column_dark[0] or not column_dark[-1]:
+            continue
+        if _max_white_gap(column_dark) > MAX_VERTICAL_WHITE_GAP_PX:
+            continue
+        columns.append(x)
     if not columns:
         return ()
     runs: list[tuple[int, int, float]] = []
