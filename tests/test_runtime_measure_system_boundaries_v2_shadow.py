@@ -41,6 +41,24 @@ class MeasureSystemBoundariesV2ShadowRegressions(unittest.TestCase):
         self.assertIsNone(result.page)
         self.assertEqual(result.report.primary_reason, B03_SYSTEM_STAFF_MEMBERSHIP_INVALID)
 
+    def test_global_staff_order_must_remain_top_to_bottom(self) -> None:
+        png = _page_png((40, 150), verticals_by_staff=((160,), (160,)))
+        grouped = _group(png, policy="fixed-two-staff-v1")
+        corrupted = PageGeometryContract(
+            normalized_image_sha256=grouped.normalized_image_sha256,
+            geometry_config_fingerprint=grouped.geometry_config_fingerprint,
+            page_width=grouped.page_width,
+            page_height=grouped.page_height,
+            transform=grouped.transform,
+            systems=grouped.systems,
+            staffs=tuple(reversed(grouped.staffs)),
+            measure_proposals=(),
+            status="accepted",
+        )
+        result = propose_measure_system_boundaries_v2(b"invalid-is-never-read", corrupted)
+        self.assertIsNone(result.page)
+        self.assertEqual(result.report.primary_reason, B03_SYSTEM_STAFF_MEMBERSHIP_INVALID)
+
     def test_system_bbox_must_equal_exact_union_of_member_staff_boxes(self) -> None:
         png = _page_png((40, 150), verticals_by_staff=((160,), (160,)))
         grouped = _group(png, policy="fixed-two-staff-v1")
