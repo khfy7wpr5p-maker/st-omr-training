@@ -3,7 +3,7 @@ from __future__ import annotations
 from hashlib import sha256
 import unittest
 
-from st_omr_training.meter_v2_digit_crop_adapter_v1 import meter_v2_digit_crop_profile_fingerprint
+from st_omr_training.meter_v2_digit_crop_profile_v1 import meter_v2_digit_crop_profile_fingerprint_v1
 from st_omr_training.runtime_geometry_engine_contract import BoxContract
 from st_omr_training.runtime_local_roi_v1 import RuntimeRoiArtifact
 from st_omr_training.runtime_meter_input_provenance_v1 import (
@@ -33,7 +33,7 @@ class MeterRuntimeInputProvenanceV1Tests(unittest.TestCase):
         slots = DigitSlotGeometryV1((1, 2, 10, 12), (1, 15, 10, 25), "localizer-sha")
         changed = DigitSlotGeometryV1((2, 2, 10, 12), (1, 15, 10, 25), "localizer-sha")
         self.assertNotEqual(slots.fingerprint(), changed.fingerprint())
-        self.assertEqual(len(meter_v2_digit_crop_profile_fingerprint()), 64)
+        self.assertEqual(len(meter_v2_digit_crop_profile_fingerprint_v1()), 64)
 
     def test_current_runtime_roi_cannot_masquerade_as_historical_presence_crop(self) -> None:
         slots = DigitSlotGeometryV1((1, 2, 10, 12), (1, 15, 10, 25), "localizer-sha")
