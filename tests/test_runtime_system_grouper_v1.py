@@ -22,7 +22,10 @@ from st_omr_training.runtime_system_grouper_v1 import (
     G03_DECLARED_POLICY_STAFF_COUNT_MISMATCH,
     G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP,
     G05_INVALID_STAFF_ORDER,
+    G06_RASTER_EVIDENCE_REQUIRED,
+    MIN_CONNECTOR_COVERAGE_MILLI,
     SYSTEM_GROUPER_REASON_PRIORITY,
+    SystemGrouperV1Error,
     SystemGroupingReportV1,
     group_staffs_into_systems_v1,
     page_geometry_fingerprint_v1,
@@ -36,12 +39,21 @@ IDENTITY = HomographyContract(
 NORMALIZER_FP = sha256(b"system-grouper-v1-normalizer").hexdigest()
 
 
-def _png_with_staff_tops(tops: tuple[int, ...], *, height: int = 460) -> bytes:
+def _png_with_staff_tops(
+    tops: tuple[int, ...],
+    *,
+    connectors: tuple[int, ...] = (),
+    height: int = 460,
+) -> bytes:
     image = Image.new("L", (320, height), 255)
     draw = ImageDraw.Draw(image)
     for top in tops:
         for offset in (0, 10, 20, 30, 40):
             draw.line((20, top + offset, 300, top + offset), fill=0, width=1)
+    for upper_index in connectors:
+        if upper_index < 0 or upper_index + 1 >= len(tops):
+            raise ValueError("connector index must reference one adjacent staff pair")
+        draw.line((20, tops[upper_index] + 40, 20, tops[upper_index + 1]), fill=0, width=1)
     out = BytesIO()
     image.save(out, format="PNG", optimize=False, compress_level=9)
     return out.getvalue()
@@ -57,12 +69,15 @@ def _input(png: bytes, *, height: int = 460) -> GeometryInputContract:
     )
 
 
-def _accepted_staff_page(tops: tuple[int, ...], *, height: int = 460) -> PageGeometryContract:
-    png = _png_with_staff_tops(tops, height=height)
+def _accepted_staff_page_from_png(png: bytes, *, height: int = 460) -> PageGeometryContract:
     result = detect_multistaff_geometry_v2(png, _input(png, height=height))
     if result.page.status != "accepted":
         raise AssertionError(f"test fixture must be accepted: {result.page.reasons}")
     return result.page
+
+
+def _accepted_staff_page(tops: tuple[int, ...], *, height: int = 460) -> PageGeometryContract:
+    return _accepted_staff_page_from_png(_png_with_staff_tops(tops, height=height), height=height)
 
 
 class SystemGrouperContractV1Tests(unittest.TestCase):
@@ -74,6 +89,7 @@ class SystemGrouperContractV1Tests(unittest.TestCase):
                 G02_MEASURE_GEOMETRY_ALREADY_PRESENT,
                 G05_INVALID_STAFF_ORDER,
                 G03_DECLARED_POLICY_STAFF_COUNT_MISMATCH,
+                G06_RASTER_EVIDENCE_REQUIRED,
                 G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP,
             ),
         )
@@ -85,14 +101,16 @@ class SystemGrouperContractV1Tests(unittest.TestCase):
             output_geometry_fingerprint=None,
             primary_reason=G05_INVALID_STAFF_ORDER,
             secondary_reasons=(G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP,),
+            adjacent_connector_coverages_milli=(0,),
         )
         self.assertEqual(
             report.active_reasons,
             (G05_INVALID_STAFF_ORDER, G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP),
         )
+        self.assertEqual(report.adjacent_connector_coverages_milli, (0,))
         self.assertEqual(report.fingerprint(), report.fingerprint())
 
-    def test_unknown_or_noncanonical_reasons_fail_closed(self) -> None:
+    def test_unknown_noncanonical_or_invalid_evidence_fails_closed(self) -> None:
         digest = sha256(b"input").hexdigest()
         with self.assertRaises(ValueError):
             SystemGroupingReportV1(
@@ -111,10 +129,19 @@ class SystemGrouperContractV1Tests(unittest.TestCase):
                 primary_reason=G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP,
                 secondary_reasons=(G05_INVALID_STAFF_ORDER,),
             )
+        with self.assertRaises(ValueError):
+            SystemGroupingReportV1(
+                status="ambiguous",
+                policy="auto-v1",
+                input_geometry_fingerprint=digest,
+                output_geometry_fingerprint=None,
+                primary_reason=G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP,
+                adjacent_connector_coverages_milli=(1001,),
+            )
 
 
 class RuntimeSystemGrouperV1Tests(unittest.TestCase):
-    def test_auto_single_staff_is_unambiguous_and_accepted(self) -> None:
+    def test_auto_single_staff_is_unambiguous_and_accepted_without_raster(self) -> None:
         page = _accepted_staff_page((40,))
         result = group_staffs_into_systems_v1(page)
         self.assertEqual(result.report.status, "accepted")
@@ -124,12 +151,53 @@ class RuntimeSystemGrouperV1Tests(unittest.TestCase):
         self.assertEqual(result.page.systems[0].staff_ids, ("staff-1",))
         self.assertEqual(result.page.staffs[0].system_id, "system-1")
 
-    def test_auto_multistaff_fails_closed_instead_of_guessing(self) -> None:
+    def test_auto_multistaff_requires_hash_bound_raster(self) -> None:
         page = _accepted_staff_page((30, 140))
         result = group_staffs_into_systems_v1(page, policy="auto-v1")
         self.assertIsNone(result.page)
         self.assertEqual(result.report.status, "ambiguous")
+        self.assertEqual(result.report.primary_reason, G06_RASTER_EVIDENCE_REQUIRED)
+
+    def test_auto_multistaff_without_connector_fails_closed_instead_of_splitting(self) -> None:
+        png = _png_with_staff_tops((30, 140))
+        page = _accepted_staff_page_from_png(png)
+        result = group_staffs_into_systems_v1(page, normalized_png=png, policy="auto-v1")
+        self.assertIsNone(result.page)
+        self.assertEqual(result.report.status, "ambiguous")
         self.assertEqual(result.report.primary_reason, G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP)
+        self.assertEqual(result.report.adjacent_connector_coverages_milli, (0,))
+
+    def test_auto_visible_grand_staff_connector_is_positive_raster_evidence(self) -> None:
+        png = _png_with_staff_tops((30, 140), connectors=(0,))
+        page = _accepted_staff_page_from_png(png)
+        result = group_staffs_into_systems_v1(page, normalized_png=png, policy="auto-v1")
+        self.assertEqual(result.report.status, "accepted")
+        assert result.page is not None
+        self.assertEqual(len(result.page.systems), 1)
+        self.assertEqual(result.page.systems[0].staff_ids, ("staff-1", "staff-2"))
+        self.assertEqual(len(result.report.adjacent_connector_coverages_milli), 1)
+        self.assertGreaterEqual(
+            result.report.adjacent_connector_coverages_milli[0],
+            MIN_CONNECTOR_COVERAGE_MILLI,
+        )
+
+    def test_auto_partial_connector_pattern_is_ambiguous_not_partially_grouped(self) -> None:
+        png = _png_with_staff_tops((30, 100, 240, 310), connectors=(0, 2))
+        page = _accepted_staff_page_from_png(png)
+        result = group_staffs_into_systems_v1(page, normalized_png=png, policy="auto-v1")
+        self.assertIsNone(result.page)
+        self.assertEqual(result.report.primary_reason, G04_UNDERDETERMINED_MULTISTAFF_MEMBERSHIP)
+        self.assertEqual(len(result.report.adjacent_connector_coverages_milli), 3)
+        self.assertGreaterEqual(result.report.adjacent_connector_coverages_milli[0], MIN_CONNECTOR_COVERAGE_MILLI)
+        self.assertLess(result.report.adjacent_connector_coverages_milli[1], MIN_CONNECTOR_COVERAGE_MILLI)
+        self.assertGreaterEqual(result.report.adjacent_connector_coverages_milli[2], MIN_CONNECTOR_COVERAGE_MILLI)
+
+    def test_auto_raster_identity_mismatch_is_never_ignored(self) -> None:
+        png = _png_with_staff_tops((30, 140), connectors=(0,))
+        page = _accepted_staff_page_from_png(png)
+        wrong = _png_with_staff_tops((30, 150), connectors=(0,))
+        with self.assertRaises(SystemGrouperV1Error):
+            group_staffs_into_systems_v1(page, normalized_png=wrong, policy="auto-v1")
 
     def test_monostaff_policy_rebinds_every_detected_staff_to_its_own_system(self) -> None:
         page = _accepted_staff_page((30, 140, 260))
@@ -237,7 +305,7 @@ class RuntimeSystemGrouperV1Tests(unittest.TestCase):
         self.assertIsNone(result.page)
         self.assertEqual(result.report.primary_reason, G05_INVALID_STAFF_ORDER)
 
-    def test_same_input_policy_produces_identical_page_and_report_10_of_10(self) -> None:
+    def test_same_declared_policy_produces_identical_page_and_report_10_of_10(self) -> None:
         page = _accepted_staff_page((30, 100, 240, 310))
         results = [
             group_staffs_into_systems_v1(page, policy="fixed-two-staff-v1")
@@ -248,6 +316,17 @@ class RuntimeSystemGrouperV1Tests(unittest.TestCase):
         report_fingerprints = [result.report.fingerprint() for result in results]
         self.assertEqual(len(set(page_fingerprints)), 1)
         self.assertEqual(len(set(report_fingerprints)), 1)
+
+    def test_same_auto_raster_produces_identical_evidence_and_report_10_of_10(self) -> None:
+        png = _png_with_staff_tops((30, 140), connectors=(0,))
+        page = _accepted_staff_page_from_png(png)
+        results = [
+            group_staffs_into_systems_v1(page, normalized_png=png, policy="auto-v1")
+            for _ in range(10)
+        ]
+        self.assertTrue(all(result.page is not None for result in results))
+        self.assertEqual(len({result.report.fingerprint() for result in results}), 1)
+        self.assertEqual(len({result.report.adjacent_connector_coverages_milli for result in results}), 1)
 
     def test_policy_changes_output_fingerprint_without_changing_staff_observations(self) -> None:
         page = _accepted_staff_page((30, 140))
