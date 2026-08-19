@@ -20,6 +20,7 @@ from typing import Final
 
 from .runtime_geometry_engine_contract import BoxContract, PageGeometryContract
 from .runtime_local_roi_v1 import (
+    METER_START_WIDTH_SPACINGS_MILLI,
     RuntimeRoiArtifact,
     RuntimeRoiBatch,
     runtime_roi_v1_config_fingerprint,
@@ -309,6 +310,31 @@ def _box_inside(inner: BoxContract, outer: BoxContract) -> bool:
     )
 
 
+def _boxes_equal(a: BoxContract, b: BoxContract) -> bool:
+    return all(
+        abs(left - right) <= _EPS
+        for left, right in zip(
+            (a.x_min, a.y_min, a.x_max, a.y_max),
+            (b.x_min, b.y_min, b.x_max, b.y_max),
+        )
+    )
+
+
+def _expected_measure_start_crop(geometry: PageGeometryContract, measure) -> BoxContract | None:
+    staffs = tuple(staff for staff in geometry.staffs if staff.staff_id == measure.staff_id)
+    if len(staffs) != 1:
+        return None
+    desired_width = staffs[0].staff_spacing * METER_START_WIDTH_SPACINGS_MILLI / 1000.0
+    desired_x_max = min(measure.bbox.x_max, measure.bbox.x_min + desired_width)
+    left = max(0, int(math.floor(measure.bbox.x_min)))
+    top = max(0, int(math.floor(measure.bbox.y_min)))
+    right = min(geometry.page_width, int(math.ceil(desired_x_max)))
+    bottom = min(geometry.page_height, int(math.ceil(measure.bbox.y_max)))
+    if right <= left or bottom <= top:
+        return None
+    return BoxContract(float(left), float(top), float(right), float(bottom))
+
+
 def _line_y_at_source_x(line, source_x: float) -> float | None:
     x0, x1 = float(line.start.x), float(line.end.x)
     y0, y1 = float(line.start.y), float(line.end.y)
@@ -389,11 +415,21 @@ def _boundary_report_matches_geometry(
 
     measures = tuple(geometry.measure_proposals)
     measure_by_id = {item.measure_id: item for item in measures}
-    if len(measure_by_id) != len(measures):
+    if len(measure_by_id) != len(measures) or any(item.status != "accepted" for item in measures):
         return False, {}
+
     system_by_id = {item.system_id: item for item in geometry.systems}
-    if len(system_by_id) != len(geometry.systems):
+    staff_by_id = {item.staff_id: item for item in geometry.staffs}
+    if len(system_by_id) != len(geometry.systems) or len(staff_by_id) != len(geometry.staffs):
         return False, {}
+
+    for measure in measures:
+        system = system_by_id.get(measure.system_id)
+        staff = staff_by_id.get(measure.staff_id)
+        if system is None or staff is None:
+            return False, {}
+        if staff.system_id != measure.system_id or staff.staff_id not in system.staff_ids:
+            return False, {}
 
     logical_by_measure: dict[str, str] = {}
     logical_ids: set[str] = set()
@@ -450,6 +486,26 @@ def _boundary_report_matches_geometry(
     return True, logical_by_measure
 
 
+def _roi_batch_ownership_matches_geometry(
+    geometry: PageGeometryContract,
+    roi_batch: RuntimeRoiBatch,
+    measure_by_id: dict[str, object],
+) -> bool:
+    if roi_batch.source_image_sha256 != geometry.normalized_image_sha256:
+        return False
+    if roi_batch.config_fingerprint != runtime_roi_v1_config_fingerprint(geometry.geometry_config_fingerprint):
+        return False
+    for artifact in roi_batch.artifacts:
+        measure = measure_by_id.get(artifact.measure_id)
+        if measure is None:
+            return False
+        if artifact.staff_id != measure.staff_id or artifact.source_image_sha256 != geometry.normalized_image_sha256:
+            return False
+        if artifact.roi_id != f"{artifact.measure_id}:{artifact.kind}":
+            return False
+    return True
+
+
 def _decision_for_measure(
     geometry: PageGeometryContract,
     measure,
@@ -463,6 +519,7 @@ def _decision_for_measure(
             _placeholder_decision(measure, logical_id, roi.roi_id, M04_WRONG_PRESENCE_REGION),
             evidence_id=evidence.evidence_id,
         )
+    expected_crop = _expected_measure_start_crop(geometry, measure)
     identity_ok = (
         evidence.system_id == measure.system_id
         and evidence.logical_measure_id == logical_id
@@ -473,7 +530,8 @@ def _decision_for_measure(
         and roi.measure_id == measure.measure_id
         and roi.staff_id == measure.staff_id
         and roi.source_image_sha256 == geometry.normalized_image_sha256
-        and _box_inside(roi.crop_bbox, measure.bbox)
+        and expected_crop is not None
+        and _boxes_equal(roi.crop_bbox, expected_crop)
         and _translation_matches_roi(roi)
     )
     if not identity_ok:
@@ -579,6 +637,7 @@ def integrate_meter_evidence_v3(
     geometry_fp = page_geometry_fingerprint_v1(geometry)
     config_fp = meter_runtime_integration_v3_config_fingerprint(geometry_fp)
     ordered_measures = _ordered_measures(geometry)
+    measure_by_id = {item.measure_id: item for item in geometry.measure_proposals}
     valid_report, logical_by_measure = _boundary_report_matches_geometry(geometry, boundary_report, geometry_fp)
 
     roi_candidates: dict[str, list[RuntimeRoiArtifact]] = {}
@@ -595,12 +654,8 @@ def integrate_meter_evidence_v3(
         for evidence_id, count in Counter(item.evidence_id for item in evidence).items()
         if count != 1
     }
-
-    expected_roi_config = runtime_roi_v1_config_fingerprint(geometry.geometry_config_fingerprint)
-    roi_batch_identity_ok = (
-        roi_batch.source_image_sha256 == geometry.normalized_image_sha256
-        and roi_batch.config_fingerprint == expected_roi_config
-    )
+    evidence_ownership_ok = all(item.measure_id in measure_by_id for item in evidence)
+    roi_batch_identity_ok = _roi_batch_ownership_matches_geometry(geometry, roi_batch, measure_by_id)
 
     decisions: list[MeterIntegrationDecisionV3] = []
     for measure in ordered_measures:
@@ -612,7 +667,7 @@ def integrate_meter_evidence_v3(
         if not valid_report:
             decisions.append(_placeholder_decision(measure, logical_id, expected_roi, M02_BOUNDARY_REPORT_MISMATCH))
             continue
-        if not roi_batch_identity_ok:
+        if not roi_batch_identity_ok or not evidence_ownership_ok:
             decisions.append(_placeholder_decision(measure, logical_id, expected_roi, M05_IDENTITY_MISMATCH))
             continue
 
