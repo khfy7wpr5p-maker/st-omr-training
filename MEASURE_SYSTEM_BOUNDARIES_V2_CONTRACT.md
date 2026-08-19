@@ -16,14 +16,14 @@ Required:
 - no existing measure proposals;
 - exact normalized grayscale PNG bytes whose SHA-256, dimensions and mode match the geometry contract.
 
-System membership is input truth from the System Grouper. This layer must never regroup staffs.
+System membership is input truth from the System Grouper. This layer must never regroup staffs. The predecessor membership must be canonical: global staff order is top-to-bottom, each staff belongs to exactly one system, each system member list follows that staff order, and every system bbox must equal the exact union of its member staff bboxes.
 
 ## Boundary construction
 
 For every system independently:
 
-1. detect strong vertical raster runs spanning each staff under the frozen gray/coverage contract;
-2. merge contiguous dark columns into one run;
+1. detect strong vertical raster runs spanning each staff under the frozen gray/coverage contract; a candidate column must also touch both outer-staff-line endpoint bands so a long note stem that covers most, but not both edges, is not promoted to a measure separator;
+2. merge contiguous qualifying columns into one run;
 3. cluster neighbouring vertical runs whose ink gap is at most one staff spacing. This treats double/final barline strokes as one *geometric boundary candidate* rather than inventing a tiny measure between strokes;
 4. use the detected staff-line x extents as deterministic implicit system start/end edges;
 5. snap any explicit vertical candidate within one staff spacing of an implicit system edge to that edge;
@@ -37,6 +37,7 @@ System edges are geometry, not claims that a visible barline exists. Therefore a
 
 - vertical dark threshold: `128`;
 - minimum vertical coverage: `800/1000`;
+- outer-staff-line endpoint anchor tolerance: `1 px` at both top and bottom;
 - maximum double/final-barline stroke gap for one geometric cluster: `1000/1000` of staff spacing;
 - edge snap distance: `1000/1000` of staff spacing;
 - maximum cross-staff aligned-boundary delta: `500/1000` of staff spacing;
@@ -83,12 +84,14 @@ The closure suite must cover:
 - first and last measures;
 - pickup/anacrusis-shaped short first measure above the minimum-width contract;
 - double/final barline stroke clustering;
+- long note-stem-like vertical ink that does not touch both outer staff-line bands;
 - missing internal barline on one staff of a multi-staff system;
 - cross-staff mismatched barline positions;
 - multiple staffs sharing the same logical measure;
 - independent measure layouts across a system break;
 - page-edge system extent;
 - no-internal-barline one-measure system;
+- corrupted predecessor staff order/member order/system bbox rejection;
 - exact 10/10 deterministic replay;
 - detector -> System Grouper -> Measure/System v2 integration.
 
@@ -100,6 +103,7 @@ This stage must not:
 - use Meter or symbol classes to repair geometry;
 - silently drop an unmatched staff boundary;
 - turn double-bar strokes into a tiny measure;
+- treat a near-full note stem as a separator merely because its vertical coverage is high;
 - invent an expected measure count;
 - weaken a mismatch because a later specialist could compensate;
 - access sealed TEST or any training/checkpoint path.
