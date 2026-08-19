@@ -15,7 +15,11 @@ from st_omr_training.runtime_geometry_engine_contract import (
     StaffGeometryContract,
     SystemGeometryContract,
 )
-from st_omr_training.runtime_local_roi_v1 import RuntimeRoiArtifact, RuntimeRoiBatch
+from st_omr_training.runtime_local_roi_v1 import (
+    RuntimeRoiArtifact,
+    RuntimeRoiBatch,
+    runtime_roi_v1_config_fingerprint,
+)
 from st_omr_training.runtime_measure_system_boundaries_v2 import (
     LogicalMeasureV2,
     MeasureSystemBoundaryReportV2,
@@ -152,6 +156,37 @@ def _two_staff_geometry() -> tuple[PageGeometryContract, MeasureSystemBoundaryRe
     return geometry, report
 
 
+def _two_system_geometry() -> tuple[PageGeometryContract, MeasureSystemBoundaryReportV2]:
+    top = _staff("staff-top", "system-2", 20.0)
+    bottom = _staff("staff-bottom", "system-10", 80.0)
+    top_measure = _measure("staff-top", "system-2", 20.0)
+    bottom_measure = _measure("staff-bottom", "system-10", 80.0)
+    geometry = PageGeometryContract(
+        normalized_image_sha256=SOURCE_SHA,
+        geometry_config_fingerprint=CONFIG_SHA,
+        page_width=200,
+        page_height=160,
+        transform=_homography_identity(),
+        systems=(
+            SystemGeometryContract("system-2", top.staff_bbox, (top.staff_id,)),
+            SystemGeometryContract("system-10", bottom.staff_bbox, (bottom.staff_id,)),
+        ),
+        staffs=(top, bottom),
+        measure_proposals=(bottom_measure, top_measure),
+        status="accepted",
+    )
+    report = MeasureSystemBoundaryReportV2(
+        status="accepted",
+        input_geometry_fingerprint="c" * 64,
+        output_geometry_fingerprint=page_geometry_fingerprint_v1(geometry),
+        logical_measures=(
+            LogicalMeasureV2("system-2-measure-1", "system-2", 1, 10.0, 190.0, "system_edge", "system_edge", (top_measure.measure_id,)),
+            LogicalMeasureV2("system-10-measure-1", "system-10", 1, 10.0, 190.0, "system_edge", "system_edge", (bottom_measure.measure_id,)),
+        ),
+    )
+    return geometry, report
+
+
 def _png(width: int, height: int) -> bytes:
     image = Image.new("L", (width, height), 255)
     output = BytesIO()
@@ -159,8 +194,18 @@ def _png(width: int, height: int) -> bytes:
     return output.getvalue()
 
 
-def _roi(measure_id: str, staff_id: str, top: float, kind: str = "measure-start") -> RuntimeRoiArtifact:
-    if kind == "measure-start":
+def _roi(
+    measure_id: str,
+    staff_id: str,
+    top: float,
+    kind: str = "measure-start",
+    *,
+    roi_id_override: str | None = None,
+    box_override: BoxContract | None = None,
+) -> RuntimeRoiArtifact:
+    if box_override is not None:
+        box = box_override
+    elif kind == "measure-start":
         box = BoxContract(10.0, top, 130.0, top + 40.0)
     else:
         box = BoxContract(10.0, top, 190.0, top + 40.0)
@@ -173,7 +218,7 @@ def _roi(measure_id: str, staff_id: str, top: float, kind: str = "measure-start"
         inverse=(1.0, 0.0, left, 0.0, 1.0, y0, 0.0, 0.0, 1.0),
     )
     return RuntimeRoiArtifact(
-        roi_id=f"{measure_id}:{kind}",
+        roi_id=roi_id_override or f"{measure_id}:{kind}",
         kind=kind,
         measure_id=measure_id,
         staff_id=staff_id,
@@ -185,8 +230,12 @@ def _roi(measure_id: str, staff_id: str, top: float, kind: str = "measure-start"
     )
 
 
-def _batch(*artifacts: RuntimeRoiArtifact) -> RuntimeRoiBatch:
-    return RuntimeRoiBatch(SOURCE_SHA, "d" * 64, tuple(artifacts))
+def _batch(*artifacts: RuntimeRoiArtifact, config_fingerprint: str | None = None) -> RuntimeRoiBatch:
+    return RuntimeRoiBatch(
+        SOURCE_SHA,
+        config_fingerprint or runtime_roi_v1_config_fingerprint(CONFIG_SHA),
+        tuple(artifacts),
+    )
 
 
 def _scores(digit: int | None) -> MeterDigitScoresV3:
@@ -209,14 +258,16 @@ def _evidence(
     upper: int | None = 2,
     lower: int | None = 4,
     status: str = "accepted",
+    evidence_id: str | None = None,
+    roi_id: str | None = None,
 ) -> MeterModelEvidenceV3:
     return MeterModelEvidenceV3(
-        evidence_id=f"e:{measure_id}",
+        evidence_id=evidence_id or f"e:{measure_id}",
         system_id=system_id,
         logical_measure_id=logical_id,
         measure_id=measure_id,
         staff_id=staff_id,
-        roi_id=f"{measure_id}:{roi_kind}",
+        roi_id=roi_id or f"{measure_id}:{roi_kind}",
         presence_status=status,
         presence_score=presence,
         refined_x_center_roi=30.0,
@@ -241,24 +292,14 @@ class RuntimeMeterIntegrationV3Tests(unittest.TestCase):
     def test_presence_absent_with_no_digit_accepts_none(self) -> None:
         geometry, report = _single_geometry()
         roi = _roi("staff-1-measure-1", "staff-1", 20.0)
-        result = integrate_meter_evidence_v3(
-            geometry,
-            report,
-            _batch(roi),
-            (_evidence(presence=0.10, upper=None, lower=None),),
-        )
+        result = integrate_meter_evidence_v3(geometry, report, _batch(roi), (_evidence(presence=0.10, upper=None, lower=None),))
         self.assertEqual((result.decisions[0].status, result.decisions[0].meter_class), ("accepted", "none"))
         self.assertIsNone(result.decisions[0].bbox)
 
     def test_presence_absent_with_passing_digit_is_ambiguous(self) -> None:
         geometry, report = _single_geometry()
         roi = _roi("staff-1-measure-1", "staff-1", 20.0)
-        result = integrate_meter_evidence_v3(
-            geometry,
-            report,
-            _batch(roi),
-            (_evidence(presence=0.10, upper=2, lower=None),),
-        )
+        result = integrate_meter_evidence_v3(geometry, report, _batch(roi), (_evidence(presence=0.10, upper=2, lower=None),))
         self.assertEqual(result.decisions[0].reasons, (M12_PRESENCE_DIGIT_CONFLICT,))
 
     def test_present_with_no_digit_reports_no_digit(self) -> None:
@@ -299,29 +340,14 @@ class RuntimeMeterIntegrationV3Tests(unittest.TestCase):
         geometry, report = _single_geometry()
         start = _roi("staff-1-measure-1", "staff-1", 20.0)
         full = _roi("staff-1-measure-1", "staff-1", 20.0, "measure-full")
-        result = integrate_meter_evidence_v3(
-            geometry,
-            report,
-            _batch(start, full),
-            (_evidence(roi_kind="measure-full"),),
-        )
+        result = integrate_meter_evidence_v3(geometry, report, _batch(start, full), (_evidence(roi_kind="measure-full"),))
         self.assertEqual(result.decisions[0].reasons, (M04_WRONG_PRESENCE_REGION,))
 
     def test_wrong_system_or_logical_measure_identity_fails_closed(self) -> None:
         geometry, report = _single_geometry()
         roi = _roi("staff-1-measure-1", "staff-1", 20.0)
-        wrong_system = integrate_meter_evidence_v3(
-            geometry,
-            report,
-            _batch(roi),
-            (_evidence(system_id="system-99"),),
-        )
-        wrong_logical = integrate_meter_evidence_v3(
-            geometry,
-            report,
-            _batch(roi),
-            (_evidence(logical_id="system-99-measure-1"),),
-        )
+        wrong_system = integrate_meter_evidence_v3(geometry, report, _batch(roi), (_evidence(system_id="system-99"),))
+        wrong_logical = integrate_meter_evidence_v3(geometry, report, _batch(roi), (_evidence(logical_id="system-99-measure-1"),))
         self.assertEqual(wrong_system.decisions[0].reasons, (M05_IDENTITY_MISMATCH,))
         self.assertEqual(wrong_logical.decisions[0].reasons, (M05_IDENTITY_MISMATCH,))
 
@@ -337,6 +363,30 @@ class RuntimeMeterIntegrationV3Tests(unittest.TestCase):
         result = integrate_meter_evidence_v3(geometry, bad_report, _batch(roi), (_evidence(),))
         self.assertEqual(result.decisions[0].reasons, (M02_BOUNDARY_REPORT_MISMATCH,))
 
+    def test_forged_logical_boundary_with_correct_geometry_fingerprint_is_rejected(self) -> None:
+        geometry, report = _single_geometry()
+        roi = _roi("staff-1-measure-1", "staff-1", 20.0)
+        logical = report.logical_measures[0]
+        forged = MeasureSystemBoundaryReportV2(
+            status="accepted",
+            input_geometry_fingerprint=report.input_geometry_fingerprint,
+            output_geometry_fingerprint=report.output_geometry_fingerprint,
+            logical_measures=(
+                LogicalMeasureV2(
+                    logical.logical_measure_id,
+                    logical.system_id,
+                    logical.measure_index,
+                    11.0,
+                    logical.right_x,
+                    logical.left_kind,
+                    logical.right_kind,
+                    logical.member_measure_ids,
+                ),
+            ),
+        )
+        result = integrate_meter_evidence_v3(geometry, forged, _batch(roi), (_evidence(),))
+        self.assertEqual(result.decisions[0].reasons, (M02_BOUNDARY_REPORT_MISMATCH,))
+
     def test_missing_evidence_is_explicit_ambiguous_and_propagated(self) -> None:
         geometry, report = _single_geometry()
         roi = _roi("staff-1-measure-1", "staff-1", 20.0)
@@ -349,25 +399,47 @@ class RuntimeMeterIntegrationV3Tests(unittest.TestCase):
     def test_ambiguous_presence_remains_ambiguous(self) -> None:
         geometry, report = _single_geometry()
         roi = _roi("staff-1-measure-1", "staff-1", 20.0)
-        result = integrate_meter_evidence_v3(
-            geometry,
-            report,
-            _batch(roi),
-            (_evidence(status="ambiguous"),),
-        )
+        result = integrate_meter_evidence_v3(geometry, report, _batch(roi), (_evidence(status="ambiguous"),))
         self.assertEqual(result.decisions[0].reasons, (M06_PRESENCE_AMBIGUOUS,))
         self.assertEqual(result.evidence_batch.observations[0].status, "ambiguous")
+
+    def test_runtime_roi_batch_config_must_match_exact_geometry_policy(self) -> None:
+        geometry, report = _single_geometry()
+        roi = _roi("staff-1-measure-1", "staff-1", 20.0)
+        result = integrate_meter_evidence_v3(geometry, report, _batch(roi, config_fingerprint="d" * 64), (_evidence(),))
+        self.assertEqual(result.decisions[0].reasons, (M05_IDENTITY_MISMATCH,))
+
+    def test_measure_start_roi_id_must_be_canonical(self) -> None:
+        geometry, report = _single_geometry()
+        roi = _roi(
+            "staff-1-measure-1",
+            "staff-1",
+            20.0,
+            roi_id_override="arbitrary-measure-start",
+        )
+        evidence = _evidence(roi_id="arbitrary-measure-start")
+        result = integrate_meter_evidence_v3(geometry, report, _batch(roi), (evidence,))
+        self.assertEqual(result.decisions[0].reasons, (M05_IDENTITY_MISMATCH,))
+
+    def test_none_cannot_be_accepted_from_roi_outside_owning_measure(self) -> None:
+        geometry, report = _single_geometry()
+        roi = _roi(
+            "staff-1-measure-1",
+            "staff-1",
+            20.0,
+            box_override=BoxContract(0.0, 20.0, 100.0, 60.0),
+        )
+        evidence = _evidence(presence=0.10, upper=None, lower=None)
+        result = integrate_meter_evidence_v3(geometry, report, _batch(roi), (evidence,))
+        self.assertEqual(result.decisions[0].reasons, (M05_IDENTITY_MISMATCH,))
+        self.assertIsNone(result.decisions[0].meter_class)
 
     def test_cross_staff_meter_disagreement_marks_entire_logical_measure_ambiguous(self) -> None:
         geometry, report = _two_staff_geometry()
         roi1 = _roi("staff-1-measure-1", "staff-1", 20.0)
         roi2 = _roi("staff-2-measure-1", "staff-2", 70.0)
         e1 = _evidence()
-        e2 = _evidence(
-            measure_id="staff-2-measure-1",
-            staff_id="staff-2",
-            upper=3,
-        )
+        e2 = _evidence(measure_id="staff-2-measure-1", staff_id="staff-2", upper=3)
         result = integrate_meter_evidence_v3(geometry, report, _batch(roi1, roi2), (e1, e2))
         self.assertEqual(len(result.decisions), 2)
         self.assertTrue(all(item.status == "ambiguous" for item in result.decisions))
@@ -384,14 +456,46 @@ class RuntimeMeterIntegrationV3Tests(unittest.TestCase):
         self.assertEqual(tuple(item.meter_class for item in result.decisions), ("2/4", "2/4"))
         self.assertTrue(all(item.status == "accepted" for item in result.decisions))
 
+    def test_duplicate_evidence_ids_fail_closed_for_all_owners(self) -> None:
+        geometry, report = _two_staff_geometry()
+        roi1 = _roi("staff-1-measure-1", "staff-1", 20.0)
+        roi2 = _roi("staff-2-measure-1", "staff-2", 70.0)
+        duplicate_id = "duplicated-meter-evidence"
+        e1 = _evidence(evidence_id=duplicate_id)
+        e2 = _evidence(measure_id="staff-2-measure-1", staff_id="staff-2", evidence_id=duplicate_id)
+        result = integrate_meter_evidence_v3(geometry, report, _batch(roi1, roi2), (e1, e2))
+        self.assertTrue(all(M05_IDENTITY_MISMATCH in item.reasons for item in result.decisions))
+        self.assertTrue(all(item.status == "ambiguous" for item in result.decisions))
+
+    def test_output_order_uses_geometry_system_order_not_lexical_ids(self) -> None:
+        geometry, report = _two_system_geometry()
+        top_roi = _roi("staff-top-measure-1", "staff-top", 20.0)
+        bottom_roi = _roi("staff-bottom-measure-1", "staff-bottom", 80.0)
+        top_evidence = _evidence(
+            measure_id="staff-top-measure-1",
+            staff_id="staff-top",
+            system_id="system-2",
+            logical_id="system-2-measure-1",
+        )
+        bottom_evidence = _evidence(
+            measure_id="staff-bottom-measure-1",
+            staff_id="staff-bottom",
+            system_id="system-10",
+            logical_id="system-10-measure-1",
+        )
+        result = integrate_meter_evidence_v3(
+            geometry,
+            report,
+            _batch(top_roi, bottom_roi),
+            (bottom_evidence, top_evidence),
+        )
+        self.assertEqual(tuple(item.system_id for item in result.decisions), ("system-2", "system-10"))
+
     def test_replay_is_bit_stable_10_of_10(self) -> None:
         geometry, report = _single_geometry()
         roi = _roi("staff-1-measure-1", "staff-1", 20.0)
         evidence = (_evidence(),)
-        fingerprints = tuple(
-            integrate_meter_evidence_v3(geometry, report, _batch(roi), evidence).fingerprint()
-            for _ in range(10)
-        )
+        fingerprints = tuple(integrate_meter_evidence_v3(geometry, report, _batch(roi), evidence).fingerprint() for _ in range(10))
         self.assertEqual(len(set(fingerprints)), 1)
 
     def test_safety_gates_remain_closed(self) -> None:
