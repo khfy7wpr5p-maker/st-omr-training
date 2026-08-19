@@ -1,7 +1,7 @@
 """Deterministic system-local measure boundary construction.
 
 This stage consumes accepted System Grouper output, never regroups staffs, and
-uses only normalized raster geometry.  System edges are implicit geometric
+uses only normalized raster geometry. System edges are implicit geometric
 boundaries; strong internal vertical runs are geometric separator candidates,
 not semantic barline recognition.
 """
@@ -270,12 +270,34 @@ def _membership_is_exact(geometry: PageGeometryContract) -> bool:
     staff_ids = tuple(staff.staff_id for staff in geometry.staffs)
     if len(set(staff_ids)) != len(staff_ids):
         return False
+    if len({system.system_id for system in geometry.systems}) != len(geometry.systems):
+        return False
+
+    staff_by_id = {staff.staff_id: staff for staff in geometry.staffs}
+    staff_order = {staff.staff_id: index for index, staff in enumerate(geometry.staffs)}
     owner: dict[str, str] = {}
     for system in geometry.systems:
+        if not system.staff_ids or len(set(system.staff_ids)) != len(system.staff_ids):
+            return False
+        if any(staff_id not in staff_by_id for staff_id in system.staff_ids):
+            return False
+        expected_ids = tuple(sorted(system.staff_ids, key=staff_order.__getitem__))
+        if system.staff_ids != expected_ids:
+            return False
+        members = tuple(staff_by_id[staff_id] for staff_id in system.staff_ids)
+        expected_bbox = BoxContract(
+            min(staff.staff_bbox.x_min for staff in members),
+            min(staff.staff_bbox.y_min for staff in members),
+            max(staff.staff_bbox.x_max for staff in members),
+            max(staff.staff_bbox.y_max for staff in members),
+        )
+        if system.system_bbox != expected_bbox:
+            return False
         for staff_id in system.staff_ids:
             if staff_id in owner:
                 return False
             owner[staff_id] = system.system_id
+
     if set(owner) != set(staff_ids):
         return False
     return all(owner[staff.staff_id] == staff.system_id for staff in geometry.staffs)
