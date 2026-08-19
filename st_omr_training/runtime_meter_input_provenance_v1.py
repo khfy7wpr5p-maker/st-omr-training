@@ -11,7 +11,7 @@ import json
 from typing import Final
 
 from .runtime_local_roi_v1 import RuntimeRoiArtifact
-from .meter_v2_digit_crop_adapter_v1 import meter_v2_digit_crop_profile_fingerprint
+from .meter_v2_digit_crop_profile_v1 import meter_v2_digit_crop_profile_fingerprint_v1
 
 METER_RUNTIME_INPUT_PROVENANCE_V1: Final[str] = "meter-runtime-input-provenance-v1"
 HISTORICAL_PRESENCE_ROI_PROFILE: Final[str] = "measure-start-meter-roi-v1"
@@ -49,7 +49,7 @@ class DigitSlotGeometryV1:
             "numerator_box_roi": self.numerator_box_roi,
             "denominator_box_roi": self.denominator_box_roi,
             "localization_profile_fingerprint": self.localization_profile_fingerprint,
-            "digit_crop_profile_fingerprint": meter_v2_digit_crop_profile_fingerprint(),
+            "digit_crop_profile_fingerprint": meter_v2_digit_crop_profile_fingerprint_v1(),
         })
 
 
