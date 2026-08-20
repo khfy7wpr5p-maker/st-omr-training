@@ -1,0 +1,81 @@
+{
+  "candidate_policy": {
+    "candidate_1": "median_five_line_left_plus_frozen_train_offset",
+    "candidate_2": "staff_region_component_left_plus_same_frozen_train_offset",
+    "frozen_train_offset_staff_spaces": -0.06619667590040451,
+    "maximum_candidates": 2,
+    "oracle_best_of_two_used_as_optimistic_lower_bound": true
+  },
+  "decision": "STOP_BEFORE_D11_SPECIALIST_INFERENCE_AND_RETURN_TO_ANCHOR_ROOT_CAUSE",
+  "gate": {
+    "adapter_pass": false,
+    "full_model_scoring_required": false,
+    "maximum_anchor_p95_staff_spaces": 2.0,
+    "oracle_anchor_p95_pass": false
+  },
+  "metrics": {
+    "by_truth_class": {
+      "2/4": {
+        "count": 75,
+        "oracle_anchor_p50_staff_spaces": 0.47980403839747976,
+        "oracle_anchor_p95_staff_spaces": 17.15904685888942,
+        "oracle_within_2_staff_spaces_rate": 0.8266666666666667
+      },
+      "3/4": {
+        "count": 59,
+        "oracle_anchor_p50_staff_spaces": 0.2160436556269166,
+        "oracle_anchor_p95_staff_spaces": 15.956266745197134,
+        "oracle_within_2_staff_spaces_rate": 0.8983050847457628
+      },
+      "4/4": {
+        "count": 78,
+        "oracle_anchor_p50_staff_spaces": 0.30675400655548973,
+        "oracle_anchor_p95_staff_spaces": 16.920305610718735,
+        "oracle_within_2_staff_spaces_rate": 0.8846153846153846
+      },
+      "none": {
+        "count": 71,
+        "oracle_anchor_p50_staff_spaces": 0.12442985640441814,
+        "oracle_anchor_p95_staff_spaces": 0.3248941485430382,
+        "oracle_within_2_staff_spaces_rate": 0.9859154929577465
+      }
+    },
+    "candidate_1_anchor_p50_staff_spaces": 0.3021741595345893,
+    "candidate_1_anchor_p95_staff_spaces": 21.619187313850016,
+    "candidate_1_better_count": 63,
+    "candidate_2_anchor_p50_staff_spaces": 0.3110580722344156,
+    "candidate_2_anchor_p95_staff_spaces": 17.916018653317487,
+    "candidate_2_better_count": 86,
+    "candidate_tie_count": 134,
+    "oracle_best_of_two_anchor_p50_staff_spaces": 0.23936033971480067,
+    "oracle_best_of_two_anchor_p95_staff_spaces": 16.29257406585162,
+    "oracle_best_of_two_over_10_staff_spaces_count": 26,
+    "oracle_best_of_two_over_2_staff_spaces_count": 29,
+    "oracle_best_of_two_within_2_staff_spaces_rate": 0.8975265017667845
+  },
+  "safety": {
+    "candidate_generation_tuned": false,
+    "final_a_reused": false,
+    "final_b_opened": false,
+    "merge_allowed": false,
+    "model_inference_run": false,
+    "optimizer_steps_added": 0,
+    "production_promotion": false,
+    "test_opened": false,
+    "threshold_tuning": false
+  },
+  "source_evidence": {
+    "labels_used_for_scoring_only": true,
+    "v4_validation_predictions_sha256": "98de47c01c4f83eef1f30c6be143c9cfb19a5c63f8f6f6b5745da6d6808ce826",
+    "v5_validation_predictions_sha256": "0b6a3229a97150597ffc54b81774a12810237ba0f40ea1f21f5f10745d3dde04",
+    "v6_validation_predictions_sha256": "7a734bc9d08369da1e0592e22a167777ef587c490e6c3489de6b32d98cf44e06"
+  },
+  "stage": "M4-E3I-V1-FROZEN-DEVELOPMENT-GEOMETRY-PREFLIGHT",
+  "state": "COMPLETE_EARLY_FAIL_PRESERVED",
+  "surface": {
+    "system_geometry_coverage": 0.9929824561403509,
+    "systems_scored": 283,
+    "systems_total": 285,
+    "systems_without_anchor_observations": 2
+  }
+}
