@@ -59,8 +59,12 @@ class MeterRealDomainBackgroundV2Tests(unittest.TestCase):
             "epochs_total",
             "heartbeat_age_seconds",
             "resume",
+            "?/44260",
+            "SONUÇ HAZIR DEĞİL; gerçek arka plan durumu",
+            "SON 25 LOG SATIRI",
         ):
             self.assertIn(required, source)
+        self.assertNotIn("Background run is not complete", source)
         self.assertNotIn("/01_REVIEW/test", source)
         self.assertIn("metrics['test_opened'] is False", source)
         self.assertIn("metrics['runtime_connected'] is False", source)
@@ -86,6 +90,10 @@ class MeterRealDomainBackgroundV2Tests(unittest.TestCase):
                     rows.append({"split": split, "image_path": image, "label_path": label})
                 manifest = json.dumps({"records": rows}, separators=(",", ":"), sort_keys=True).encode("ascii")
                 (source / "manifest.json").write_bytes(manifest)
+                (source / "manifest.sha256").write_text(
+                    f"{sha256(manifest).hexdigest()}  manifest.json\n",
+                    encoding="ascii",
+                )
                 (source / "receipt.json").write_bytes(b"receipt")
                 (source / "COMPLETE").write_bytes(b"complete")
                 status = _StatusRecorder()
@@ -96,11 +104,84 @@ class MeterRealDomainBackgroundV2Tests(unittest.TestCase):
                     status=status,  # type: ignore[arg-type]
                 )
                 self.assertEqual(result, cache)
-                self.assertTrue((cache / "CACHE_COMPLETE.json").is_file())
+                self.assertEqual(
+                    {path.name for path in cache.iterdir()},
+                    {"images", "labels", "manifest.json", "manifest.sha256", "receipt.json", "COMPLETE"},
+                )
+                self.assertTrue((cache.parent / f".{cache.name}.complete.json").is_file())
                 final = status.events[-1]
                 self.assertEqual(final[0], "d10_cache_complete")
-                self.assertEqual(final[1]["files_completed"], 7)
-                self.assertEqual(final[1]["files_total"], 7)
+                self.assertEqual(final[1]["files_completed"], 8)
+                self.assertEqual(final[1]["files_total"], 8)
+        finally:
+            runner.EXPECTED_D10_RECORDS = old_expected
+
+    def test_legacy_cache_is_migrated_without_recopying_existing_artifacts(self) -> None:
+        old_expected = runner.EXPECTED_D10_RECORDS
+        runner.EXPECTED_D10_RECORDS = 2
+        try:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                source = root / "source"
+                cache = root / "cache"
+                source.mkdir()
+                rows = []
+                for index, split in enumerate(("train", "validation")):
+                    image = f"images/{index}.png"
+                    label = f"labels/{index}.json"
+                    (source / image).parent.mkdir(parents=True, exist_ok=True)
+                    (source / label).parent.mkdir(parents=True, exist_ok=True)
+                    (source / image).write_bytes(f"image-{index}".encode("ascii"))
+                    (source / label).write_bytes(f"label-{index}".encode("ascii"))
+                    rows.append({"split": split, "image_path": image, "label_path": label})
+                manifest = json.dumps({"records": rows}, separators=(",", ":"), sort_keys=True).encode("ascii")
+                manifest_sha = sha256(manifest).hexdigest()
+                (source / "manifest.json").write_bytes(manifest)
+                (source / "manifest.sha256").write_text(
+                    f"{manifest_sha}  manifest.json\n", encoding="ascii"
+                )
+                (source / "receipt.json").write_bytes(b"receipt")
+                (source / "COMPLETE").write_bytes(b"complete")
+                for relative in (
+                    "COMPLETE",
+                    "manifest.json",
+                    "receipt.json",
+                    "images/0.png",
+                    "labels/0.json",
+                    "images/1.png",
+                    "labels/1.json",
+                ):
+                    destination = cache / relative
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes((source / relative).read_bytes())
+                legacy_marker = {
+                    "schema_version": "st-omr-meter-d10-local-cache-v1",
+                    "manifest_sha256": manifest_sha,
+                    "record_count": 2,
+                    "file_count": 7,
+                    "test_records": 0,
+                    "test_opened": False,
+                }
+                (cache / "CACHE_COMPLETE.json").write_text(
+                    json.dumps(legacy_marker), encoding="ascii"
+                )
+                preserved_mtime = (cache / "images/0.png").stat().st_mtime_ns
+                status = _StatusRecorder()
+
+                result = runner.materialize_d10_cache(
+                    source_root=source,
+                    cache_root=cache,
+                    expected_manifest_sha256=manifest_sha,
+                    status=status,  # type: ignore[arg-type]
+                )
+
+                self.assertEqual(result, cache)
+                self.assertEqual((cache / "images/0.png").stat().st_mtime_ns, preserved_mtime)
+                self.assertFalse((cache / "CACHE_COMPLETE.json").exists())
+                self.assertTrue((cache / "manifest.sha256").is_file())
+                self.assertEqual(status.events[-1][0], "d10_cache_migrated")
+                self.assertEqual(status.events[-1][1]["files_completed"], 8)
+                self.assertEqual(status.events[-1][1]["files_total"], 8)
         finally:
             runner.EXPECTED_D10_RECORDS = old_expected
 
@@ -118,6 +199,9 @@ class MeterRealDomainBackgroundV2Tests(unittest.TestCase):
                     sort_keys=True,
                 ).encode("ascii")
                 (source / "manifest.json").write_bytes(manifest)
+                (source / "manifest.sha256").write_text(
+                    f"{sha256(manifest).hexdigest()}  manifest.json\n", encoding="ascii"
+                )
                 with self.assertRaisesRegex(RuntimeError, "sealed TEST"):
                     runner.materialize_d10_cache(
                         source_root=source,

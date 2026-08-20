@@ -23,8 +23,12 @@ from typing import Mapping
 
 
 EXPECTED_D10_RECORDS = 22_128
-CACHE_SCHEMA = "st-omr-meter-d10-local-cache-v1"
+CACHE_SCHEMA = "st-omr-meter-d10-local-cache-v2"
+LEGACY_CACHE_SCHEMA = "st-omr-meter-d10-local-cache-v1"
 STATUS_SCHEMA = "st-omr-meter-background-status-v1"
+D10_TOP_LEVEL = frozenset(
+    {"images", "labels", "manifest.json", "manifest.sha256", "receipt.json", "COMPLETE"}
+)
 
 
 def _now() -> str:
@@ -129,6 +133,17 @@ def _copy_atomic(source: Path, destination: Path) -> None:
     temporary.replace(destination)
 
 
+def _read_marker(path: Path) -> object:
+    try:
+        return json.loads(path.read_text("ascii"))
+    except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
+        return None
+
+
+def _cache_marker_path(cache_root: Path) -> Path:
+    return cache_root.parent / f".{cache_root.name}.complete.json"
+
+
 def materialize_d10_cache(
     *,
     source_root: Path,
@@ -145,7 +160,16 @@ def materialize_d10_cache(
     rows = payload.get("records")
     if not isinstance(rows, list) or len(rows) != EXPECTED_D10_RECORDS:
         raise RuntimeError("D10 manifest record count differs from 22,128")
-    relative_paths = [Path("COMPLETE"), Path("manifest.json"), Path("receipt.json")]
+    source_manifest_sidecar = source_root / "manifest.sha256"
+    expected_sidecar = f"{expected_manifest_sha256}  manifest.json\n".encode("ascii")
+    if source_manifest_sidecar.read_bytes() != expected_sidecar:
+        raise RuntimeError("D10 Drive manifest SHA sidecar mismatch before cache copy")
+    relative_paths = [
+        Path("COMPLETE"),
+        Path("manifest.json"),
+        Path("manifest.sha256"),
+        Path("receipt.json"),
+    ]
     for row in rows:
         if not isinstance(row, dict):
             raise RuntimeError("D10 manifest record must be an object")
@@ -155,7 +179,8 @@ def materialize_d10_cache(
             raise RuntimeError("D10 cache accepts only TRAIN/VALIDATION records")
         relative_paths.extend((_safe_relative(row.get("image_path")), _safe_relative(row.get("label_path"))))
     unique_paths = tuple(dict.fromkeys(relative_paths))
-    marker_path = cache_root / "CACHE_COMPLETE.json"
+    marker_path = _cache_marker_path(cache_root)
+    legacy_marker_path = cache_root / "CACHE_COMPLETE.json"
     marker_expected = {
         "schema_version": CACHE_SCHEMA,
         "manifest_sha256": expected_manifest_sha256,
@@ -164,12 +189,8 @@ def materialize_d10_cache(
         "test_records": 0,
         "test_opened": False,
     }
-    if marker_path.is_file():
-        try:
-            marker = json.loads(marker_path.read_text("ascii"))
-        except (OSError, UnicodeError, json.JSONDecodeError):
-            marker = None
-        if marker == marker_expected:
+    if _read_marker(marker_path) == marker_expected and cache_root.is_dir():
+        if {path.name for path in cache_root.iterdir()} == D10_TOP_LEVEL:
             status.update(
                 "d10_cache_reused",
                 {
@@ -182,6 +203,35 @@ def materialize_d10_cache(
                 },
             )
             return cache_root
+    legacy_marker_expected = {
+        "schema_version": LEGACY_CACHE_SCHEMA,
+        "manifest_sha256": expected_manifest_sha256,
+        "record_count": EXPECTED_D10_RECORDS,
+        "file_count": len(unique_paths) - 1,
+        "test_records": 0,
+        "test_opened": False,
+    }
+    legacy_top_level = (D10_TOP_LEVEL - {"manifest.sha256"}) | {"CACHE_COMPLETE.json"}
+    if (
+        _read_marker(legacy_marker_path) == legacy_marker_expected
+        and cache_root.is_dir()
+        and {path.name for path in cache_root.iterdir()} == legacy_top_level
+    ):
+        _copy_atomic(source_manifest_sidecar, cache_root / "manifest.sha256")
+        legacy_marker_path.unlink()
+        _atomic_json(marker_path, marker_expected)
+        status.update(
+            "d10_cache_migrated",
+            {
+                "phase": "d10_local_cache",
+                "phase_index": 2,
+                "phase_total": 9,
+                "files_completed": len(unique_paths),
+                "files_total": len(unique_paths),
+                "records_total": EXPECTED_D10_RECORDS,
+            },
+        )
+        return cache_root
     cache_root.mkdir(parents=True, exist_ok=True)
     total = len(unique_paths)
     status.update(
@@ -212,6 +262,17 @@ def materialize_d10_cache(
                     "records_total": EXPECTED_D10_RECORDS,
                 },
             )
+    if legacy_marker_path.is_symlink():
+        raise RuntimeError("legacy D10 cache marker must not be a symlink")
+    if legacy_marker_path.is_file():
+        legacy_marker_path.unlink()
+    observed_top_level = {path.name for path in cache_root.iterdir()}
+    if observed_top_level != D10_TOP_LEVEL:
+        missing = sorted(D10_TOP_LEVEL - observed_top_level)
+        unexpected = sorted(observed_top_level - D10_TOP_LEVEL)
+        raise RuntimeError(
+            f"D10 local cache top-level shape mismatch after copy: missing={missing}, unexpected={unexpected}"
+        )
     _atomic_json(marker_path, marker_expected)
     status.update(
         "d10_cache_complete",

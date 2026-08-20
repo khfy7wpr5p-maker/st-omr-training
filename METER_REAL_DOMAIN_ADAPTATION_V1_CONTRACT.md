@@ -113,9 +113,15 @@ for finite values, and required to reproduce the candidate model-state hash.
 
 The background Colab entry point first materializes the accepted D10
 TRAIN/VALIDATION bundle from mounted Drive onto the runtime's local SSD.  It
-reports an exact copied-file numerator/denominator and then performs the full
-authoritative D10 verification against the unchanged manifest and artifact
-binding.  The cache planner rejects TEST before copying any record.
+reports an exact copied-file numerator/denominator of `?/44260`: 22,128 image
+files, 22,128 label files, and the four authoritative top-level artifacts
+`COMPLETE`, `manifest.json`, `manifest.sha256`, and `receipt.json`.  The local
+cache marker lives outside the authoritative D10 root so it cannot change the
+strict top-level shape.  A v1 cache that completed the former `44259` plan is
+migrated by copying only the missing manifest SHA sidecar and moving its marker;
+the existing image and label bytes are not recopied.  The runner then performs
+the full authoritative D10 verification against the unchanged manifest and
+artifact binding.  The cache planner rejects TEST before copying any record.
 
 The runner writes an atomic status heartbeat to Drive at least every 30
 seconds.  Status exposes phase `?/9`, epoch `?/8`, batch `?/total`, elapsed

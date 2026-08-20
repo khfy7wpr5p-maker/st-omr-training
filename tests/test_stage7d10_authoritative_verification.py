@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
+import tools.meter_real_domain_background_runner_v1 as background_runner
 from st_omr_training.stage7d7_specialist_training import Stage7D7Record
 from st_omr_training.stage7d10_local_roi_derivatives import (
     Stage7D10DerivativeError,
@@ -105,6 +107,33 @@ class Stage7D10IndependentVerifierTests(unittest.TestCase):
             self.assertEqual(receipt.source_sample_count, 2)
             self.assertEqual(receipt.test_records, 0)
             self.assertEqual(receipt.optimizer_steps, 0)
+
+    def test_background_cache_preserves_independent_verifier_contract(self) -> None:
+        with TemporaryDirectory() as temp:
+            base = Path(temp)
+            source = self._build_fixture(base)
+            cache = base / "cache"
+            manifest = json.loads((source / "manifest.json").read_text("ascii"))
+            old_expected = background_runner.EXPECTED_D10_RECORDS
+            background_runner.EXPECTED_D10_RECORDS = len(manifest["records"])
+            try:
+                background_runner.materialize_d10_cache(
+                    source_root=source,
+                    cache_root=cache,
+                    expected_manifest_sha256=(source / "manifest.sha256").read_text("ascii").split()[0],
+                    status=Mock(),
+                )
+            finally:
+                background_runner.EXPECTED_D10_RECORDS = old_expected
+            receipt = verify_stage7d10_derivatives(
+                cache,
+                expected_authoritative_surface=False,
+            )
+            self.assertEqual(receipt.source_sample_count, 2)
+            self.assertEqual(
+                {path.name for path in cache.iterdir()},
+                {"images", "labels", "manifest.json", "manifest.sha256", "receipt.json", "COMPLETE"},
+            )
 
     def test_tiny_fixture_cannot_be_mislabeled_authoritative(self) -> None:
         with TemporaryDirectory() as temp:
