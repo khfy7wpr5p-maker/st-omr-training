@@ -109,6 +109,26 @@ probabilities and bboxes must reproduce with one identical fingerprint in
 the weights-only loader, strictly loaded into the frozen architecture, checked
 for finite values, and required to reproduce the candidate model-state hash.
 
+## Colab background execution and recovery
+
+The background Colab entry point first materializes the accepted D10
+TRAIN/VALIDATION bundle from mounted Drive onto the runtime's local SSD.  It
+reports an exact copied-file numerator/denominator and then performs the full
+authoritative D10 verification against the unchanged manifest and artifact
+binding.  The cache planner rejects TEST before copying any record.
+
+The runner writes an atomic status heartbeat to Drive at least every 30
+seconds.  Status exposes phase `?/9`, epoch `?/8`, batch `?/total`, elapsed
+time, and terminal result/error.  The monitor may be stopped and reopened
+without stopping the background process.  Colab itself may still reclaim a
+disconnected runtime; no notebook can guarantee execution after that event.
+
+After every complete epoch, a weights-only-loadable resume state is atomically
+written to the shadow run directory.  Resume is accepted only when repository,
+configuration, teacher manifest, D10 identity, D11 checkpoint, base model,
+frozen encoder, and recomputed baseline metrics all match.  A partial epoch is
+never claimed as complete and is repeated after restart.
+
 ## Outputs and closed boundaries
 
 An accepted checkpoint is labeled

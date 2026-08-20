@@ -182,6 +182,17 @@ class MeterRealDomainAdaptationGateV1Tests(unittest.TestCase):
                 expected_d10_artifact_binding_sha256="0" * 64,
                 config=MeterRealDomainAdaptationConfigV1(epochs=7),
             )
+        with self.assertRaisesRegex(TypeError, "resume must be bool"):
+            run_meter_real_domain_adaptation_v1(
+                teacher_bundle_root="unused",
+                d10_root="unused",
+                base_checkpoint_path="unused",
+                output_root="unused",
+                repository_root="unused",
+                expected_d10_manifest_sha256="0" * 64,
+                expected_d10_artifact_binding_sha256="0" * 64,
+                resume="yes",  # type: ignore[arg-type]
+            )
 
 
 if __name__ == "__main__":

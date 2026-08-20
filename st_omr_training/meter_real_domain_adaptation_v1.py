@@ -529,6 +529,42 @@ def _fresh_output_root(output_root: Path, repository_root: Path) -> None:
     output_root.mkdir(parents=True)
 
 
+def _prepare_output_root(output_root: Path, repository_root: Path, *, resume: bool) -> None:
+    if not output_root.exists() and not output_root.is_symlink():
+        _fresh_output_root(output_root, repository_root)
+        return
+    output = output_root.resolve()
+    repository = repository_root.resolve()
+    if output == repository or repository in output.parents:
+        _fail("adaptation outputs/checkpoints must remain outside Git")
+    if output_root.is_symlink() or not output_root.is_dir():
+        _fail("adaptation output root must be a regular directory")
+    if not resume:
+        _fail("adaptation output root must be fresh unless resume is explicit")
+    if (output_root / "RUN_COMPLETE").exists():
+        _fail("completed adaptation output cannot be resumed")
+
+
+def _evaluation_from_payload_v1(payload: object, *, name: str) -> MeterEvaluationV1:
+    if not isinstance(payload, Mapping):
+        _fail(f"{name} must be an evaluation object")
+    try:
+        confusion = tuple(tuple(int(value) for value in row) for row in payload["confusion"])
+        return MeterEvaluationV1(
+            loss=float(payload["loss"]),
+            macro_f1=float(payload["macro_f1"]),
+            accuracy=float(payload["accuracy"]),
+            positive_localization_f1_2px=float(payload["positive_localization_f1_2px"]),
+            class_counts={str(key): int(value) for key, value in dict(payload["class_counts"]).items()},
+            per_class_recall={
+                str(key): float(value) for key, value in dict(payload["per_class_recall"]).items()
+            },
+            confusion=confusion,
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise MeterRealDomainAdaptationError(f"{name} is malformed") from exc
+
+
 def run_meter_real_domain_adaptation_v1(
     *,
     teacher_bundle_root: str | Path,
@@ -540,12 +576,15 @@ def run_meter_real_domain_adaptation_v1(
     expected_d10_artifact_binding_sha256: str,
     config: MeterRealDomainAdaptationConfigV1 = FROZEN_ADAPTATION_CONFIG_V1,
     progress=None,
+    resume: bool = False,
 ) -> dict[str, object]:
     """Run one deterministic, shadow-only adaptation and return its metrics payload."""
     if not isinstance(config, MeterRealDomainAdaptationConfigV1):
         raise TypeError("config must be MeterRealDomainAdaptationConfigV1")
     if config != FROZEN_ADAPTATION_CONFIG_V1:
         _fail("Meter real-domain adaptation v1 requires the frozen configuration")
+    if not isinstance(resume, bool):
+        raise TypeError("resume must be bool")
     try:
         import torch
         from .runtime_meter_real_checkpoint_audit_v1 import audit_presence_d11_checkpoint_v1
@@ -564,6 +603,8 @@ def run_meter_real_domain_adaptation_v1(
         raise MeterRealDomainAdaptationError("torch and the pinned training runtime are required for adaptation") from exc
 
     teacher_root = Path(teacher_bundle_root)
+    if progress is not None:
+        progress("phase_started", {"phase": "teacher_gold_verify", "phase_index": 1, "phase_total": 7})
     teacher_receipt = verify_meter_teacher_gold_bundle_v1(teacher_root)
     teacher_records = _load_teacher_records(teacher_root)
     real_train = tuple(record for record in teacher_records if record.split == "train")
@@ -578,6 +619,16 @@ def run_meter_real_domain_adaptation_v1(
 
     d10_manifest = _hex64("expected D10 manifest SHA", expected_d10_manifest_sha256)
     d10_binding = _hex64("expected D10 artifact binding SHA", expected_d10_artifact_binding_sha256)
+    if progress is not None:
+        progress(
+            "phase_started",
+            {
+                "phase": "d10_full_integrity_verify",
+                "phase_index": 2,
+                "phase_total": 7,
+                "records_total": 22_128,
+            },
+        )
     d10_records = load_verified_stage7d11_records(
         d10_root,
         expected_manifest_sha256=d10_manifest,
@@ -604,6 +655,8 @@ def run_meter_real_domain_adaptation_v1(
     synthetic_replay = tuple(record_by_id[record_id] for record_id in replay_ids)
 
     base_path = Path(base_checkpoint_path)
+    if progress is not None:
+        progress("phase_started", {"phase": "d11_checkpoint_audit", "phase_index": 3, "phase_total": 7})
     if _sha(_read_regular(base_path, maximum=64 * 1024 * 1024, name="base D11 checkpoint")) != PRESENCE_D11_SHA256:
         _fail("base D11 checkpoint SHA-256 mismatch")
     audited = audit_presence_d11_checkpoint_v1(base_path)
@@ -618,7 +671,7 @@ def run_meter_real_domain_adaptation_v1(
         config=config,
     )
     root = Path(output_root)
-    _fresh_output_root(root, Path(repository_root))
+    _prepare_output_root(root, Path(repository_root), resume=resume)
 
     set_deterministic_cpu(config.master_seed)
     model = build_meter_refiner(FROZEN_D11_CONFIG)
@@ -632,7 +685,14 @@ def run_meter_real_domain_adaptation_v1(
     if not trainable:
         _fail("adaptation trainable head surface is empty")
     base_state_sha = model_state_sha256(model)
+    if progress is not None:
+        progress("phase_started", {"phase": "baseline_real_validation", "phase_index": 4, "phase_total": 7})
     baseline_real = _evaluate_teacher(model, real_validation, config)
+    if progress is not None:
+        progress(
+            "phase_started",
+            {"phase": "baseline_synthetic_validation", "phase_index": 5, "phase_total": 7, "records_total": 1_224},
+        )
     baseline_synthetic = _evaluate_synthetic(model, synthetic_validation, config)
     optimizer = torch.optim.AdamW(
         trainable,
@@ -655,9 +715,109 @@ def run_meter_real_domain_adaptation_v1(
     best_epoch = 0
     optimizer_steps = 0
 
+    resume_path = root / "resume.pt"
+    if resume_path.exists():
+        if resume_path.is_symlink() or not resume_path.is_file():
+            _fail("adaptation resume state must be a regular file")
+        try:
+            snapshot = torch.load(resume_path, map_location="cpu", weights_only=True)
+        except Exception as exc:
+            raise MeterRealDomainAdaptationError("adaptation resume state cannot be loaded safely") from exc
+        if not isinstance(snapshot, Mapping):
+            _fail("adaptation resume state must be a mapping")
+        resume_checks = {
+            "role": "meter-real-domain-adaptation-resume-v1",
+            "adaptation_version": METER_REAL_DOMAIN_ADAPTATION_V1,
+            "repository_sha": repository_sha,
+            "profile_fingerprint": profile,
+            "teacher_manifest_sha256": teacher_receipt.manifest_sha256,
+            "d10_manifest_sha256": d10_manifest,
+            "base_checkpoint_sha256": PRESENCE_D11_SHA256,
+            "base_meter_state_sha256": base_state_sha,
+            "encoder_state_sha256": encoder_state_sha_before,
+            "baseline_real": asdict(baseline_real),
+            "baseline_synthetic": asdict(baseline_synthetic),
+        }
+        for name, expected in resume_checks.items():
+            if snapshot.get(name) != expected:
+                _fail(f"adaptation resume state {name} mismatch")
+        try:
+            completed_epoch_value = snapshot["completed_epoch"]
+            best_epoch_value = snapshot["best_epoch"]
+            optimizer_steps_value = snapshot["optimizer_steps"]
+            if any(
+                not isinstance(value, int) or isinstance(value, bool)
+                for value in (completed_epoch_value, best_epoch_value, optimizer_steps_value)
+            ):
+                _fail("adaptation resume counters must be plain integers")
+            completed_epoch = completed_epoch_value
+            if not 1 <= completed_epoch <= config.epochs:
+                _fail("adaptation resume epoch is outside the frozen run")
+            model.load_state_dict(snapshot["current_model_state"], strict=True)
+            optimizer.load_state_dict(snapshot["optimizer_state_dict"])
+            loaded_best = snapshot.get("best_model_state")
+            best_state = None if loaded_best is None else dict(loaded_best)
+            decision_payload = snapshot["best_decision"]
+            if not isinstance(decision_payload, Mapping):
+                _fail("adaptation resume best decision is malformed")
+            accepted_value = decision_payload.get("accepted")
+            reasons_value = decision_payload.get("reasons")
+            if not isinstance(accepted_value, bool):
+                _fail("adaptation resume best decision accepted flag is malformed")
+            if not isinstance(reasons_value, Sequence) or isinstance(reasons_value, (str, bytes, bytearray)):
+                _fail("adaptation resume best decision reasons are malformed")
+            if any(not isinstance(value, str) for value in reasons_value):
+                _fail("adaptation resume best decision reason must be a string")
+            best_decision = AdaptationGateDecisionV1(
+                accepted_value, tuple(reasons_value)
+            )
+            best_real = _evaluation_from_payload_v1(snapshot["best_real"], name="resume best real")
+            best_synthetic = _evaluation_from_payload_v1(
+                snapshot["best_synthetic"], name="resume best synthetic"
+            )
+            best_epoch = best_epoch_value
+            optimizer_steps = optimizer_steps_value
+            history_value = snapshot["history"]
+            if not isinstance(history_value, Sequence) or isinstance(history_value, (str, bytes, bytearray)):
+                _fail("adaptation resume history must be a sequence")
+            history = list(history_value)
+        except MeterRealDomainAdaptationError:
+            raise
+        except (KeyError, TypeError, ValueError, RuntimeError) as exc:
+            raise MeterRealDomainAdaptationError("adaptation resume state is malformed") from exc
+        assert_model_finite(model)
+        if model_state_sha256(model.encoder) != encoder_state_sha_before:
+            _fail("resumed adaptation mutated the frozen encoder")
+        if progress is not None:
+            progress(
+                "resume_loaded",
+                {"completed_epoch": completed_epoch, "epochs_total": config.epochs, "optimizer_steps": optimizer_steps},
+            )
+    else:
+        completed_epoch = 0
+
     training_items = [("real", record) for record in real_train for _ in range(config.real_repeat_factor)]
     training_items += [("synthetic", record) for record in synthetic_replay]
-    for epoch in range(1, config.epochs + 1):
+    batches_per_epoch = math.ceil(len(training_items) / config.batch_size)
+    if len(history) != completed_epoch:
+        _fail("adaptation resume history length differs from completed epoch")
+    if optimizer_steps != completed_epoch * batches_per_epoch:
+        _fail("adaptation resume optimizer step count mismatch")
+    if not 0 <= best_epoch <= completed_epoch:
+        _fail("adaptation resume best epoch is outside completed history")
+    if progress is not None:
+        progress(
+            "phase_started",
+            {
+                "phase": "training_and_validation",
+                "phase_index": 6,
+                "phase_total": 7,
+                "completed_epoch": completed_epoch,
+                "epochs_total": config.epochs,
+                "batches_per_epoch": batches_per_epoch,
+            },
+        )
+    for epoch in range(completed_epoch + 1, config.epochs + 1):
         order = list(range(len(training_items)))
         random.Random(config.master_seed + epoch * 1_000_003).shuffle(order)
         total_loss, batches = 0.0, 0
@@ -687,6 +847,22 @@ def run_meter_real_domain_adaptation_v1(
             )
             optimizer_steps += 1
             batches += 1
+            if progress is not None:
+                progress(
+                    "training_batch",
+                    {
+                        "epoch": epoch,
+                        "epochs_total": config.epochs,
+                        "batch": batches,
+                        "batches_total": batches_per_epoch,
+                        "optimizer_steps": optimizer_steps,
+                    },
+                )
+        if progress is not None:
+            progress(
+                "epoch_validation_started",
+                {"epoch": epoch, "epochs_total": config.epochs, "validation_records": 18 + 1_224},
+            )
         real_metrics = _evaluate_teacher(model, real_validation, config)
         synthetic_metrics = _evaluate_synthetic(model, synthetic_validation, config)
         decision = adaptation_acceptance_v1(
@@ -704,8 +880,6 @@ def run_meter_real_domain_adaptation_v1(
             "gate": asdict(decision),
         }
         history.append(event)
-        if progress is not None:
-            progress("epoch_complete", event)
         if best_state is None and not decision.accepted and (
             best_epoch == 0
             or real_metrics.macro_f1 > best_real.macro_f1
@@ -734,7 +908,43 @@ def run_meter_real_domain_adaptation_v1(
             best_real = real_metrics
             best_synthetic = synthetic_metrics
             best_epoch = epoch
+        temporary_resume = root / "resume.tmp.pt"
+        torch.save(
+            {
+                "role": "meter-real-domain-adaptation-resume-v1",
+                "adaptation_version": METER_REAL_DOMAIN_ADAPTATION_V1,
+                "repository_sha": repository_sha,
+                "profile_fingerprint": profile,
+                "teacher_manifest_sha256": teacher_receipt.manifest_sha256,
+                "d10_manifest_sha256": d10_manifest,
+                "base_checkpoint_sha256": PRESENCE_D11_SHA256,
+                "base_meter_state_sha256": base_state_sha,
+                "encoder_state_sha256": encoder_state_sha_before,
+                "baseline_real": asdict(baseline_real),
+                "baseline_synthetic": asdict(baseline_synthetic),
+                "completed_epoch": epoch,
+                "current_model_state": _clone_state(model),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "best_model_state": best_state,
+                "best_decision": asdict(best_decision),
+                "best_real": asdict(best_real),
+                "best_synthetic": asdict(best_synthetic),
+                "best_epoch": best_epoch,
+                "optimizer_steps": optimizer_steps,
+                "history": history,
+            },
+            temporary_resume,
+        )
+        temporary_resume.replace(resume_path)
+        if progress is not None:
+            progress(
+                "epoch_checkpointed",
+                {"epoch": epoch, "epochs_total": config.epochs, "resume_path": str(resume_path)},
+            )
+            progress("epoch_complete", event)
 
+    if progress is not None:
+        progress("phase_started", {"phase": "final_verification", "phase_index": 7, "phase_total": 7})
     ending_sha, ending_origin = verify_authoritative_repository(repository_root)
     if (ending_sha, ending_origin) != (repository_sha, repository_origin):
         _fail("repository identity changed during adaptation")
@@ -895,6 +1105,11 @@ def run_meter_real_domain_adaptation_v1(
     if checkpoint_path is not None and checkpoint_sha is not None:
         lines.append(f"{checkpoint_sha}  {checkpoint_path.name}")
     (root / "RUN_COMPLETE").write_bytes(("\n".join(lines) + "\n").encode("ascii"))
+    if progress is not None:
+        progress(
+            "run_complete",
+            {"status": status, "best_epoch": best_epoch, "epochs_total": config.epochs, "run_root": str(root)},
+        )
     return metrics
 
 
