@@ -33,7 +33,7 @@ class MeterRealDomainRetentionV3WiringTests(unittest.TestCase):
     def test_runtime_wrapper_uses_scoped_public_optimizer_hook(self) -> None:
         source = inspect.getsource(run_meter_real_domain_retention_v3)
         self.assertIn("register_optimizer_step_pre_hook", source)
-        self.assertIn("config=FROZEN_ADAPTATION_CONFIG_V2", source.replace("config=config", "config=FROZEN_ADAPTATION_CONFIG_V2") if False else source)
+        self.assertIn("config = FROZEN_ADAPTATION_CONFIG_V2", source)
         self.assertIn("config=config", source)
         self.assertIn("finally:", source)
         self.assertIn("handle.remove()", source)
