@@ -113,9 +113,24 @@ def write_completion_receipt(
     path = root / COMPLETE_NAME
     if path.exists():
         existing = read_json(path)
-        if existing != receipt:
-            fail("existing completion receipt differs from deterministic recomputation")
-        return path
+        if existing == receipt:
+            return path
+        # Human visual QA may legitimately correct annotations after the first
+        # mechanical receipt. Refresh is allowed only while every downstream
+        # gate is still closed and the immutable selection/image binding agrees.
+        for key in ("schema", "selection_sha256", "image_binding_sha256"):
+            if existing.get(key) != receipt.get(key):
+                fail(f"existing completion receipt identity mismatch: {key}")
+        for key in (
+            "human_visual_review_passed",
+            "model_evaluated",
+            "candidate_checkpoint_opened",
+            "test_opened",
+            "runtime_connected",
+            "production_promotion_authorized",
+        ):
+            if existing.get(key) is not False:
+                fail(f"completion receipt is no longer refreshable: {key}")
     atomic_write_json(path, receipt)
     return path
 
