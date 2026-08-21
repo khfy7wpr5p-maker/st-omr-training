@@ -30,40 +30,40 @@ def launch_colab_annotation(*, candidate_root: str, manifest_path: str) -> Annot
     """
     try:
         from google.colab import output
-        from IPython.display import HTML, display
+        from IPython.display import HTML, JSON, display
     except ImportError as exc:
         raise MeterV4_4AnnotationError("V4-4 mouse UI requires Google Colab") from exc
 
     session = AnnotationSession(candidate_root=candidate_root, manifest_path=manifest_path)
 
-    def get_callback(index: object) -> dict[str, object]:
+    def get_callback(index: object) -> object:
         if type(index) is not int:
             raise MeterV4_4AnnotationError("sample index must be integer")
-        return session.sample_payload(index)
+        return JSON(session.sample_payload(index))
 
-    def save_callback(payload: object) -> dict[str, object]:
+    def save_callback(payload: object) -> object:
         body = _require_dict(payload, "save")
         required = ("token", "x0", "y0", "x1", "y1", "preview_width", "preview_height")
         if not all(key in body for key in required):
             raise MeterV4_4AnnotationError("save payload is incomplete")
-        return session.save_from_preview(
-            token=body["token"],
-            x0=body["x0"],
-            y0=body["y0"],
-            x1=body["x1"],
-            y1=body["y1"],
-            preview_width=body["preview_width"],
-            preview_height=body["preview_height"],
-        )
+        return JSON(session.save_from_preview(
+            token=body["token"],  # type: ignore[arg-type]
+            x0=body["x0"],  # type: ignore[arg-type]
+            y0=body["y0"],  # type: ignore[arg-type]
+            x1=body["x1"],  # type: ignore[arg-type]
+            y1=body["y1"],  # type: ignore[arg-type]
+            preview_width=body["preview_width"],  # type: ignore[arg-type]
+            preview_height=body["preview_height"],  # type: ignore[arg-type]
+        ))
 
-    def flag_callback(payload: object) -> dict[str, object]:
+    def flag_callback(payload: object) -> object:
         body = _require_dict(payload, "review flag")
         if set(body) != {"token", "flagged"}:
             raise MeterV4_4AnnotationError("review flag payload malformed")
-        return session.set_review_flag(
-            token=body["token"],
-            flagged=body["flagged"],
-        )
+        return JSON(session.set_review_flag(
+            token=body["token"],  # type: ignore[arg-type]
+            flagged=body["flagged"],  # type: ignore[arg-type]
+        ))
 
     output.register_callback(_CALLBACK_GET, get_callback)
     output.register_callback(_CALLBACK_SAVE, save_callback)
