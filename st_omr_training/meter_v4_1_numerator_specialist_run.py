@@ -50,6 +50,21 @@ def _hex64(name: str, value: object) -> str:
     return value
 
 
+def _git_sha40(value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 40
+        or any(ch not in "0123456789abcdef" for ch in value)
+    ):
+        _fail("git_commit_sha must be canonical lowercase SHA-1")
+    return value
+
+
+def repository_binding_v4_1(git_commit_sha: str) -> str:
+    git_commit_sha = _git_sha40(git_commit_sha)
+    return sha256(("git-commit-sha1:" + git_commit_sha).encode("ascii")).hexdigest()
+
+
 def _progress(callback: Callable[[str], None] | None, message: str) -> None:
     if callback is not None:
         callback(message)
@@ -90,11 +105,16 @@ def run_meter_v4_1_numerator_specialist(
     *,
     parent_v4_0_root: str | Path,
     output_root: str | Path,
+    git_commit_sha: str,
     repository_sha: str,
     progress: Callable[[str], None] | None = None,
 ) -> dict[str, object]:
     """Run exact fixed V4-1 family-disjoint OOF training and write immutable evidence."""
+    git_commit_sha = _git_sha40(git_commit_sha)
     repository_sha = _hex64("repository_sha", repository_sha)
+    expected_binding = repository_binding_v4_1(git_commit_sha)
+    if repository_sha != expected_binding:
+        _fail("repository_sha does not bind the supplied exact Git commit")
     output = Path(output_root)
     if output.exists() or output.is_symlink():
         _fail("V4-1 output root must be fresh")
@@ -144,7 +164,9 @@ def run_meter_v4_1_numerator_specialist(
     result = {
         "schema": RESULT_SCHEMA_V4_1,
         "experiment": METER_V4_1_NUMERATOR_SPECIALIST,
+        "git_commit_sha": git_commit_sha,
         "repository_sha": repository_sha,
+        "repository_binding_formula": "sha256('git-commit-sha1:' + git_commit_sha)",
         "parent_v4_0": {
             "result_sha256": parent.result_sha256,
             "repository_binding": parent.repository_binding,
