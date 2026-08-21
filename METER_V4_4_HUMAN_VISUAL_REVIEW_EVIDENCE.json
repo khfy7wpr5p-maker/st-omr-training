@@ -1,0 +1,56 @@
+{
+  "schema": "st-omr-meter-v4-4-human-visual-review-evidence-v1",
+  "stage": "st-omr-meter-v4-4-final-holdout-bbox-annotation-v1",
+  "review_status": "PASS",
+  "reviewed_count": 150,
+  "contact_sheet_count": 6,
+  "contact_sheet_files": [
+    "contact_sheet_01.png",
+    "contact_sheet_02.png",
+    "contact_sheet_03.png",
+    "contact_sheet_04.png",
+    "contact_sheet_05.png",
+    "contact_sheet_06.png"
+  ],
+  "human_confirmation": {
+    "explicit": true,
+    "statement": "contact sheet'ler temiz, onayliyorum",
+    "recorded_at": "2026-08-21T23:25:00+03:00"
+  },
+  "mechanical_receipt": {
+    "schema": "st-omr-meter-v4-4-bbox-complete-v1",
+    "sha256": "24aea7f900128858a1fecdb5ed01427161e1ba02768da4a191be3e70226d2548",
+    "selection_sha256": "4335a48a091912ba422c16d8fcbaaa7bbf5f7a0a43f088146a50a3e02e3ed7dc",
+    "image_binding_sha256": "73c932e8cbb55c9b57a482bb05fbf7e033cdd375f4929e34851cca01f9c1cd66",
+    "bbox_manifest_sha256": "0242fe99d39393a78d5b5d69ed95dbfc6d65975a3bef21ec43368386cdfdca70",
+    "annotated_count": 150,
+    "missing_bbox": 0,
+    "invalid_bbox": 0,
+    "unique_family_count": 150,
+    "class_counts": {
+      "2": 50,
+      "3": 50,
+      "4": 50
+    }
+  },
+  "review_assertions": {
+    "both_meter_digits_contained": true,
+    "digits_not_cut": true,
+    "correct_meter_target": true,
+    "no_symbol_drift": true,
+    "visible_meter_sign": true
+  },
+  "downstream_gates": {
+    "model_evaluated": false,
+    "inference_count": 0,
+    "candidate_checkpoint_opened": false,
+    "test_opened": false,
+    "runtime_connected": false,
+    "production_promotion_authorized": false
+  },
+  "decision": {
+    "v4_4_complete": true,
+    "v4_5_one_time_independent_evaluation_may_be_prepared": true,
+    "production_promotion_authorized": false
+  }
+}
