@@ -9,10 +9,14 @@ does not tune the model, and does not authorize production promotion.
 ## Candidate surface
 
 - Drive root: `TEST/METER_V1/03_FINAL_HOLDOUT_150`
-- Candidate folders: exactly 65 under each of `2/4`, `3/4`, `4/4` (195 total).
+- Planned candidate pool: 65 per class (195 total).
+- A bounded surplus is allowed at admission: each numerator class may contain **65..80** candidates.
+- The final selection remains exactly 50/50/50 (150 total), regardless of bounded surplus size.
 - Each candidate folder must contain a non-empty `image.png` and a bounded `bbox_meter.txt`.
-- The `bbox_meter.txt` meter label must agree with the parent class folder.
+- The `bbox_meter.txt` meter label must agree with the candidate folder class.
 - Bbox coordinates must still be blank during admission. Human annotation happens only after the 150-family selection is frozen.
+
+The bounded surplus rule exists only to provide extra replacement candidates after leakage/duplicate rejection. It does not change the final holdout size and does not permit arbitrary extra data.
 
 ## Leakage boundary
 
@@ -21,7 +25,7 @@ The selector reads only the completed V4-1 and V4-2 result metadata to construct
 - 27 V4-1 OOF/training families;
 - 9 V4-2 development-validation families.
 
-Those 36 families are ineligible for the final holdout. Any family appearing more than once anywhere in the 195-candidate pool is also ineligible.
+Those 36 families are ineligible for the final holdout. Any family appearing more than once anywhere in the candidate pool is also ineligible.
 
 ## Deterministic selection
 
@@ -33,7 +37,7 @@ For each numerator class independently:
 4. take exactly the first 50.
 
 The final manifest therefore contains exactly 150 unique families, balanced 50/50/50 for numerators 2/3/4.
-The canonical selected list is bound by `selection_sha256`.
+The canonical selected list is bound by `selection_sha256`. The manifest records the actual admitted candidate count and per-class counts.
 
 ## Safety state
 
