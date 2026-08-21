@@ -1,0 +1,56 @@
+{
+  "schema": "st-omr-meter-v4-5-preregistration-v1",
+  "stage": "meter-v4-5-one-time-final-holdout-evaluation-v1",
+  "status": "PREREGISTERED_NO_FINAL_INFERENCE",
+  "parents": {
+    "v4_4_selection_sha256": "4335a48a091912ba422c16d8fcbaaa7bbf5f7a0a43f088146a50a3e02e3ed7dc",
+    "v4_4_image_binding_sha256": "73c932e8cbb55c9b57a482bb05fbf7e033cdd375f4929e34851cca01f9c1cd66",
+    "v4_4_bbox_manifest_sha256": "0242fe99d39393a78d5b5d69ed95dbfc6d65975a3bef21ec43368386cdfdca70",
+    "v4_4_completion_receipt_file_sha256": "24aea7f900128858a1fecdb5ed01427161e1ba02768da4a191be3e70226d2548",
+    "v4_2_result_file_sha256": "bf32ccd4bf9512ad6a39b3e34ac2b7b0ab708f140d8e8bcf48721fab28cab04b",
+    "v4_2_checkpoint_file_sha256": "2dc820bc0cbadf5db90a7ddee7f5a9daba06e546dcae1da560d1ac9718e3692a",
+    "v4_2_model_state_sha256": "0ca4831729ba4723d6aac71c73dc24501569492ebb72cf97e6f4bcc33596ead1",
+    "v4_2_configuration_fingerprint": "414625aa8d2617cf89b324263205e8bbdbc92536a081e8b245823325bd78a4ba"
+  },
+  "surface": {
+    "records": 150,
+    "families": 150,
+    "classes": {"2": 50, "3": 50, "4": 50},
+    "holdout_read_only": true,
+    "sealed_test_opened": false
+  },
+  "representation": {
+    "source_coordinates": "original_image_integer_pixels",
+    "horizontal_padding_milli": 150,
+    "vertical_padding_milli": 50,
+    "numerator_fraction_milli": 500,
+    "output_size": 64,
+    "grayscale_mode": "L",
+    "resample": "BILINEAR",
+    "ink_normalization": "(255-gray)/255"
+  },
+  "evaluation": {
+    "checkpoint_deserializations_max": 1,
+    "inference_records_exact": 150,
+    "optimizer_steps": 0,
+    "training": false,
+    "tuning": false,
+    "calibration": false,
+    "threshold_search": false,
+    "test_time_augmentation": false,
+    "ensemble": false,
+    "rerun_after_lock": false
+  },
+  "gate": {
+    "accuracy_min": 0.9,
+    "macro_f1_min": 0.9,
+    "per_class_recall_min": {"2": 0.9, "3": 0.9, "4": 0.9},
+    "pass_name": "FINAL_HOLDOUT_PASS",
+    "fail_name": "FINAL_HOLDOUT_FAIL"
+  },
+  "downstream": {
+    "runtime_connected": false,
+    "resolver_connected": false,
+    "production_promotion_authorized": false
+  }
+}
