@@ -4,6 +4,10 @@ Google Drive permits '/' in folder display names, while a POSIX mount cannot exp
 '/' as a literal path component. This module therefore discovers sample folders by
 the frozen sample-folder grammar instead of assuming class container path spelling.
 It remains admission-only: no checkpoint is opened and no inference is run.
+
+The candidate pool may contain a bounded surplus above the originally planned
+65 samples per class. Surplus candidates are useful because previously observed
+or duplicate families are rejected before the deterministic 50/50/50 selection.
 """
 from __future__ import annotations
 
@@ -27,8 +31,8 @@ from st_omr_training.meter_v4_3_final_holdout_admission import (
     select_final_holdout,
 )
 
-EXPECTED_TOTAL: Final[int] = 195
-EXPECTED_PER_CLASS: Final[int] = 65
+MIN_PER_CLASS: Final[int] = 65
+MAX_PER_CLASS: Final[int] = 80
 METER_BY_NUMERATOR: Final[dict[str, str]] = {"2": "2/4", "3": "3/4", "4": "4/4"}
 
 
@@ -74,11 +78,22 @@ def scan_candidate_pool_portable(candidate_root: str | Path) -> tuple[CandidateV
         )
 
     counts = Counter(row.numerator_class for row in candidates)
-    if len(candidates) != EXPECTED_TOTAL:
-        _fail(f"V4-3 candidate pool must contain exactly {EXPECTED_TOTAL} sample folders, got {len(candidates)}")
-    expected = Counter({"2": EXPECTED_PER_CLASS, "3": EXPECTED_PER_CLASS, "4": EXPECTED_PER_CLASS})
-    if counts != expected:
-        _fail(f"candidate class counts must be 65/65/65, got {dict(sorted(counts.items()))}")
+    expected_classes = {"2", "3", "4"}
+    if set(counts) != expected_classes:
+        _fail(f"candidate classes must be exactly 2/3/4, got {dict(sorted(counts.items()))}")
+    for class_name in ("2", "3", "4"):
+        count = counts[class_name]
+        if count < MIN_PER_CLASS or count > MAX_PER_CLASS:
+            _fail(
+                f"class {class_name} candidate count must be within "
+                f"{MIN_PER_CLASS}..{MAX_PER_CLASS}, got {count}"
+            )
+    total = len(candidates)
+    if total < MIN_PER_CLASS * 3 or total > MAX_PER_CLASS * 3:
+        _fail(
+            f"V4-3 candidate pool must be within "
+            f"{MIN_PER_CLASS * 3}..{MAX_PER_CLASS * 3} sample folders, got {total}"
+        )
     return tuple(candidates)
 
 
@@ -92,13 +107,15 @@ def build_manifest_portable(
     v4_2 = _read_json(Path(v4_2_result_path), schema=RESULT_SCHEMA_V4_2, name="V4-2 result")
     observed = observed_families(v4_1, v4_2)
     candidates = scan_candidate_pool_portable(candidate_root)
+    candidate_counts = Counter(row.numerator_class for row in candidates)
     selected, excluded = select_final_holdout(candidates, observed=observed)
     manifest: dict[str, object] = {
         "schema": "st-omr-meter-v4-3-final-holdout-admission-manifest-v1",
         "experiment": "meter-v4-3-final-holdout-admission-v1",
         "candidate_root_name": Path(candidate_root).name,
-        "candidate_count": EXPECTED_TOTAL,
-        "candidate_classes": {"2": 65, "3": 65, "4": 65},
+        "candidate_count": len(candidates),
+        "candidate_classes": {key: candidate_counts[key] for key in ("2", "3", "4")},
+        "candidate_pool_bounds_per_class": {"min": MIN_PER_CLASS, "max": MAX_PER_CLASS},
         "previously_observed_family_count": len(observed),
         "selected_count": 150,
         "selected_classes": {"2": 50, "3": 50, "4": 50},
