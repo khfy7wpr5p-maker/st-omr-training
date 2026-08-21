@@ -1,53 +1,63 @@
 """Execution helper for the bounded Meter V4-0 numerator representation audit.
 
-The runner verifies Teacher Gold COMPLETE/manifest/receipt metadata without
-reopening adaptation-validation artifacts, then opens only the 27 positive
-TRAIN label/image pairs required by the audit.
+The runner replays the approved Teacher Gold admission split from pilot/choices
+metadata, decodes only the 27 positive adaptation-TRAIN source images, derives
+numerator crops, and runs the zero-training family-disjoint centroid probe.
 """
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
+from dataclasses import asdict
 from hashlib import sha256
 from io import BytesIO
 import json
 from pathlib import Path
-import shutil
 from typing import Final
 
-from PIL import Image, ImageDraw, UnidentifiedImageError
+from PIL import Image, ImageDraw
 
 from .meter_teacher_gold_admission_v1 import (
-    EXPECTED_CLASS_SPLIT_COUNTS,
+    ALLOWED_USE,
+    CHOICES_SCHEMA,
     EXPECTED_SOURCES,
-    EXPECTED_SPLIT_COUNTS,
     EXPECTED_TASKS,
-    LABEL_SCHEMA,
-    MANIFEST_SCHEMA,
+    METER_CLASSES,
     METER_TEACHER_GOLD_ADMISSION_V1,
-    RECEIPT_SCHEMA,
+    PILOT_SCHEMA,
+    _adaptation_split_by_family,
+    _bounded_ascii,
+    _canonical_json as _teacher_canonical_json,
+    _decode_source_png,
+    _json_file,
+    _map_bbox,
+    _mapping,
+    _render_roi,
+    _sequence,
+    _sha as _teacher_sha,
+    _validate_permission,
+    _validate_privacy,
+    _xywh,
 )
 from .meter_v4_0_numerator_audit import (
     AuditRecordIdentityV4_0,
     FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0,
     METER_TO_NUMERATOR,
     METER_V4_0_NUMERATOR_AUDIT,
-    NUMERATOR_CLASSES,
     audit_decision_v4_0,
-    classification_summary_v4_0,
+    centroid_oof_probe_v4_0,
     fold_plan_v4_0,
+    normalized_ink_vector_v4_0,
     numerator_crop_bounds_v4_0,
-    numerator_crop_tensor_v4_0,
-    train_fold_v4_0,
+    render_numerator_crop_v4_0,
 )
 
 
 RESULT_SCHEMA: Final[str] = "st-omr-meter-v4-0-numerator-representation-audit-result-v1"
-_MAX_MANIFEST_BYTES: Final[int] = 16 * 1024 * 1024
-_MAX_RECEIPT_BYTES: Final[int] = 1024 * 1024
-_MAX_LABEL_BYTES: Final[int] = 256 * 1024
-_MAX_IMAGE_BYTES: Final[int] = 2 * 1024 * 1024
+_MAX_PILOT_BYTES: Final[int] = 32 * 1024 * 1024
+_MAX_CHOICES_BYTES: Final[int] = 4 * 1024 * 1024
+_MAX_EVIDENCE_BYTES: Final[int] = 64 * 1024
 
 
 class MeterV4_0AuditRunError(RuntimeError):
@@ -82,152 +92,172 @@ def _hex64(name: str, value: object) -> str:
     return value
 
 
-def _read_regular(path: Path, *, maximum: int, name: str) -> bytes:
-    if path.is_symlink() or not path.is_file():
-        _fail(f"{name} must be a regular non-symlink file")
-    size = path.stat().st_size
-    if not 1 <= size <= maximum:
-        _fail(f"{name} byte length is outside V4-0 bounds")
-    return path.read_bytes()
-
-
-def _read_canonical_json(path: Path, *, maximum: int, name: str) -> tuple[dict[str, object], bytes]:
-    raw = _read_regular(path, maximum=maximum, name=name)
-    try:
-        payload = json.loads(raw.decode("ascii"))
-    except (UnicodeError, json.JSONDecodeError) as exc:
-        raise MeterV4_0AuditRunError(f"{name} is not valid ASCII JSON") from exc
-    if not isinstance(payload, dict) or _canonical_json(payload) != raw:
-        _fail(f"{name} must be a canonical JSON object")
-    return payload, raw
-
-
-def _sequence(name: str, value: object) -> Sequence[object]:
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes, bytearray)):
-        _fail(f"{name} must be a sequence")
-    return value
-
-
-def _mapping(name: str, value: object) -> Mapping[str, object]:
-    if not isinstance(value, Mapping):
-        _fail(f"{name} must be an object")
-    return value
-
-
-def _verify_teacher_metadata_only(bundle_root: Path) -> tuple[tuple[dict[str, object], ...], str, str]:
-    """Verify Teacher Gold control-plane evidence without opening record artifacts."""
-    if bundle_root.is_symlink() or not bundle_root.is_dir():
-        _fail("Teacher Gold bundle root must be a regular directory")
-    complete = _read_regular(bundle_root / "COMPLETE", maximum=1024, name="Teacher Gold COMPLETE")
-    manifest, manifest_raw = _read_canonical_json(
-        bundle_root / "manifest.json", maximum=_MAX_MANIFEST_BYTES, name="Teacher Gold manifest"
+def _validate_and_select_source(
+    *,
+    pilot_path: Path,
+    choices_path: Path,
+    permission_path: Path,
+    privacy_path: Path,
+) -> tuple[tuple[tuple[Mapping[str, object], Mapping[str, object], str], ...], dict[str, str]]:
+    """Return exactly 27 positive adaptation-TRAIN task/answer pairs without decoding validation images."""
+    pilot, pilot_raw = _json_file(pilot_path, maximum=_MAX_PILOT_BYTES, name="V4-0 pilot data")
+    choices, choices_raw = _json_file(choices_path, maximum=_MAX_CHOICES_BYTES, name="V4-0 review choices")
+    permission, permission_raw = _json_file(
+        permission_path, maximum=_MAX_EVIDENCE_BYTES, name="V4-0 training permission evidence", canonical=True
     )
-    receipt, receipt_raw = _read_canonical_json(
-        bundle_root / "receipt.json", maximum=_MAX_RECEIPT_BYTES, name="Teacher Gold receipt"
+    privacy, privacy_raw = _json_file(
+        privacy_path, maximum=_MAX_EVIDENCE_BYTES, name="V4-0 privacy review evidence", canonical=True
     )
-    expected_complete = f"{_sha(receipt_raw)}  receipt.json\n{_sha(manifest_raw)}  manifest.json\n".encode("ascii")
-    if complete != expected_complete:
-        _fail("Teacher Gold COMPLETE binding mismatch")
-    if manifest.get("schema_version") != MANIFEST_SCHEMA or receipt.get("schema_version") != RECEIPT_SCHEMA:
-        _fail("Teacher Gold schema mismatch")
-    if manifest.get("admission_version") != METER_TEACHER_GOLD_ADMISSION_V1 or receipt.get("admission_version") != METER_TEACHER_GOLD_ADMISSION_V1:
-        _fail("Teacher Gold admission version mismatch")
-    if receipt.get("manifest_sha256") != _sha(manifest_raw):
-        _fail("Teacher Gold receipt does not bind manifest bytes")
-    if manifest.get("record_count") != EXPECTED_TASKS or manifest.get("source_count") != EXPECTED_SOURCES:
-        _fail("Teacher Gold manifest cardinality mismatch")
-    if manifest.get("split_counts") != EXPECTED_SPLIT_COUNTS or manifest.get("class_split_counts") != EXPECTED_CLASS_SPLIT_COUNTS:
-        _fail("Teacher Gold split/class counts changed")
-    for payload in (manifest, receipt):
-        if payload.get("test_records") != 0 or payload.get("test_opened") is not False:
-            _fail("Teacher Gold metadata exposes sealed TEST")
-        if payload.get("optimizer_steps") != 0 or payload.get("model_loaded") is not False:
-            _fail("Teacher Gold admission metadata unexpectedly trained or loaded a model")
+    _validate_permission(permission)
+    _validate_privacy(privacy)
+    if permission.get("allowed_use") != ALLOWED_USE:
+        _fail("V4-0 permission use differs from the approved offline Meter pilot")
+    if pilot.get("schema") != PILOT_SCHEMA or choices.get("schema") != CHOICES_SCHEMA:
+        _fail("V4-0 pilot/choices schema mismatch")
+    if pilot.get("source") != "METER_V1/01_REVIEW/train":
+        _fail("V4-0 pilot source must remain METER_V1 TRAIN review surface")
+    selection = _mapping("V4-0 pilot selection", pilot.get("selection"))
+    if selection.get("test_opened") is not False or choices.get("test_opened") is not False:
+        _fail("sealed TEST evidence reached V4-0")
+    if choices.get("task_count") != EXPECTED_TASKS or choices.get("answered_count") != EXPECTED_TASKS:
+        _fail("V4-0 requires the exact 72 answered Teacher Gold tasks")
 
-    rows_raw = _sequence("Teacher Gold records", manifest.get("records"))
-    if len(rows_raw) != EXPECTED_TASKS:
-        _fail("Teacher Gold manifest must contain exactly 72 records")
-    rows: list[dict[str, object]] = []
-    family_split: dict[str, str] = {}
-    bindings: list[dict[str, str]] = []
-    for index, raw_row in enumerate(rows_raw):
-        row = dict(_mapping(f"Teacher Gold record[{index}]", raw_row))
-        record_id = _hex64("record_id", row.get("record_id"))
-        split = row.get("split")
-        meter_class = row.get("meter_class")
-        family = row.get("family_id")
-        if split not in {"train", "validation"} or meter_class not in {"none", "2/4", "3/4", "4/4"}:
-            _fail("Teacher Gold row split/class is invalid")
-        if not isinstance(family, str) or not family:
-            _fail("Teacher Gold family_id must be non-empty")
-        prior = family_split.setdefault(family, str(split))
-        if prior != split:
-            _fail("Teacher Gold family crosses adaptation split")
-        if row.get("image_path") != f"images/{record_id}.png" or row.get("label_path") != f"labels/{record_id}.json":
-            _fail("Teacher Gold artifact paths are not canonical")
-        image_sha = _hex64("image_sha256", row.get("image_sha256"))
-        label_sha = _hex64("label_sha256", row.get("label_sha256"))
-        bindings.append({"record_id": record_id, "image_sha256": image_sha, "label_sha256": label_sha})
-        rows.append(row)
-    binding = _sha(_canonical_json(bindings))
-    if manifest.get("artifact_binding_sha256") != binding or receipt.get("artifact_binding_sha256") != binding:
-        _fail("Teacher Gold metadata artifact binding mismatch")
+    tasks_raw = _sequence("V4-0 pilot tasks", pilot.get("tasks"))
+    answers_raw = _sequence("V4-0 review answers", choices.get("answers"))
+    if len(tasks_raw) != EXPECTED_TASKS or len(answers_raw) != EXPECTED_TASKS:
+        _fail("V4-0 Teacher Gold task cardinality changed")
+    tasks = [_mapping(f"V4-0 task[{index}]", item) for index, item in enumerate(tasks_raw)]
+    answers = [_mapping(f"V4-0 answer[{index}]", item) for index, item in enumerate(answers_raw)]
+    task_ids = [_bounded_ascii("V4-0 task_id", task.get("task_id")) for task in tasks]
+    answer_ids = [_bounded_ascii("V4-0 answer task_id", answer.get("task_id")) for answer in answers]
+    if len(set(task_ids)) != EXPECTED_TASKS or len(set(answer_ids)) != EXPECTED_TASKS or set(task_ids) != set(answer_ids):
+        _fail("V4-0 pilot/answer task identities must be unique and identical")
+    task_by_id = dict(zip(task_ids, tasks))
+    answer_by_id = dict(zip(answer_ids, answers))
 
-    counts = Counter((str(row["split"]), str(row["meter_class"])) for row in rows)
-    if counts[("train", "2/4")] != 9 or counts[("train", "3/4")] != 9 or counts[("train", "4/4")] != 9:
-        _fail("V4-0 requires exact 9/9/9 positive Teacher Gold TRAIN metadata")
-    return tuple(rows), _sha(manifest_raw), _sha(receipt_raw)
+    if Counter(task.get("kind") for task in tasks) != {"positive": 36, "none": 36}:
+        _fail("V4-0 pilot must remain 36 positive + 36 none")
+    if Counter(task.get("expected_class") for task in tasks if task.get("kind") == "positive") != {
+        "2/4": 12,
+        "3/4": 12,
+        "4/4": 12,
+    }:
+        _fail("V4-0 positive pilot classes changed")
+
+    source_tasks: defaultdict[str, list[Mapping[str, object]]] = defaultdict(list)
+    for task in tasks:
+        source_id = _bounded_ascii("V4-0 source_id", task.get("source_id"))
+        if task.get("split") != "train":
+            _fail("V4-0 may consume only source TRAIN")
+        if task.get("expected_class") not in METER_CLASSES:
+            _fail("V4-0 task class is outside Meter classes")
+        source_tasks[source_id].append(task)
+    if len(source_tasks) != EXPECTED_SOURCES:
+        _fail("V4-0 pilot must remain 36 source families")
+    for source_id, paired in source_tasks.items():
+        if Counter(task.get("kind") for task in paired) != {"positive": 1, "none": 1}:
+            _fail(f"V4-0 source {source_id} lost its positive/none pair")
+        if len({task.get("family_key") for task in paired}) != 1:
+            _fail("V4-0 paired tasks disagree on family identity")
+        # Compare encoded source bytes without decoding either task here.
+        if paired[0].get("image_data_uri") != paired[1].get("image_data_uri"):
+            _fail("V4-0 paired tasks disagree on source image data URI")
+
+    family_splits = _adaptation_split_by_family(tasks)
+    selected: list[tuple[Mapping[str, object], Mapping[str, object], str]] = []
+    validation_positive_count = 0
+    for task_id in sorted(task_ids):
+        task = task_by_id[task_id]
+        answer = answer_by_id[task_id]
+        family = _bounded_ascii("V4-0 family_key", task.get("family_key"))
+        adaptation_split = family_splits[family]
+        if task.get("kind") != "positive":
+            continue
+        if adaptation_split == "validation":
+            validation_positive_count += 1
+            continue
+        if adaptation_split != "train":
+            _fail("V4-0 adaptation split is outside train/validation")
+        source_id = _bounded_ascii("V4-0 selected source_id", task.get("source_id"))
+        expected = task.get("expected_class")
+        if expected not in METER_TO_NUMERATOR:
+            _fail("V4-0 selected positive class must be 2/4, 3/4, or 4/4")
+        if answer.get("source_id") != source_id or answer.get("split") != "train" or answer.get("kind") != "positive":
+            _fail("V4-0 selected answer identity differs from task")
+        if answer.get("status") != "accepted" or answer.get("label_confirmed") is not True or answer.get("crop_usable") is not True:
+            _fail("V4-0 accepts only explicitly confirmed usable Teacher Gold positives")
+        if answer.get("expected_class") != expected or answer.get("label") != expected:
+            _fail("V4-0 selected answer label differs from expected class")
+        # Validate selected geometry before any image decoding.
+        _xywh("V4-0 selected roi_crop_box", answer.get("roi_crop_box"))
+        _xywh("V4-0 selected bbox", answer.get("bbox"))
+        selected.append((task, answer, adaptation_split))
+
+    if validation_positive_count != 9:
+        _fail("V4-0 expected exactly 9 positive adaptation-validation families")
+    if len(selected) != 27:
+        _fail("V4-0 requires exactly 27 positive adaptation-TRAIN families")
+    if Counter(task.get("expected_class") for task, _answer, _split in selected) != {"2/4": 9, "3/4": 9, "4/4": 9}:
+        _fail("V4-0 selected positive TRAIN classes must be 9/9/9")
+    if len({_bounded_ascii("V4-0 selected family", task.get("family_key")) for task, _answer, _split in selected}) != 27:
+        _fail("V4-0 requires one selected positive per family")
+
+    provenance = {
+        "pilot_sha256": _teacher_sha(pilot_raw),
+        "choices_sha256": _teacher_sha(choices_raw),
+        "permission_sha256": _teacher_sha(permission_raw),
+        "privacy_sha256": _teacher_sha(privacy_raw),
+    }
+    return tuple(selected), provenance
 
 
-def _load_train_positive_record(bundle_root: Path, row: Mapping[str, object]):
-    """Open exactly one selected TRAIN-positive label/image pair."""
-    import torch
+def _derive_selected_crop(
+    task: Mapping[str, object],
+    answer: Mapping[str, object],
+    adaptation_split: str,
+):
+    """Decode and transform exactly one selected positive TRAIN source image."""
+    task_id = _bounded_ascii("V4-0 selected task_id", task.get("task_id"))
+    source_id = _bounded_ascii("V4-0 selected source_id", task.get("source_id"))
+    family = _bounded_ascii("V4-0 selected family", task.get("family_key"))
+    expected = str(task.get("expected_class"))
+    source_image, source_raw = _decode_source_png(task.get("image_data_uri"))
+    roi_box = _xywh("V4-0 selected roi_crop_box", answer.get("roi_crop_box"))
+    full_bbox = _xywh("V4-0 selected bbox", answer.get("bbox"))
+    roi_raw, transform = _render_roi(source_image, roi_box)
+    mapped_bbox = _map_bbox(full_bbox, transform)
+    record_id = _teacher_sha(
+        _teacher_canonical_json(
+            {
+                "version": METER_TEACHER_GOLD_ADMISSION_V1,
+                "task_id": task_id,
+                "source_id": source_id,
+                "source_image_sha256": _teacher_sha(source_raw),
+                "adaptation_split": adaptation_split,
+                "meter_class": expected,
+                "roi_transform": transform,
+                "meter_bbox": mapped_bbox,
+            }
+        )
+    )
+    with Image.open(BytesIO(roi_raw)) as opened:
+        opened.load()
+        if opened.format != "PNG" or opened.mode != "L" or opened.size != (256, 192):
+            _fail("V4-0 replayed Teacher Gold ROI must be gray8 PNG 256x192")
+        roi_image = opened.copy()
+    numerator = render_numerator_crop_v4_0(roi_image, mapped_bbox)
+    vector = normalized_ink_vector_v4_0(numerator)
+    return (
+        AuditRecordIdentityV4_0(record_id=record_id, family_id=family, meter_class=expected),
+        numerator,
+        vector,
+        dict(mapped_bbox),
+        dict(transform),
+        _teacher_sha(source_raw),
+    )
 
-    record_id = _hex64("record_id", row.get("record_id"))
-    if row.get("split") != "train" or row.get("meter_class") not in METER_TO_NUMERATOR:
-        _fail("V4-0 artifact loader accepts only positive Teacher Gold TRAIN records")
-    family = row.get("family_id")
-    if not isinstance(family, str) or not family:
-        _fail("Teacher Gold family_id must be non-empty")
 
-    label_path = bundle_root / str(row["label_path"])
-    image_path = bundle_root / str(row["image_path"])
-    root_resolved = bundle_root.resolve()
-    if root_resolved not in label_path.resolve().parents or root_resolved not in image_path.resolve().parents:
-        _fail("Teacher Gold selected artifact path escapes bundle root")
-
-    label, label_raw = _read_canonical_json(label_path, maximum=_MAX_LABEL_BYTES, name="selected Teacher Gold label")
-    image_raw = _read_regular(image_path, maximum=_MAX_IMAGE_BYTES, name="selected Teacher Gold ROI image")
-    if _sha(label_raw) != row["label_sha256"] or _sha(image_raw) != row["image_sha256"]:
-        _fail("selected Teacher Gold artifact SHA mismatch")
-    if label.get("schema_version") != LABEL_SCHEMA or label.get("record_id") != record_id:
-        _fail("selected Teacher Gold label schema/identity mismatch")
-    if label.get("adaptation_split") != "train" or label.get("family_id") != family:
-        _fail("selected Teacher Gold label split/family mismatch")
-    target = _mapping("selected Teacher Gold target", label.get("target"))
-    if target.get("meter_class") != row["meter_class"]:
-        _fail("selected Teacher Gold target class mismatch")
-    bbox = _mapping("selected Teacher Gold meter_bbox", target.get("meter_bbox"))
-
-    try:
-        with Image.open(BytesIO(image_raw)) as opened:
-            opened.load()
-            if opened.format != "PNG" or opened.mode != "L" or opened.size != (256, 192):
-                _fail("selected Teacher Gold ROI must be gray8 PNG 256x192")
-            pixels = bytearray(opened.tobytes())
-    except MeterV4_0AuditRunError:
-        raise
-    except (UnidentifiedImageError, OSError) as exc:
-        raise MeterV4_0AuditRunError("selected Teacher Gold ROI cannot be decoded") from exc
-    tensor = torch.frombuffer(pixels, dtype=torch.uint8).clone().reshape(192, 256)
-    roi_tensor = (1.0 - tensor.to(dtype=torch.float32) / 255.0).unsqueeze(0)
-    crop = numerator_crop_tensor_v4_0(roi_tensor, bbox)
-    return AuditRecordIdentityV4_0(record_id=record_id, family_id=family, meter_class=str(row["meter_class"])), crop, dict(bbox)
-
-
-def _crop_png_bytes(crop) -> bytes:
-    values = ((1.0 - crop.squeeze(0)).clamp(0, 1) * 255.0).round().to(dtype=__import__("torch").uint8)
-    image = Image.frombytes("L", (64, 64), bytes(values.flatten().tolist()))
+def _png_bytes(image: Image.Image) -> bytes:
     out = BytesIO()
     image.save(out, format="PNG", optimize=False, compress_level=9)
     return out.getvalue()
@@ -255,46 +285,53 @@ def _contact_sheet(crop_rows: Sequence[Mapping[str, object]], crop_bytes: Mappin
 
 def run_meter_v4_0_numerator_audit(
     *,
-    teacher_bundle_root: str | Path,
+    pilot_path: str | Path,
+    choices_path: str | Path,
+    permission_path: str | Path,
+    privacy_path: str | Path,
     output_root: str | Path,
     repository_sha: str,
 ) -> dict[str, object]:
-    """Run the fixed 27-record family-disjoint numerator OOF audit."""
-    import torch
-    from .training_model import verify_torch_runtime
-
-    verify_torch_runtime()
+    """Run the fixed 27-family zero-training numerator representation audit."""
     repository_sha = _hex64("repository_sha", repository_sha)
-    bundle_root = Path(teacher_bundle_root)
-    rows, manifest_sha, receipt_sha = _verify_teacher_metadata_only(bundle_root)
-
-    selected_rows = [
-        row
-        for row in rows
-        if row["split"] == "train" and row["meter_class"] in METER_TO_NUMERATOR
-    ]
-    if len(selected_rows) != 27:
-        _fail("V4-0 selected TRAIN-positive cardinality changed")
+    selected, provenance = _validate_and_select_source(
+        pilot_path=Path(pilot_path),
+        choices_path=Path(choices_path),
+        permission_path=Path(permission_path),
+        privacy_path=Path(privacy_path),
+    )
 
     identities: list[AuditRecordIdentityV4_0] = []
-    crops: dict[str, object] = {}
-    bboxes: dict[str, dict[str, object]] = {}
+    vectors: dict[str, tuple[float, ...]] = {}
+    crops: dict[str, Image.Image] = {}
     crop_png: dict[str, bytes] = {}
-    for row in sorted(selected_rows, key=lambda item: (str(item["meter_class"]), str(item["family_id"]), str(item["record_id"]))):
-        identity, crop, bbox = _load_train_positive_record(bundle_root, row)
+    mapped_bboxes: dict[str, dict[str, object]] = {}
+    transforms: dict[str, dict[str, object]] = {}
+    source_hashes: dict[str, str] = {}
+    for task, answer, adaptation_split in selected:
+        identity, numerator, vector, mapped_bbox, transform, source_sha = _derive_selected_crop(
+            task, answer, adaptation_split
+        )
+        if identity.record_id in vectors:
+            _fail("V4-0 derived duplicate record id")
         identities.append(identity)
-        crops[identity.record_id] = crop
-        bboxes[identity.record_id] = bbox
-        crop_png[identity.record_id] = _crop_png_bytes(crop)
+        vectors[identity.record_id] = vector
+        crops[identity.record_id] = numerator
+        crop_png[identity.record_id] = _png_bytes(numerator)
+        mapped_bboxes[identity.record_id] = mapped_bbox
+        transforms[identity.record_id] = transform
+        source_hashes[identity.record_id] = source_sha
 
     assignments = fold_plan_v4_0(tuple(identities))
     assignment_by_id = {item.record_id: item for item in assignments}
-    identity_by_id = {item.record_id: item for item in identities}
+    probe = centroid_oof_probe_v4_0(tuple(identities), vectors)
+    decision = audit_decision_v4_0(probe.summary)
 
     crop_rows: list[dict[str, object]] = []
     for identity in sorted(identities, key=lambda item: item.record_id):
         assignment = assignment_by_id[identity.record_id]
-        left, top, right, bottom = numerator_crop_bounds_v4_0(bboxes[identity.record_id])
+        left, top, right, bottom = numerator_crop_bounds_v4_0(mapped_bboxes[identity.record_id])
+        ink_values = [(255 - value) / 255.0 for value in crops[identity.record_id].tobytes()]
         crop_rows.append(
             {
                 "record_id": identity.record_id,
@@ -302,76 +339,14 @@ def run_meter_v4_0_numerator_audit(
                 "meter_class": identity.meter_class,
                 "numerator_class": identity.numerator_class,
                 "fold": assignment.fold,
-                "source_meter_bbox": bboxes[identity.record_id],
+                "source_image_sha256": source_hashes[identity.record_id],
+                "replayed_roi_transform": transforms[identity.record_id],
+                "mapped_meter_bbox": mapped_bboxes[identity.record_id],
                 "numerator_crop_bounds": {"left": left, "top": top, "right": right, "bottom": bottom},
                 "crop_png_sha256": _sha(crop_png[identity.record_id]),
-                "ink_fraction": float(crops[identity.record_id].mean().item()),
+                "ink_fraction": sum(ink_values) / len(ink_values),
             }
         )
-
-    predictions: list[dict[str, object]] = []
-    fold_runs: list[dict[str, object]] = []
-    for fold in range(3):
-        train_ids = sorted(
-            (item.record_id for item in assignments if item.fold != fold),
-            key=lambda record_id: (
-                identity_by_id[record_id].meter_class,
-                identity_by_id[record_id].family_id,
-                record_id,
-            ),
-        )
-        holdout_ids = sorted(
-            (item.record_id for item in assignments if item.fold == fold),
-            key=lambda record_id: (
-                identity_by_id[record_id].meter_class,
-                identity_by_id[record_id].family_id,
-                record_id,
-            ),
-        )
-        if len(train_ids) != 18 or len(holdout_ids) != 9:
-            _fail("V4-0 fold cardinality changed")
-        train_images = torch.stack([crops[record_id] for record_id in train_ids], dim=0)
-        train_labels = torch.tensor([identity_by_id[record_id].class_index for record_id in train_ids], dtype=torch.int64)
-        model, final_loss, state_sha = train_fold_v4_0(train_images, train_labels, fold=fold)
-        holdout_images = torch.stack([crops[record_id] for record_id in holdout_ids], dim=0)
-        with torch.no_grad():
-            logits = model(holdout_images)
-            probabilities = torch.softmax(logits, dim=1)
-            guesses = logits.argmax(1).tolist()
-        for row_index, record_id in enumerate(holdout_ids):
-            identity = identity_by_id[record_id]
-            guess = int(guesses[row_index])
-            predictions.append(
-                {
-                    "record_id": record_id,
-                    "family_id": identity.family_id,
-                    "fold": fold,
-                    "true": identity.numerator_class,
-                    "pred": NUMERATOR_CLASSES[guess],
-                    "correct": NUMERATOR_CLASSES[guess] == identity.numerator_class,
-                    "probabilities": {
-                        label: float(probabilities[row_index, class_index].item())
-                        for class_index, label in enumerate(NUMERATOR_CLASSES)
-                    },
-                }
-            )
-        fold_runs.append(
-            {
-                "fold": fold,
-                "train_records": 18,
-                "holdout_records": 9,
-                "final_train_loss": final_loss,
-                "model_state_sha256": state_sha,
-            }
-        )
-
-    predictions.sort(key=lambda row: (int(row["fold"]), str(row["true"]), str(row["family_id"]), str(row["record_id"])))
-    if len(predictions) != 27 or len({str(row["record_id"]) for row in predictions}) != 27:
-        _fail("V4-0 OOF predictions must cover each selected record exactly once")
-    truth = [NUMERATOR_CLASSES.index(str(row["true"])) for row in predictions]
-    guessed = [NUMERATOR_CLASSES.index(str(row["pred"])) for row in predictions]
-    summary = classification_summary_v4_0(truth, guessed)
-    decision = audit_decision_v4_0(summary)
 
     output = Path(output_root)
     if output.exists() or output.is_symlink():
@@ -381,73 +356,70 @@ def run_meter_v4_0_numerator_audit(
         _fail("V4-0 temporary output root already exists")
     temporary.mkdir(parents=True)
     (temporary / "crops").mkdir()
-    try:
-        for row in crop_rows:
-            record_id = str(row["record_id"])
-            (temporary / "crops" / f"{record_id}.png").write_bytes(crop_png[record_id])
-        sheet_raw = _contact_sheet(crop_rows, crop_png)
-        (temporary / "numerator-crops-contact-sheet.png").write_bytes(sheet_raw)
-        result = {
-            "schema": RESULT_SCHEMA,
-            "experiment": METER_V4_0_NUMERATOR_AUDIT,
-            "repository_sha": repository_sha,
-            "teacher_manifest_sha256": manifest_sha,
-            "teacher_receipt_sha256": receipt_sha,
-            "audit_surface": {
-                "teacher_train_positive_records": 27,
-                "classes": list(NUMERATOR_CLASSES),
-                "records_per_class": 9,
-                "folds": 3,
-                "teacher_adaptation_validation_evaluated": False,
-                "teacher_adaptation_validation_artifacts_opened_by_audit": 0,
-                "d10_opened": False,
-                "test_opened": False,
-            },
-            "configuration": {
-                "output_size": FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.output_size,
-                "epochs_per_fold": FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.epochs,
-                "shift_pixels": FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.shift_pixels,
-                "horizontal_padding_milli": FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.horizontal_padding_milli,
-                "vertical_padding_milli": FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.vertical_padding_milli,
-                "numerator_fraction_milli": FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.numerator_fraction_milli,
-            },
-            "crop_records": crop_rows,
-            "fold_runs": fold_runs,
-            "oof_predictions": predictions,
-            "oof_summary": {
-                "record_count": summary.record_count,
-                "accuracy": summary.accuracy,
-                "macro_f1": summary.macro_f1,
-                "per_class_recall": dict(summary.per_class_recall),
-                "confusion": [list(row) for row in summary.confusion],
-            },
-            "decision": {
-                "name": decision.decision,
-                "strong_signal": decision.strong_signal,
-                "reasons": list(decision.reasons),
-            },
-            "contact_sheet_sha256": _sha(sheet_raw),
-            "optimizer_steps": 3 * FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.epochs,
-            "d11_checkpoint_loaded": False,
-            "v3_checkpoint_loaded": False,
-            "runtime_connected": False,
-            "resolver_connected": False,
-            "production_promotion_authorized": False,
-        }
-        result_raw = _canonical_json(result)
-        (temporary / "result.json").write_bytes(result_raw)
-        result_sha = _sha(result_raw)
-        (temporary / "COMPLETE").write_bytes(f"{result_sha}  result.json\n".encode("ascii"))
-        temporary.replace(output)
-        return result
-    except BaseException:
-        raise
 
+    for row in crop_rows:
+        record_id = str(row["record_id"])
+        (temporary / "crops" / f"{record_id}.png").write_bytes(crop_png[record_id])
+    sheet_raw = _contact_sheet(crop_rows, crop_png)
+    (temporary / "numerator-crops-contact-sheet.png").write_bytes(sheet_raw)
 
-def clean_incomplete_v4_0_output(path: str | Path) -> None:
-    """Explicit helper for a caller that chooses to discard only a known `.part` audit directory."""
-    target = Path(path)
-    if target.name.startswith(".") and target.name.endswith(".part") and target.is_dir() and not target.is_symlink():
-        shutil.rmtree(target)
-    else:
-        raise ValueError("only an explicit V4-0 .part directory may be removed")
+    result = {
+        "schema": RESULT_SCHEMA,
+        "experiment": METER_V4_0_NUMERATOR_AUDIT,
+        "repository_sha": repository_sha,
+        "source_provenance": provenance,
+        "audit_surface": {
+            "teacher_positive_train_records": 27,
+            "teacher_positive_validation_records": 9,
+            "teacher_adaptation_validation_evaluated": False,
+            "teacher_adaptation_validation_images_decoded": 0,
+            "none_tasks_used": 0,
+            "d10_opened": False,
+            "test_opened": False,
+        },
+        "configuration": asdict(FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0),
+        "classifier": {
+            "type": "l2-normalized-class-centroid-cosine",
+            "trainable_parameters": 0,
+            "optimizer_steps": 0,
+            "tie_break_order": ["2", "3", "4"],
+        },
+        "crop_records": crop_rows,
+        "oof_predictions": [
+            {
+                "record_id": row.record_id,
+                "family_id": row.family_id,
+                "fold": row.fold,
+                "true": row.true_class,
+                "pred": row.predicted_class,
+                "correct": row.true_class == row.predicted_class,
+                "cosine_scores": dict(row.cosine_scores),
+            }
+            for row in probe.predictions
+        ],
+        "oof_summary": {
+            "record_count": probe.summary.record_count,
+            "accuracy": probe.summary.accuracy,
+            "macro_f1": probe.summary.macro_f1,
+            "per_class_recall": dict(probe.summary.per_class_recall),
+            "confusion": [list(row) for row in probe.summary.confusion],
+        },
+        "decision": {
+            "name": decision.decision,
+            "strong_signal": decision.strong_signal,
+            "reasons": list(decision.reasons),
+        },
+        "contact_sheet_sha256": _sha(sheet_raw),
+        "optimizer_steps": 0,
+        "d11_checkpoint_loaded": False,
+        "v3_checkpoint_loaded": False,
+        "runtime_connected": False,
+        "resolver_connected": False,
+        "production_promotion_authorized": False,
+    }
+    result_raw = _canonical_json(result)
+    (temporary / "result.json").write_bytes(result_raw)
+    result_sha = _sha(result_raw)
+    (temporary / "COMPLETE").write_bytes(f"{result_sha}  result.json\n".encode("ascii"))
+    temporary.replace(output)
+    return result
