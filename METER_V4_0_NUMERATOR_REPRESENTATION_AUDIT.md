@@ -4,9 +4,9 @@
 
 V4-0 is a bounded diagnostic experiment to test whether the current Meter bottleneck is primarily a representation problem rather than another loss/logit-calibration problem.
 
-The experiment uses only the 27 positive Teacher Gold TRAIN records (9 each of 2/4, 3/4, and 4/4), derives a deterministic numerator-only crop from the accepted Teacher Gold meter bbox, and evaluates a tiny 3-class specialist with family-disjoint out-of-fold (OOF) evaluation.
+The experiment uses only the 27 positive Teacher Gold TRAIN families (9 each of 2/4, 3/4, and 4/4), derives a deterministic numerator-only crop from the accepted Teacher Gold meter bbox, and evaluates the representation with a zero-training normalized class-centroid classifier under family-disjoint out-of-fold (OOF) evaluation.
 
-V4-0 is not a production candidate, does not replace D11/V3, does not access D10, does not evaluate the 18 Teacher Gold adaptation-validation records, and never opens sealed TEST.
+V4-0 is not a production candidate, does not replace D11/V3, does not access D10, does not evaluate the 18 Teacher Gold adaptation-validation records, performs zero optimizer steps, and never opens sealed TEST.
 
 ## Scientific question
 
@@ -22,27 +22,31 @@ V4-0 asks whether isolating this numerator produces a substantially cleaner fami
 
 ## Frozen input surface
 
-- exact Teacher Gold admission contract v1;
+- exact Teacher Gold pilot/choices/evidence and admission split policy v1;
 - source split remains the approved Teacher Gold source TRAIN surface;
-- audit uses only records whose adaptation split is `train` and target class is one of `2/4`, `3/4`, `4/4`;
+- the adaptation split is reproduced deterministically from family/class/package metadata;
+- only positive records assigned to adaptation `train` are decoded and transformed;
 - expected audit cardinality: exactly 27 records, 9 per positive class;
 - one positive record per family;
-- Teacher Gold adaptation-validation records may be enumerated only as manifest metadata by the existing verifier, but their label/image tensors are not opened, trained on, selected on, or evaluated by V4-0;
+- the 9 positive adaptation-validation families are never decoded, trained on, selected on, or evaluated by V4-0;
+- the paired `none` tasks are not used by the representation audit;
 - D10 is not read;
 - sealed TEST is not enumerated or opened.
 
+The source pilot JSON necessarily contains metadata/data-URI strings for the approved 36 source families, but V4-0 decodes image bytes only for the 27 positive TRAIN families selected by the frozen adaptation split policy.
+
 ## Numerator crop contract
 
-The accepted Teacher Gold label already contains the mapped full Meter bbox in the canonical 256x192 ROI. V4-0 derives the numerator crop deterministically:
+The accepted Teacher Gold positive answer contains the full Meter bbox and ROI crop box. V4-0 replays the existing admission transform to the canonical 256x192 Teacher Gold ROI, maps the full Meter bbox into that ROI, and then derives the numerator crop deterministically:
 
-1. validate the bbox is finite, positive-area, and fully inside 256x192;
+1. validate the mapped full Meter bbox is finite, positive-area, and fully inside 256x192;
 2. use the full bbox width plus 15% horizontal padding on each side;
 3. use the top half of the bbox as the numerator vertical extent;
 4. add 5% full-bbox-height padding above and below the numerator half;
 5. clamp to the 256x192 ROI;
-6. extract from the already verified Teacher Gold image tensor;
-7. resize aspect-preserving into a 64x64 canvas with white/background padding;
-8. represent ink as float32 in `[0,1]` with background zero, matching the existing inverted grayscale convention.
+6. resize aspect-preserving into a 64x64 grayscale canvas with white padding;
+7. convert pixels to an ink vector where white=0 and black=1;
+8. L2-normalize the 4096-element vector.
 
 No OCR, external OMR engine, heuristic class correction, validation-ID special case, or manual per-record crop tweak is permitted.
 
@@ -61,26 +65,23 @@ Therefore each held-out fold contains exactly:
 TOTAL: 9 records
 ```
 
-Each fold trains on 18 records and predicts 9 previously unseen families. Every one of the 27 records receives exactly one prediction from a model that did not train on that record or family.
+Each fold builds class centroids from the other 18 records and predicts 9 previously unseen families. Every one of the 27 records receives exactly one prediction from centroids that did not consume that record or family.
 
-The existing 18 Teacher Gold adaptation-validation records are not used for model selection, early stopping, threshold choice, or metric computation.
+The existing 18 Teacher Gold adaptation-validation records are not used for model selection, threshold choice, or metric computation.
 
-## Tiny specialist
+## Zero-training centroid probe
 
-The audit model is deliberately small and from scratch:
+V4-0 deliberately avoids another learned classifier. It tests the representation itself.
 
-```text
-64x64 numerator crop
- -> Conv 1->8 + ReLU + MaxPool
- -> Conv 8->16 + ReLU + MaxPool
- -> AdaptiveAvgPool 4x4
- -> FC 256->32 + ReLU
- -> FC 32->3
-```
+For each fold:
 
-Only classes `2`, `3`, `4` exist in this specialist.
+1. L2-normalize each 64x64 numerator ink vector;
+2. average the six TRAIN vectors per numerator class (`2`, `3`, `4`);
+3. L2-normalize each class mean to obtain three deterministic centroids;
+4. compute cosine similarity from each held-out vector to the three centroids;
+5. choose the highest-similarity class, with fixed class order `2 < 3 < 4` as the exact tie-break.
 
-Training is fixed-length and deterministic. No held-out fold is used for checkpoint selection. Training uses only deterministic integer-pixel shifts of the 18 training crops; no synthetic renderer corpus, D10 replay, V3 adapter, bbox loss, presence loss, or margin loss is used.
+There are no trainable parameters, epochs, gradients, checkpoints, random augmentations, or optimizer steps. This makes the result a direct test of whether the isolated numerator pixels carry a simple family-generalizing class signal.
 
 ## Audit decision
 
@@ -95,7 +96,7 @@ V4-0 emits a diagnostic decision, not a promotion decision.
 
 Interpretation:
 
-- strong signal supports moving to a dedicated Meter numerator specialist architecture;
+- strong signal supports moving to a dedicated learned Meter numerator specialist in V4-1;
 - weak signal means the isolated glyph representation alone is insufficient with the current real-data diversity, so the next action should prioritize crop review and/or more real font/domain diversity rather than more V3 logit tuning.
 
 The decision does not authorize production, checkpoint replacement, TEST access, or ScoreMosaic integration.
@@ -104,14 +105,17 @@ The decision does not authorize production, checkpoint replacement, TEST access,
 
 The Colab audit must write a compact result JSON containing:
 
-- repository SHA and contract version;
-- exact 27 record/family ids and deterministic fold assignment;
-- crop geometry and crop SHA-256 per record;
-- fold-by-fold predictions;
+- repository SHA and V4-0 contract version;
+- exact 27 family/task identities and deterministic fold assignment;
+- replayed full Meter bbox and numerator crop geometry per record;
+- crop SHA-256 per record;
+- fold-by-fold cosine scores and predictions;
 - aggregate 3x3 confusion matrix, accuracy, macro-F1, per-class recall;
 - audit decision and reasons;
+- `optimizer_steps=0`;
 - `d10_opened=false`;
 - `teacher_adaptation_validation_evaluated=false`;
+- `teacher_adaptation_validation_images_decoded=0`;
 - `test_opened=false`;
 - `runtime_connected=false`;
 - `production_promotion_authorized=false`.
@@ -125,6 +129,7 @@ V4-0 is an isolated training-lab diagnostic only. It may not:
 - open sealed TEST;
 - read D10;
 - use Teacher Gold adaptation-validation outcomes;
+- train or fine-tune a model;
 - mutate D11/V3 checkpoints;
 - connect Resolver/runtime;
 - authorize production promotion;
