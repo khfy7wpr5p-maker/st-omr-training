@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from collections import Counter
+import math
 import unittest
 
-import torch
+from PIL import Image
 
 from st_omr_training.meter_v4_0_numerator_audit import (
     AuditRecordIdentityV4_0,
@@ -12,20 +13,20 @@ from st_omr_training.meter_v4_0_numerator_audit import (
     MeterV4_0AuditError,
     NumeratorAuditConfigV4_0,
     audit_decision_v4_0,
-    build_numerator_specialist_v4_0,
+    centroid_oof_probe_v4_0,
     classification_summary_v4_0,
     d10_access_allowed,
-    deterministic_shift_bank_v4_0,
     fold_plan_v4_0,
+    normalized_ink_vector_v4_0,
     numerator_crop_bounds_v4_0,
-    numerator_crop_tensor_v4_0,
+    optimizer_step_allowed,
     production_promotion_allowed,
+    render_numerator_crop_v4_0,
     resolver_connection_allowed,
     runtime_connection_allowed,
     sealed_test_access_allowed,
     teacher_adaptation_validation_evaluation_allowed,
 )
-from st_omr_training.training_model import count_trainable_parameters
 
 
 class MeterV40NumeratorAuditTests(unittest.TestCase):
@@ -44,6 +45,17 @@ class MeterV40NumeratorAuditTests(unittest.TestCase):
                 counter += 1
         return tuple(rows)
 
+    def _easy_vectors(self, identities: tuple[AuditRecordIdentityV4_0, ...]):
+        vectors = {}
+        class_feature = {"2/4": 0, "3/4": 1, "4/4": 2}
+        for family_index, item in enumerate(identities):
+            raw = [0.0] * 4096
+            raw[class_feature[item.meter_class]] = 1.0
+            raw[10 + family_index] = 0.01
+            norm = math.sqrt(sum(value * value for value in raw))
+            vectors[item.record_id] = tuple(value / norm for value in raw)
+        return vectors
+
     def test_config_is_frozen(self) -> None:
         self.assertEqual(FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.output_size, 64)
         self.assertEqual(FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0.folds, 3)
@@ -56,14 +68,26 @@ class MeterV40NumeratorAuditTests(unittest.TestCase):
         with self.assertRaises(MeterV4_0AuditError):
             numerator_crop_bounds_v4_0({"x_min": -1, "y_min": 0, "x_max": 10, "y_max": 20})
 
-    def test_crop_tensor_is_exact_64_square_and_finite(self) -> None:
-        image = torch.zeros((1, 192, 256), dtype=torch.float32)
-        image[:, 45:75, 105:125] = 1.0
+    def test_render_crop_is_exact_gray8_64_square(self) -> None:
+        image = Image.new("L", (256, 192), 255)
+        for y in range(45, 75):
+            for x in range(105, 125):
+                image.putpixel((x, y), 0)
         bbox = {"x_min": 100.0, "y_min": 40.0, "x_max": 140.0, "y_max": 120.0}
-        crop = numerator_crop_tensor_v4_0(image, bbox)
-        self.assertEqual(tuple(crop.shape), (1, 64, 64))
-        self.assertTrue(bool(torch.isfinite(crop).all()))
-        self.assertGreater(float(crop.sum().item()), 0.0)
+        crop = render_numerator_crop_v4_0(image, bbox)
+        self.assertEqual(crop.mode, "L")
+        self.assertEqual(crop.size, (64, 64))
+        self.assertLess(min(crop.getdata()), 255)
+
+    def test_normalized_ink_vector_is_unit_length(self) -> None:
+        image = Image.new("L", (64, 64), 255)
+        image.putpixel((20, 20), 0)
+        image.putpixel((21, 20), 0)
+        vector = normalized_ink_vector_v4_0(image)
+        self.assertEqual(len(vector), 4096)
+        self.assertAlmostEqual(math.sqrt(sum(value * value for value in vector)), 1.0)
+        with self.assertRaises(MeterV4_0AuditError):
+            normalized_ink_vector_v4_0(Image.new("L", (64, 64), 255))
 
     def test_fold_plan_is_balanced_and_family_disjoint(self) -> None:
         identities = self._identities()
@@ -81,20 +105,24 @@ class MeterV40NumeratorAuditTests(unittest.TestCase):
         with self.assertRaises(MeterV4_0AuditError):
             fold_plan_v4_0(self._identities()[:-1])
 
-    def test_shift_bank_is_deterministic_and_no_wraparound(self) -> None:
-        image = torch.zeros((1, 1, 64, 64), dtype=torch.float32)
-        image[0, 0, 0, 0] = 1.0
-        first = deterministic_shift_bank_v4_0(image)
-        second = deterministic_shift_bank_v4_0(image)
-        self.assertEqual(tuple(first.shape), (9, 1, 64, 64))
-        self.assertTrue(torch.equal(first, second))
-        self.assertLessEqual(float(first.sum().item()), 9.0)
+    def test_centroid_probe_is_family_disjoint_and_deterministic(self) -> None:
+        identities = self._identities()
+        vectors = self._easy_vectors(identities)
+        first = centroid_oof_probe_v4_0(identities, vectors)
+        second = centroid_oof_probe_v4_0(tuple(reversed(identities)), vectors)
+        self.assertEqual(first, second)
+        self.assertEqual(first.summary.record_count, 27)
+        self.assertEqual(first.summary.accuracy, 1.0)
+        self.assertEqual(len(first.predictions), 27)
+        self.assertEqual(len({row.record_id for row in first.predictions}), 27)
+        self.assertTrue(all(row.true_class == row.predicted_class for row in first.predictions))
 
-    def test_tiny_specialist_is_bounded(self) -> None:
-        model = build_numerator_specialist_v4_0(seed=840_001)
-        self.assertLessEqual(count_trainable_parameters(model), 50_000)
-        logits = model(torch.zeros((2, 1, 64, 64), dtype=torch.float32))
-        self.assertEqual(tuple(logits.shape), (2, 3))
+    def test_centroid_probe_requires_exact_vector_set(self) -> None:
+        identities = self._identities()
+        vectors = self._easy_vectors(identities)
+        vectors.pop(identities[0].record_id)
+        with self.assertRaises(MeterV4_0AuditError):
+            centroid_oof_probe_v4_0(identities, vectors)
 
     def test_summary_and_strong_decision(self) -> None:
         truth = [0] * 9 + [1] * 9 + [2] * 9
@@ -126,6 +154,7 @@ class MeterV40NumeratorAuditTests(unittest.TestCase):
         self.assertIn("OOF_2_RECALL_BELOW_8_OF_9", decision.reasons)
 
     def test_external_surfaces_are_closed(self) -> None:
+        self.assertFalse(optimizer_step_allowed())
         self.assertFalse(sealed_test_access_allowed())
         self.assertFalse(d10_access_allowed())
         self.assertFalse(teacher_adaptation_validation_evaluation_allowed())
