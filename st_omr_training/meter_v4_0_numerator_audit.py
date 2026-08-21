@@ -1,8 +1,8 @@
 """Bounded Meter V4-0 numerator-only representation audit.
 
-V4-0 uses only positive Teacher Gold TRAIN records and derives a deterministic
-numerator crop from the accepted full Meter bbox.  A tiny from-scratch 3-class
-specialist is evaluated with family-disjoint 3-fold out-of-fold predictions.
+V4-0 isolates the numerator of positive Teacher Gold TRAIN Meter examples and
+measures family-generalizing pixel-space separability with a deterministic
+normalized class-centroid probe.  It has no trainable parameters or optimizer.
 
 D10, Teacher Gold adaptation-validation evaluation, sealed TEST, runtime,
 Resolver, checkpoint replacement, and production promotion remain closed.
@@ -17,6 +17,8 @@ from hashlib import sha256
 import json
 import math
 from typing import Final
+
+from PIL import Image
 
 
 METER_V4_0_NUMERATOR_AUDIT: Final[str] = "meter-v4-0-numerator-representation-audit-v1"
@@ -58,31 +60,17 @@ def _hex64(name: str, value: object) -> str:
 class NumeratorAuditConfigV4_0:
     output_size: int = 64
     folds: int = 3
-    master_seed: int = 840_001
-    epochs: int = 120
-    learning_rate_micros: int = 3_000
-    weight_decay_micros: int = 100
-    grad_clip_milli: int = 2_000
     horizontal_padding_milli: int = 150
     vertical_padding_milli: int = 50
     numerator_fraction_milli: int = 500
-    shift_pixels: int = 2
-    max_trainable_parameters: int = 50_000
 
     def __post_init__(self) -> None:
         bounds = {
             "output_size": (self.output_size, 32, 128),
             "folds": (self.folds, 2, 9),
-            "master_seed": (self.master_seed, 0, 2**63 - 1),
-            "epochs": (self.epochs, 1, 500),
-            "learning_rate_micros": (self.learning_rate_micros, 1, 100_000),
-            "weight_decay_micros": (self.weight_decay_micros, 0, 100_000),
-            "grad_clip_milli": (self.grad_clip_milli, 1, 100_000),
             "horizontal_padding_milli": (self.horizontal_padding_milli, 0, 500),
             "vertical_padding_milli": (self.vertical_padding_milli, 0, 250),
             "numerator_fraction_milli": (self.numerator_fraction_milli, 350, 650),
-            "shift_pixels": (self.shift_pixels, 0, 4),
-            "max_trainable_parameters": (self.max_trainable_parameters, 1, 1_000_000),
         }
         for name, (value, low, high) in bounds.items():
             if not isinstance(value, int) or isinstance(value, bool) or not low <= value <= high:
@@ -90,16 +78,9 @@ class NumeratorAuditConfigV4_0:
         frozen = {
             "output_size": 64,
             "folds": 3,
-            "master_seed": 840_001,
-            "epochs": 120,
-            "learning_rate_micros": 3_000,
-            "weight_decay_micros": 100,
-            "grad_clip_milli": 2_000,
             "horizontal_padding_milli": 150,
             "vertical_padding_milli": 50,
             "numerator_fraction_milli": 500,
-            "shift_pixels": 2,
-            "max_trainable_parameters": 50_000,
         }
         for name, expected in frozen.items():
             if getattr(self, name) != expected:
@@ -140,12 +121,28 @@ class FoldAssignmentV4_0:
 
 
 @dataclass(frozen=True, slots=True)
+class OofPredictionV4_0:
+    record_id: str
+    family_id: str
+    fold: int
+    true_class: str
+    predicted_class: str
+    cosine_scores: dict[str, float]
+
+
+@dataclass(frozen=True, slots=True)
 class ClassificationSummaryV4_0:
     record_count: int
     accuracy: float
     macro_f1: float
     per_class_recall: dict[str, float]
     confusion: tuple[tuple[int, int, int], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class CentroidProbeResultV4_0:
+    predictions: tuple[OofPredictionV4_0, ...]
+    summary: ClassificationSummaryV4_0
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,42 +192,46 @@ def numerator_crop_bounds_v4_0(
     return left, top, right, bottom
 
 
-def numerator_crop_tensor_v4_0(
-    roi_tensor,
+def render_numerator_crop_v4_0(
+    roi_image: Image.Image,
     meter_bbox: Mapping[str, object],
     config: NumeratorAuditConfigV4_0 = FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0,
-):
-    """Extract and aspect-fit a verified inverted-ink [1,192,256] tensor to [1,64,64]."""
-    try:
-        import torch
-        from torch.nn import functional as F
-    except ModuleNotFoundError as exc:
-        raise MeterV4_0AuditError("torch is required only for V4-0 execution") from exc
-
+) -> Image.Image:
+    """Extract and aspect-fit the numerator to a deterministic gray8 64x64 canvas."""
     if config != FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0:
         _fail("V4-0 requires the frozen audit configuration")
-    if not isinstance(roi_tensor, torch.Tensor) or roi_tensor.dtype != torch.float32:
-        _fail("Teacher Gold ROI tensor must be float32")
-    if tuple(roi_tensor.shape) != (1, ROI_HEIGHT, ROI_WIDTH):
-        _fail("Teacher Gold ROI tensor must be exact [1,192,256]")
-    if not bool(torch.isfinite(roi_tensor).all()) or bool((roi_tensor < 0).any()) or bool((roi_tensor > 1).any()):
-        _fail("Teacher Gold ROI tensor must be finite ink values in [0,1]")
-
+    if not isinstance(roi_image, Image.Image) or roi_image.mode != "L" or roi_image.size != (ROI_WIDTH, ROI_HEIGHT):
+        _fail("Teacher Gold ROI must be exact gray8 256x192 image")
     left, top, right, bottom = numerator_crop_bounds_v4_0(meter_bbox, config)
-    cropped = roi_tensor[:, top:bottom, left:right].unsqueeze(0)
-    crop_h = bottom - top
-    crop_w = right - left
-    scale = min(config.output_size / crop_w, config.output_size / crop_h)
-    resized_w = max(1, min(config.output_size, int(round(crop_w * scale))))
-    resized_h = max(1, min(config.output_size, int(round(crop_h * scale))))
-    resized = F.interpolate(cropped, size=(resized_h, resized_w), mode="bilinear", align_corners=False)[0]
-    canvas = torch.zeros((1, config.output_size, config.output_size), dtype=torch.float32)
+    crop = roi_image.crop((left, top, right, bottom))
+    scale = min(config.output_size / crop.width, config.output_size / crop.height)
+    resized_w = max(1, min(config.output_size, int(round(crop.width * scale))))
+    resized_h = max(1, min(config.output_size, int(round(crop.height * scale))))
+    resized = crop.resize((resized_w, resized_h), resample=Image.Resampling.BILINEAR)
+    canvas = Image.new("L", (config.output_size, config.output_size), 255)
     x0 = (config.output_size - resized_w) // 2
     y0 = (config.output_size - resized_h) // 2
-    canvas[:, y0 : y0 + resized_h, x0 : x0 + resized_w] = resized
-    if not bool(torch.isfinite(canvas).all()) or bool((canvas < 0).any()) or bool((canvas > 1).any()):
-        _fail("normalized numerator crop left the finite [0,1] boundary")
-    return canvas.contiguous()
+    canvas.paste(resized, (x0, y0))
+    return canvas
+
+
+def normalized_ink_vector_v4_0(
+    crop_image: Image.Image,
+    config: NumeratorAuditConfigV4_0 = FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0,
+) -> tuple[float, ...]:
+    """Convert gray8 crop to a unit-L2 ink vector, white=0 and black=1."""
+    if config != FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0:
+        _fail("V4-0 requires the frozen audit configuration")
+    if not isinstance(crop_image, Image.Image) or crop_image.mode != "L" or crop_image.size != (64, 64):
+        _fail("V4-0 numerator crop must be exact gray8 64x64")
+    vector = tuple((255 - value) / 255.0 for value in crop_image.tobytes())
+    norm = math.sqrt(sum(value * value for value in vector))
+    if not math.isfinite(norm) or norm <= 1e-12:
+        _fail("V4-0 numerator crop has no finite ink signal")
+    normalized = tuple(value / norm for value in vector)
+    if len(normalized) != 4096 or any(not math.isfinite(value) for value in normalized):
+        _fail("V4-0 normalized ink vector is invalid")
+    return normalized
 
 
 def fold_plan_v4_0(
@@ -278,131 +279,89 @@ def fold_plan_v4_0(
 
     assignments.sort(key=lambda item: (item.fold, item.meter_class, item.family_id, item.record_id))
     fold_class_counts = Counter((item.fold, item.meter_class) for item in assignments)
-    expected = Counter((fold, meter_class) for fold in range(3) for meter_class in ("2/4", "3/4", "4/4") for _ in range(3))
-    if fold_class_counts != expected:
-        _fail("V4-0 fold plan must hold out exactly three families per class per fold")
+    for fold in range(3):
+        for meter_class in ("2/4", "3/4", "4/4"):
+            if fold_class_counts[(fold, meter_class)] != 3:
+                _fail("V4-0 fold plan must hold out exactly three families per class per fold")
     return tuple(assignments)
 
 
-def _shift_tensor(image, dx: int, dy: int):
-    import torch
-
-    if tuple(image.shape) != (1, 64, 64):
-        _fail("V4-0 shift input must be [1,64,64]")
-    result = torch.zeros_like(image)
-    src_x0 = max(0, -dx)
-    src_x1 = min(64, 64 - dx)
-    dst_x0 = max(0, dx)
-    dst_x1 = min(64, 64 + dx)
-    src_y0 = max(0, -dy)
-    src_y1 = min(64, 64 - dy)
-    dst_y0 = max(0, dy)
-    dst_y1 = min(64, 64 + dy)
-    if src_x0 < src_x1 and src_y0 < src_y1:
-        result[:, dst_y0:dst_y1, dst_x0:dst_x1] = image[:, src_y0:src_y1, src_x0:src_x1]
-    return result
+def _unit_centroid(vectors: Sequence[Sequence[float]]) -> tuple[float, ...]:
+    if len(vectors) != 6 or any(len(vector) != 4096 for vector in vectors):
+        _fail("each V4-0 class centroid must consume exactly six 4096-element vectors")
+    mean = [sum(vector[index] for vector in vectors) / len(vectors) for index in range(4096)]
+    norm = math.sqrt(sum(value * value for value in mean))
+    if not math.isfinite(norm) or norm <= 1e-12:
+        _fail("V4-0 class centroid has no finite signal")
+    return tuple(value / norm for value in mean)
 
 
-def deterministic_shift_bank_v4_0(images, config: NumeratorAuditConfigV4_0 = FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0):
-    """Return the fixed 3x3 integer-shift bank without wrap-around."""
-    import torch
-
-    if config != FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0:
-        _fail("V4-0 requires the frozen audit configuration")
-    if not isinstance(images, torch.Tensor) or images.dtype != torch.float32 or images.ndim != 4:
-        _fail("V4-0 training images must be float32 [B,1,64,64]")
-    if tuple(images.shape[1:]) != (1, 64, 64):
-        _fail("V4-0 training images must use the exact 64x64 crop")
-    shifts = (-config.shift_pixels, 0, config.shift_pixels)
-    augmented = []
-    for dy in shifts:
-        for dx in shifts:
-            augmented.append(torch.stack([_shift_tensor(image, dx, dy) for image in images], dim=0))
-    return torch.cat(augmented, dim=0)
+def _cosine(unit_a: Sequence[float], unit_b: Sequence[float]) -> float:
+    if len(unit_a) != 4096 or len(unit_b) != 4096:
+        _fail("V4-0 cosine vectors must have length 4096")
+    score = sum(a * b for a, b in zip(unit_a, unit_b))
+    if not math.isfinite(score):
+        _fail("V4-0 cosine score is not finite")
+    return score
 
 
-def build_numerator_specialist_v4_0(
-    *,
-    seed: int,
+def centroid_oof_probe_v4_0(
+    identities: Sequence[AuditRecordIdentityV4_0],
+    vectors_by_record_id: Mapping[str, Sequence[float]],
     config: NumeratorAuditConfigV4_0 = FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0,
-):
-    """Build the frozen tiny 3-class numerator specialist from scratch."""
-    try:
-        from torch import nn
-    except ModuleNotFoundError as exc:
-        raise MeterV4_0AuditError("torch is required only for V4-0 execution") from exc
-    from .training_model import count_trainable_parameters, set_deterministic_cpu
-
+) -> CentroidProbeResultV4_0:
+    """Run the zero-training family-disjoint normalized-centroid OOF probe."""
     if config != FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0:
         _fail("V4-0 requires the frozen audit configuration")
-    if not isinstance(seed, int) or isinstance(seed, bool) or not 0 <= seed < 2**63:
-        raise ValueError("seed must be bounded non-negative integer")
-    set_deterministic_cpu(seed)
+    assignments = fold_plan_v4_0(identities, config)
+    identity_by_id = {item.record_id: item for item in identities}
+    if set(vectors_by_record_id) != set(identity_by_id):
+        _fail("V4-0 vector set must match the exact 27 selected record ids")
+    for record_id, vector in vectors_by_record_id.items():
+        if len(vector) != 4096 or any(not isinstance(value, (int, float)) or not math.isfinite(float(value)) for value in vector):
+            _fail(f"V4-0 vector is invalid for record {record_id}")
 
-    model = nn.Sequential(
-        nn.Conv2d(1, 8, 3, padding=1),
-        nn.ReLU(),
-        nn.MaxPool2d(2),
-        nn.Conv2d(8, 16, 3, padding=1),
-        nn.ReLU(),
-        nn.MaxPool2d(2),
-        nn.AdaptiveAvgPool2d((4, 4)),
-        nn.Flatten(),
-        nn.Linear(16 * 4 * 4, 32),
-        nn.ReLU(),
-        nn.Linear(32, 3),
-    ).cpu()
-    count = count_trainable_parameters(model)
-    if not 0 < count <= config.max_trainable_parameters:
-        _fail("V4-0 numerator specialist exceeds the frozen parameter budget")
-    return model
+    predictions: list[OofPredictionV4_0] = []
+    for fold in range(3):
+        train_ids = [item.record_id for item in assignments if item.fold != fold]
+        holdout_ids = [item.record_id for item in assignments if item.fold == fold]
+        if len(train_ids) != 18 or len(holdout_ids) != 9:
+            _fail("V4-0 fold cardinality changed")
+        centroids: dict[str, tuple[float, ...]] = {}
+        for numerator_class in NUMERATOR_CLASSES:
+            class_vectors = [
+                vectors_by_record_id[record_id]
+                for record_id in train_ids
+                if identity_by_id[record_id].numerator_class == numerator_class
+            ]
+            centroids[numerator_class] = _unit_centroid(class_vectors)
 
+        for record_id in holdout_ids:
+            identity = identity_by_id[record_id]
+            vector = vectors_by_record_id[record_id]
+            scores = {
+                label: _cosine(vector, centroids[label])
+                for label in NUMERATOR_CLASSES
+            }
+            predicted = max(NUMERATOR_CLASSES, key=lambda label: scores[label])
+            predictions.append(
+                OofPredictionV4_0(
+                    record_id=record_id,
+                    family_id=identity.family_id,
+                    fold=fold,
+                    true_class=identity.numerator_class,
+                    predicted_class=predicted,
+                    cosine_scores=scores,
+                )
+            )
 
-def train_fold_v4_0(
-    images,
-    labels,
-    *,
-    fold: int,
-    config: NumeratorAuditConfigV4_0 = FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0,
-):
-    """Train one fixed-length fold model; no held-out data participates."""
-    import torch
-    from torch.nn import functional as F
-    from .training_model import model_state_sha256
-
-    if config != FROZEN_NUMERATOR_AUDIT_CONFIG_V4_0:
-        _fail("V4-0 requires the frozen audit configuration")
-    if fold not in {0, 1, 2}:
-        raise ValueError("fold must be 0, 1, or 2")
-    if not isinstance(images, torch.Tensor) or images.dtype != torch.float32 or tuple(images.shape) != (18, 1, 64, 64):
-        _fail("each V4-0 fold must train on exact float32 [18,1,64,64]")
-    if not isinstance(labels, torch.Tensor) or labels.dtype != torch.int64 or tuple(labels.shape) != (18,):
-        _fail("each V4-0 fold must carry exact int64 [18] labels")
-    if Counter(labels.tolist()) != Counter({0: 6, 1: 6, 2: 6}):
-        _fail("each V4-0 fold training set must contain six examples per numerator class")
-
-    seed = config.master_seed + fold
-    model = build_numerator_specialist_v4_0(seed=seed, config=config)
-    augmented = deterministic_shift_bank_v4_0(images, config)
-    augmented_labels = labels.repeat(9)
-    optimizer = torch.optim.AdamW(
-        model.parameters(),
-        lr=config.learning_rate_micros / 1_000_000.0,
-        weight_decay=config.weight_decay_micros / 1_000_000.0,
+    predictions.sort(key=lambda row: (row.fold, row.true_class, row.family_id, row.record_id))
+    truth = [NUMERATOR_CLASSES.index(row.true_class) for row in predictions]
+    guessed = [NUMERATOR_CLASSES.index(row.predicted_class) for row in predictions]
+    return CentroidProbeResultV4_0(
+        predictions=tuple(predictions),
+        summary=classification_summary_v4_0(truth, guessed),
     )
-    final_loss = float("nan")
-    for _epoch in range(config.epochs):
-        model.train()
-        optimizer.zero_grad(set_to_none=True)
-        logits = model(augmented)
-        loss = F.cross_entropy(logits, augmented_labels)
-        if not bool(torch.isfinite(loss)):
-            _fail("V4-0 fold loss is not finite")
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), config.grad_clip_milli / 1000.0)
-        optimizer.step()
-        final_loss = float(loss.detach().item())
-    return model.eval(), final_loss, model_state_sha256(model)
 
 
 def classification_summary_v4_0(
@@ -452,6 +411,10 @@ def audit_decision_v4_0(summary: ClassificationSummaryV4_0) -> AuditDecisionV4_0
         strong_signal=strong,
         reasons=tuple(reasons),
     )
+
+
+def optimizer_step_allowed() -> bool:
+    return False
 
 
 def sealed_test_access_allowed() -> bool:
