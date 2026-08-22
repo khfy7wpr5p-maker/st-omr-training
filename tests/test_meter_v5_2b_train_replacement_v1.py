@@ -69,7 +69,10 @@ class TestMeterV52BTrainReplacementV1(unittest.TestCase):
         self.assertNotIn("geometry", source)
         self.assertNotIn("accepted", source)
         self.assertNotIn("a04", source)
-        self.assertIn("selection_rank", m.REPLACEMENT_RULE)
+        self.assertEqual(
+            m.REPLACEMENT_RULE,
+            "same-meter-next-unused-train-by-selection-rank-then-sample-id-v1",
+        )
 
     def test_apply_keeps_training_closed_and_two_human_boxes_required(self):
         source = inspect.getsource(m.apply_approved_train_replacements_v1)
