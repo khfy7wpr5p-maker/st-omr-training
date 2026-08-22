@@ -1,0 +1,108 @@
+{
+  "annotation_audit": {
+    "annotation_contract_freeze_ready": true,
+    "annotation_count": 30,
+    "bbox_height": {
+      "max": 129,
+      "mean": 108.5,
+      "median": 108.0,
+      "min": 95
+    },
+    "bbox_outside_image": 0,
+    "bbox_width": {
+      "max": 70,
+      "mean": 60.43333333333333,
+      "median": 60.0,
+      "min": 51
+    },
+    "human_review_resolution_required": false,
+    "mechanical_gate": "PASS",
+    "original_pilot_image_binding_preserved": true,
+    "pass_count": 30,
+    "per_class": {
+      "2/4": {
+        "PASS": 10,
+        "REVIEW": 0
+      },
+      "3/4": {
+        "PASS": 10,
+        "REVIEW": 0
+      },
+      "4/4": {
+        "PASS": 10,
+        "REVIEW": 0
+      }
+    },
+    "pilot_total_expected": 30,
+    "review_count": 0,
+    "suspicious_too_large_count": 0,
+    "suspicious_too_large_sample_ids": [],
+    "suspicious_too_small_count": 0,
+    "suspicious_too_small_sample_ids": [],
+    "unique_sample_id": 30,
+    "zero_or_negative_bbox": 0
+  },
+  "artifacts": {
+    "annotation_csv": {
+      "bytes": 4294,
+      "drive_file_id": "1o_1Mc78_Cyk-on0YSEZdiMOnjNl0-J5f",
+      "sha256": "b60a953811aa136752372d7c8cea6fe7a1c1c964a62bd53c0c9d48c56c735665"
+    },
+    "final_holdout_lock_json": {
+      "bytes": 389,
+      "drive_file_id": "1Iv0IFb_A042dM3pK6Qk1DMlwlulqM1k8",
+      "sha256": "51923443c1cc892a2f8852a52ef7658bc604b6fa948a3cc43f4f8b6dab3cc2e3"
+    },
+    "pilot_audit_json": {
+      "bytes": 1102,
+      "drive_file_id": "1qDeP8v5EwOb0nPNxItm-Px0x9YxYBdF9",
+      "sha256": "dd254ba7c7408a73168d52da3b50de2de8eafa4748e3f4e64e4d11707eeae366"
+    },
+    "selection_csv": {
+      "bytes": 8136,
+      "drive_file_id": "1_RPHCH4wTWctarO5FMbOog2MEJXtQfMK",
+      "sha256": "4070f46f64efed5b12b26f7dd1d4e3f09b4abf804125140d38a212819bbcbe97"
+    }
+  },
+  "closure_note": "Pilot audit and artifact identities are captured here. Stage completion still requires CI PASS on the exact repository head containing this evidence file.",
+  "dataset": {
+    "drive_folder_id": "1OY6ZInOGh0Xtqb4Lkw78zx2rZTfpUasG",
+    "fingerprint_sha256": "e7e849ac6d6d7a622dc94107a4dc4074c48e1e0ab837e726857394cb4072b8f0",
+    "name": "METER_V2_1500_PACKAGE_AB_CLEAN",
+    "test_parent_folder_id": "13PKxIyjRgZRhqF1C9n9XRMQCYFn-aSdX"
+  },
+  "pilot_result": "PASS",
+  "repository": {
+    "base_branch": "fix/meter-v5-0-v2-dataset-integrity",
+    "base_sha": "81474c44dc8a9469e1d07e7cef33144c5fd1a590",
+    "branch": "fix/meter-v5-1-clean-bbox-pilot",
+    "frozen_execution_sha": "0146ecae4f3abb06175872bebc6b7f15644b4773",
+    "full_name": "khfy7wpr5p-maker/st-omr-training",
+    "pull_request": 91,
+    "source_pr_head_sha": "e96e76c91814f33991e0ea62d8b78ef0917b7402"
+  },
+  "safety": {
+    "annotation_scope": "train_pilot_30_only",
+    "final_holdout_count": 150,
+    "final_holdout_locked": true,
+    "inference_count": 0,
+    "model_opened": false,
+    "production_promotion_authorized": false,
+    "resolver_connected": false,
+    "runtime_connected": false,
+    "training_authorized": false,
+    "tuning_opened": false
+  },
+  "schema": "st-omr-meter-v5-1-bbox-pilot-result-evidence-v1",
+  "source_head_ci": {
+    "compile_python_sources": "PASS",
+    "conclusion": "success",
+    "expected_failures": 1,
+    "os": "Ubuntu 24.04",
+    "python": "3.13",
+    "run_id": 32581088805,
+    "run_number": 515,
+    "tests_ran": 953
+  },
+  "stage": "METER V5-1"
+}
