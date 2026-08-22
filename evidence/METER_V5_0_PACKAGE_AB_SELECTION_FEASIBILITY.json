@@ -1,0 +1,79 @@
+{
+  "schema": "st-omr-meter-v5-0-package-ab-selection-feasibility-v1",
+  "status": "PASS_FEASIBILITY_ONLY",
+  "source": {
+    "dataset": "primusCalvoRizoAppliedSciences2018",
+    "required_package": "package_ab",
+    "master_index_sha256": "03fe74ff13e12c9b4c4500083812240e90c88ecf17df16d495ebe9d8f6b1ef3e",
+    "master_index_rows": 87678
+  },
+  "historical_blacklist": {
+    "source": "METER_V1/00_AUDIT/admission_template.csv",
+    "source_sha256": "9eb03e743ab1dc2e99dd3d1a8858dab7136bd1d13a008aab7daf1858f0aef202",
+    "family_count": 325,
+    "family_list_sha256": "3231134495c3993b9d0d17355c8758bff2b879513289baad62d3dec03b641fc9",
+    "consumed_v4_5_family_subset_count": 150
+  },
+  "candidate_policy": {
+    "package": "ab",
+    "complete_required": true,
+    "exactly_one_target_meter_flag_required": true,
+    "clef_restriction": false,
+    "one_sample_per_family": true,
+    "cross_meter_family_policy": "exclude_family_globally",
+    "selector_seed": "st-omr-meter-v5-0-package-ab-selector-v1"
+  },
+  "capacity_after_historical_blacklist": {
+    "2/4": {
+      "raw_rows": 5032,
+      "raw_families": 4319,
+      "clean_global_disjoint_families": 3701
+    },
+    "3/4": {
+      "raw_rows": 8267,
+      "raw_families": 6838,
+      "clean_global_disjoint_families": 6216
+    },
+    "4/4": {
+      "raw_rows": 753,
+      "raw_families": 736,
+      "clean_global_disjoint_families": 725
+    }
+  },
+  "cross_meter_ambiguous_family_exclusion_count": 625,
+  "target": {
+    "per_class": 500,
+    "split_per_class": {
+      "train": 400,
+      "val": 50,
+      "final_holdout": 50
+    },
+    "global_unique_families": 1500,
+    "source_domain_share_gap": 0.0
+  },
+  "deterministic_dry_run": {
+    "passed": true,
+    "blacklist_overlap": 0,
+    "cross_class_family_overlap": 0,
+    "cross_split_family_overlap": 0,
+    "manifest_sha256": {
+      "2/4": "d07ca3d0f7104ac1e5ed551886d80f5971da50b19ef65345c1fd6fa5ebbfb38e",
+      "3/4": "5509bed3ba11dccbed7c277e90fb5e39e9ae6890bb7f460f0f24e41bb16bf2e8",
+      "4/4": "cb8d036d1f0629eb6a14dbd57c887a5cec0d405d0e668ca403af8901080adc22"
+    }
+  },
+  "current_drive_meter_v2_1500_mutated": false,
+  "materialization_authorized": false,
+  "bbox_annotation_authorized": false,
+  "training_authorized": false,
+  "safety": {
+    "dataset_copied": false,
+    "dataset_mutated": false,
+    "bbox_annotation": false,
+    "training": false,
+    "tuning": false,
+    "checkpoint_opened": false,
+    "model_evaluated": false,
+    "inference_count": 0
+  }
+}
