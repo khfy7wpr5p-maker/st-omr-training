@@ -17,10 +17,11 @@ Drive admission evidence for the selected TEST child:
 - parent TEST folder id: `13PKxIyjRgZRhqF1C9n9XRMQCYFn-aSdX`
 - verification report: 1500 total; 500 each for 2/4, 3/4, 4/4; 400/50/50 per class; 1500 unique families; 1500 unique samples; 1500 unique source images; `package_ab_only=true`; `bbox_status=NOT_ANNOTATED`.
 
-The Colab runtime must not hard-code the Drive path. It searches `/content/drive/MyDrive` for the exact dataset directory name and:
-- fails on 0 matches;
-- accepts exactly 1 match;
-- fails on >1 matches.
+The Colab runtime must bind the preregistered authoritative dataset path exactly as:
+
+`/content/drive/MyDrive/TEST/METER_V2_1500_PACKAGE_AB_CLEAN`
+
+It must not rescan all of MyDrive and choose among same-name folders. A same-name folder outside the selected TEST parent is not admissible. If the selected TEST path is absent, or the dataset identity/integrity gate does not match the preregistered clean package_ab surface, the stage fails closed.
 
 ## Dataset gate before annotation
 
