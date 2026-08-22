@@ -242,11 +242,10 @@ $consumedSet = @{}
 foreach($familyId in $consumedFamilies) { $consumedSet[$familyId] = $true }
 
 $rows = Import-Csv -Delimiter "`t" -LiteralPath $indexPath
-$configs = @(
-    New-Object PSObject -Property @{ Key="2_4"; Label="2/4"; Flag="Meter2_4" },
-    New-Object PSObject -Property @{ Key="3_4"; Label="3/4"; Flag="Meter3_4" },
-    New-Object PSObject -Property @{ Key="4_4"; Label="4/4"; Flag="Meter4_4" }
-)
+$configs = @()
+$configs += New-Object PSObject -Property @{ Key="2_4"; Label="2/4"; Flag="Meter2_4" }
+$configs += New-Object PSObject -Property @{ Key="3_4"; Label="3/4"; Flag="Meter3_4" }
+$configs += New-Object PSObject -Property @{ Key="4_4"; Label="4/4"; Flag="Meter4_4" }
 
 $candidates = @()
 $excludedConsumed = 0
