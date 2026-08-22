@@ -1,0 +1,152 @@
+{
+  "actual": {
+    "class_split_counts": {
+      "2/4": {
+        "final_holdout": 50,
+        "train": 400,
+        "val": 50
+      },
+      "3/4": {
+        "final_holdout": 50,
+        "train": 400,
+        "val": 50
+      },
+      "4/4": {
+        "final_holdout": 50,
+        "train": 400,
+        "val": 50
+      }
+    },
+    "source_domain_counts": {
+      "2/4": {
+        "package_aa": 500
+      },
+      "3/4": {
+        "package_aa": 500
+      },
+      "4/4": {
+        "package_aa": 24,
+        "package_ab": 476
+      }
+    },
+    "source_domain_share_gaps": {
+      "package_aa": 0.952,
+      "package_ab": 0.952
+    },
+    "source_domain_shares": {
+      "package_aa": {
+        "2/4": 1.0,
+        "3/4": 1.0,
+        "4/4": 0.048
+      },
+      "package_ab": {
+        "2/4": 0.0,
+        "3/4": 0.0,
+        "4/4": 0.952
+      }
+    },
+    "total": 1500,
+    "unique_families": 1484,
+    "unique_folders": 1500,
+    "unique_samples": 1500
+  },
+  "bbox_annotation_authorized": false,
+  "consumed_holdout_overlap": [],
+  "expected": {
+    "per_class": 500,
+    "source_share_gap_max": 0.2,
+    "split_per_class": {
+      "final_holdout": 50,
+      "train": 400,
+      "val": 50
+    },
+    "total": 1500
+  },
+  "manifest_meta": {
+    "2/4": {
+      "columns": [
+        "Split",
+        "Meter",
+        "FamilyId",
+        "SampleId",
+        "Folder",
+        "SourceImage",
+        "SourceSemantic",
+        "SourceAgnostic",
+        "SplitRank"
+      ],
+      "path": "/mnt/data/2_4_SELECTION_MANIFEST.csv",
+      "rank_column": "SplitRank",
+      "row_count": 500,
+      "sha256": "688aa6c229eb01cb88a58d9c2bd4225f47af48475a7c72b3d737922016a9d1ae"
+    },
+    "3/4": {
+      "columns": [
+        "Split",
+        "Meter",
+        "FamilyId",
+        "SampleId",
+        "Folder",
+        "SourceImage",
+        "SourceSemantic",
+        "SourceAgnostic",
+        "SplitRank"
+      ],
+      "path": "/mnt/data/3_4_SELECTION_MANIFEST.csv",
+      "rank_column": "SplitRank",
+      "row_count": 500,
+      "sha256": "6db58cbacc48b41d46a856618432a6d134ff5b4cb6344fc5b7cc06b87b40d5ed"
+    },
+    "4/4": {
+      "columns": [
+        "Split",
+        "Meter",
+        "FamilyId",
+        "SampleId",
+        "Folder",
+        "SourceImage",
+        "SourceSemantic",
+        "SourceAgnostic",
+        "SelectionRank"
+      ],
+      "path": "/mnt/data/4_4_SELECTION_MANIFEST.csv",
+      "rank_column": "SelectionRank",
+      "row_count": 500,
+      "sha256": "5d103cc4dd53a4648a776caaae62b752cd3debbb6bbfa0a35b6016e1fc4db3c2"
+    }
+  },
+  "reasons": [
+    "NON_CANONICAL_RANK_COLUMN:4/4:SelectionRank",
+    "FAMILY_SPLIT_LEAKAGE:1",
+    "SOURCE_DOMAIN_SHARE_GAP:package_aa:0.952000",
+    "SOURCE_DOMAIN_SHARE_GAP:package_ab:0.952000"
+  ],
+  "safety": {
+    "checkpoint_opened": false,
+    "dataset_mutated": false,
+    "inference_count": 0,
+    "model_evaluated": false,
+    "training": false,
+    "tuning": false
+  },
+  "schema": "st-omr-meter-v5-0-dataset-integrity-audit-v1",
+  "split_leaks": [
+    {
+      "family_id": "ab_000102539",
+      "folders": [
+        "2_4_ab_000102539_000102539-1_2_1",
+        "3_4_ab_000102539_000102539-1_1_1"
+      ],
+      "meters": [
+        "2/4",
+        "3/4"
+      ],
+      "splits": [
+        "final_holdout",
+        "train"
+      ]
+    }
+  ],
+  "status": "HOLD",
+  "training_authorized": false
+}
