@@ -20,7 +20,8 @@ Expected composition:
 | total | 1200 | 150 | 150 | 1500 |
 
 Every row must be a distinct sample/folder. Family identity is the
-contamination boundary: one `FamilyId` may not span multiple splits.
+contamination boundary: one `FamilyId` may not appear in more than one class or
+split.
 
 ## Manifest schema
 
@@ -34,116 +35,165 @@ parsed for audit, but the gate remains HOLD until all three manifests use
 
 ## Historical contamination boundary
 
-The consumed V4-5 final holdout is permanently excluded from all V5 train,
-validation, and final-holdout surfaces. The current audit found **zero**
-overlap with the 150 consumed V4-5 families.
+The complete METER_V1 historical family surface is frozen in
+`evidence/METER_V1_HISTORICAL_FAMILIES.txt`.
 
-The exact consumed-family exclusion set is frozen in
-`evidence/METER_V4_5_CONSUMED_FAMILIES.txt` and is bound to:
+It contains **325 unique families**, derived from
+`METER_V1/00_AUDIT/admission_template.csv`:
 
-- V4-5 selection SHA-256:
-  `4335a48a091912ba422c16d8fcbaaa7bbf5f7a0a43f088146a50a3e02e3ed7dc`
-- sorted 150-family list SHA-256:
-  `9d969b6bf5749bae7003c45644c50be36495ccb9b10fe3e7569ace5d413adea3`
+- source CSV SHA-256:
+  `9eb03e743ab1dc2e99dd3d1a8858dab7136bd1d13a008aab7daf1858f0aef202`
+- sorted 325-family list SHA-256:
+  `3231134495c3993b9d0d17355c8758bff2b879513289baad62d3dec03b641fc9`
 
-Any later inventory, selection, split, or rebuild must reproduce this exclusion
-set exactly before proceeding.
+The consumed V4-5 final-holdout set of 150 families is a subset of this
+325-family historical blacklist. No V5 train, validation, or final-holdout row
+may overlap the 325-family blacklist.
 
-## Source-domain shortcut gate
+## Source-domain policy
 
-A class-balanced count is not sufficient if source package/domain predicts the
-label. Source domain is extracted from the `SourceImage` path (for example
-`package_aa`, `package_ab`).
+The preferred V5 repair is now **single-domain package_ab-only** for all three
+classes, not an AA/AB mixture.
 
-For each material source domain, compare its share within each meter class.
-The maximum class-to-class share gap must be **<= 0.20** before bbox annotation
-or training is authorized. This threshold is frozen before resampling.
+A single source domain is acceptable because it is identical across classes:
+package identity cannot predict the class when 2/4, 3/4, and 4/4 are all 100%
+`package_ab`. Under this plan the class-to-class source share gap is exactly
+`0.0`.
 
-Reason: a model must learn the meter glyph, not a source-package rendering
-style.
+The earlier whole-archive AA/AB inventory is therefore **not required** unless a
+future mixed-domain dataset is deliberately proposed.
+
+Source domain is taken from the actual `SourceImage`/`SourceSemantic`/
+`SourceAgnostic` path, never from a folder-name or `FamilyId` prefix.
 
 ## Current Drive audit
 
-Manifest SHA-256:
+Current Drive manifests are structurally 500/class with 400/50/50 splits, but
+are not the intended package_ab-only rebuild.
 
-- 2/4: `688aa6c229eb01cb88a58d9c2bd4225f47af48475a7c72b3d737922016a9d1ae`
-- 3/4: `6db58cbacc48b41d46a856618432a6d134ff5b4cb6344fc5b7cc06b87b40d5ed`
-- 4/4: `5d103cc4dd53a4648a776caaae62b752cd3debbb6bbfa0a35b6016e1fc4db3c2`
+Observed blockers:
 
-Observed structural counts are correct: 500/class with 400/50/50 split counts,
-1500 folders/samples total.
-
-Observed integrity failures:
-
-1. **Schema drift** — 4/4 uses `SelectionRank` instead of `SplitRank`.
-2. **One family split leak** — `ab_000102539` is present as 2/4 `train` and
-   3/4 `final_holdout`.
-3. **Severe source-domain/class confounding**:
-   - 2/4: `package_aa=500`, `package_ab=0`
-   - 3/4: `package_aa=500`, `package_ab=0`
+1. 4/4 schema drift: `SelectionRank` instead of `SplitRank`.
+2. `ab_000102539` spans 2/4 train and 3/4 final_holdout.
+3. Actual source paths are:
+   - 2/4: `package_aa=500`
+   - 3/4: `package_aa=500`
    - 4/4: `package_aa=24`, `package_ab=476`
-   - share gap for both material domains: `0.952`
 
-Therefore the current dataset is **HOLD**. Bbox annotation and model training
-are not authorized yet.
+Therefore the existing Drive surface remains **HOLD** and must not be patched
+in place.
 
-Current audit receipt SHA-256:
-`f30b3717654d253e9296db26b7ab965b4683cfaa32921bd1c7dc2fcc9c6c31d9`
+Current Drive manifest SHA-256 values:
 
-## Read-only source inventory gate
+- 2/4:
+  `688aa6c229eb01cb88a58d9c2bd4225f47af48475a7c72b3d737922016a9d1ae`
+- 3/4:
+  `6db58cbacc48b41d46a856618432a6d134ff5b4cb6344fc5b7cc06b87b40d5ed`
+- 4/4:
+  `5d103cc4dd53a4648a776caaae62b752cd3debbb6bbfa0a35b6016e1fc4db3c2`
 
-Before any regeneration, reselection, copying, or split mutation, source
-capacity must be measured from the existing Windows `MASTER_INDEX.tsv`.
+## Package_ab-only feasibility gate
 
-The approved inventory implementation is
-`tools/st_omr_meter_v5_0_source_inventory_win7.ps1`. It is observation-only:
+The supplied `MASTER_INDEX.tsv` was audited read-only before selector
+implementation.
 
-- reads `MASTER_INDEX.tsv` and referenced semantic/agnostic files only;
-- admits only `package_aa` / `package_ab` candidates;
-- requires G2, the target meter flag, exact semantic meter consistency, and the
-  matching agnostic digit pair;
-- excludes the exact frozen 150 consumed V4-5 families;
-- computes symbolic-content SHA-256 identities;
-- reports per-meter/per-package raw, unique-family, and unique-content capacity;
-- reports cross-meter family and content collisions;
-- writes only a fresh isolated `V5_0_SOURCE_INVENTORY` audit directory;
-- does not modify the current dataset.
+Frozen source index:
 
-The inventory also reports a **count-only** common package mix interval. This
-is feasibility evidence only. Even a feasible 250/250-style count does not
-authorize a rebuild because global family/content collisions may reduce the
-real selectable surface.
+- row count: `87678`
+- SHA-256:
+  `03fe74ff13e12c9b4c4500083812240e90c88ecf17df16d495ebe9d8f6b1ef3e`
 
-## Repair policy
+Candidate policy:
 
-Do not patch only the single split leak and proceed. The source-domain
-confound is the dominant blocker.
+- `Package=ab`
+- `Complete=1`
+- exactly one of `Meter2_4`, `Meter3_4`, `Meter4_4` equals `1`
+- no clef restriction
+- all source paths must resolve under `package_ab`
+- exclude all 325 historical METER_V1 families
+- exclude any family eligible for more than one target meter class
+- choose at most one sample per family
 
-Required order:
+After historical blacklist and global cross-meter ambiguity exclusion, clean
+unique-family capacity is:
 
-1. run the read-only source inventory and freeze its receipt;
-2. require a feasible common source mix before selector design proceeds;
-3. build a deterministic global selector from the inventory, with source-domain
-   stratification and family/content exclusion enforced before any copy;
-4. preserve exactly 500/class and 400/50/50 per class;
-5. enforce family-disjoint splits globally across all classes;
-6. keep consumed V4-5 families at zero overlap;
-7. normalize all manifest schemas to `SplitRank`;
-8. materialize only into a fresh staging destination and independently audit it;
-9. rerun this integrity audit;
-10. only if status is `PASS`, freeze manifest hashes and begin bbox annotation.
+| Meter | clean package_ab families |
+|---|---:|
+| 2/4 | 3701 |
+| 3/4 | 6216 |
+| 4/4 | 725 |
 
-The current `METER_V2_1500` surface remains unchanged until the inventory and
-selector gates have both passed.
+Therefore the 500/500/500 package_ab-only target is **feasible**.
+
+The exact feasibility evidence is frozen in
+`evidence/METER_V5_0_PACKAGE_AB_SELECTION_FEASIBILITY.json`.
+
+## Deterministic selector
+
+The selector is implemented in:
+
+- `st_omr_training/meter_v5_0_package_ab_selector.py`
+- `tools/meter_v5_0_package_ab_selector.py`
+
+Frozen seed:
+
+`st-omr-meter-v5-0-package-ab-selector-v1`
+
+Rules:
+
+1. fail if required index columns are missing;
+2. fail if a `Package=ab` row points outside actual `package_ab` source paths;
+3. exclude the complete 325-family historical blacklist;
+4. exclude cross-meter ambiguous families globally;
+5. deterministically choose one sample per remaining family;
+6. deterministically choose exactly 500 families per class;
+7. assign exactly 400 train + 50 val + 50 final_holdout per class;
+8. require 1500 globally unique families;
+9. write canonical `SplitRank` manifests only;
+10. refuse an existing output directory.
+
+The dry-run on the frozen index + 325-family blacklist produced:
+
+- blacklist overlap: `0`
+- cross-class family overlap: `0`
+- cross-split family overlap: `0`
+- source-domain share gap: `0.0`
+
+Expected deterministic manifest SHA-256 values:
+
+- 2/4:
+  `d07ca3d0f7104ac1e5ed551886d80f5971da50b19ef65345c1fd6fa5ebbfb38e`
+- 3/4:
+  `5509bed3ba11dccbed7c277e90fb5e39e9ae6890bb7f460f0f24e41bb16bf2e8`
+- 4/4:
+  `cb8d036d1f0629eb6a14dbd57c887a5cec0d405d0e668ca403af8901080adc22`
+
+These hashes are selection evidence only. They do not authorize bbox or
+training.
+
+## Repair order
+
+1. selector code/tests must pass exact-head CI;
+2. regenerate the three manifests from the exact source index and frozen
+   325-family blacklist;
+3. verify their SHA-256 values match the preregistered values above;
+4. materialize source files only into a **fresh staging destination**;
+5. independently audit copied files, source hashes/provenance, 500/class,
+   400/50/50, 1500 global unique families, zero historical overlap, zero
+   cross-class/split family overlap, and canonical schema;
+6. only after that audit PASS may bbox annotation be authorized;
+7. training remains closed until bbox completion and its own admission gate.
+
+The current `METER_V2_1500` Drive surface is not modified in place.
 
 ## 4/4 policy
 
-4/4 is a protected regression/reference class, not a reason to accept source
-imbalance. Its representation must remain strong while source-domain cues are
-balanced enough that 4/4 cannot be recognized merely from package identity.
+4/4 remains a protected regression/reference class. The package_ab-only plan
+prevents source package identity from becoming a class shortcut while
+preserving 500 independent 4/4 families.
 
 ## Safety invariant
 
 `training=false`, `tuning=false`, `model_evaluated=false`,
-`checkpoint_opened=false`, `inference_count=0`, `dataset_mutated=false` during
-this audit stage.
+`checkpoint_opened=false`, `inference_count=0`, `dataset_mutated=false` until
+the explicit downstream gates pass.
