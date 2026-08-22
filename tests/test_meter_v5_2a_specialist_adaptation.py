@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import Image
 
 from st_omr_training import meter_v5_1_bbox_pilot as v51
+from st_omr_training import meter_v5_2_train_bbox_scale as v52
 from st_omr_training import meter_v5_2a_specialist_adaptation as m
 
 
@@ -121,7 +122,9 @@ class TestMeterV52A(unittest.TestCase):
             fingerprint, hashes = prepare_seed(root)
             pilot = root / v51.ANNOTATIONS_DIR / v51.PILOT_CSV_NAME
             pilot.write_text(pilot.read_text(encoding="utf-8") + "\n", encoding="utf-8")
-            with self.assertRaises(m.MeterV5_2AError):
+            # Seed identity is deliberately delegated to the frozen V5-2 verifier;
+            # its fail-closed exception surface remains authoritative here.
+            with self.assertRaises(v52.MeterV5_2ScaleError):
                 m.verify_seed_evidence(
                     root,
                     expected_dataset_fingerprint=fingerprint,
