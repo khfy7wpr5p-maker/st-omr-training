@@ -1,0 +1,100 @@
+{
+  "schema": "st-omr-meter-v5-1r1-early-falsification-v1",
+  "stage": "METER V5-1R1",
+  "status": "HOLD_INPUT_CONTRACT_EARLY_FALSIFICATION",
+  "decision_basis": "The preregistered gate requires every one of 60 slots to be deterministic, UNIQUE, and correct. The first frozen pilot sample produced NO_HIT for both numerator and denominator. One counterexample is sufficient to make PASS_SCALE_ANNOTATION impossible, so no additional pilot images were opened for this early-falsification decision.",
+  "parent": {
+    "v5_1_head_sha": "4f744d0bf8a2f6180a62f0f08abb96b83cfb5da8",
+    "v5_1_selection_csv_sha256": "4070f46f64efed5b12b26f7dd1d4e3f09b4abf804125140d38a212819bbcbe97",
+    "v5_1_annotation_csv_sha256": "b60a953811aa136752372d7c8cea6fe7a1c1c964a62bd53c0c9d48c56c735665"
+  },
+  "sample": {
+    "selection_index": 0,
+    "sample_id": "150203166-1_1_1",
+    "family_id": "ab_150203166",
+    "meter": "2/4",
+    "split": "train",
+    "image_sha256": "93529d0c3d3dc9b0e4bfc7229b27aeecbb2cb67b6ef60ab4f0d714156f8bd554",
+    "image_width": 974,
+    "image_height": 137,
+    "full_meter_bbox_xywh": [146, 14, 56, 101]
+  },
+  "frozen_slot_policy": {
+    "policy": "same-x-integer-midpoint-no-padding-v1",
+    "split_y": 64,
+    "numerator_box_xyxy": [146, 14, 202, 64],
+    "denominator_box_xyxy": [146, 64, 202, 115],
+    "numerator_crop_content_size_before_canvas": [56, 50],
+    "denominator_crop_content_size_before_canvas": [56, 51],
+    "canvas": "gray8-64x64-white-centered",
+    "resize": "LANCZOS-thumbnail-no-upscale",
+    "tensor_semantics": "uint8-div255"
+  },
+  "specialists": {
+    "digit_2_checkpoint_sha256": "92b985d989e4338e3ae39b0a984879f4188be32c0d281390839117e1e9a715fa",
+    "digit_3_checkpoint_sha256": "5ee45faf2efe0e2c83dbad716736d7ae16ad7251730431d368c10c4574836485",
+    "digit_4_checkpoint_sha256": "dcd582b60b39e65798aa77aacea3cc797cd7513b7925151f0573be4aec6af43f",
+    "thresholds_milli": {
+      "2": 480,
+      "3": 600,
+      "4": 470
+    },
+    "checkpoint_sha_verification": "PASS",
+    "weights_only_cpu_state_load": "PASS"
+  },
+  "numerator": {
+    "expected_digit": 2,
+    "crop_sha256": "eb43f598502e9fa3f84a1fe55cbc4af91050861dc3671f45c24e101cce0512d9",
+    "probabilities": {
+      "2": 0.3870510756969452,
+      "3": 2.7512763267623086e-07,
+      "4": 2.707900966925081e-05
+    },
+    "scores_milli_floor": {
+      "2": 387,
+      "3": 0,
+      "4": 0
+    },
+    "passing_digits": [],
+    "arbitration": "NO_HIT",
+    "replay_count": 10,
+    "replay_stable": true,
+    "outcome": "NO_HIT"
+  },
+  "denominator": {
+    "expected_digit": 4,
+    "crop_sha256": "7c57be3a0b5ef6e92830d30dd0564f184724f378f0735c8f835ea27f0ed89f7a",
+    "probabilities": {
+      "2": 0.0033865245059132576,
+      "3": 3.9502129567381417e-08,
+      "4": 0.00021062664745841175
+    },
+    "scores_milli_floor": {
+      "2": 3,
+      "3": 0,
+      "4": 0
+    },
+    "passing_digits": [],
+    "arbitration": "NO_HIT",
+    "replay_count": 10,
+    "replay_stable": true,
+    "outcome": "NO_HIT"
+  },
+  "interpretation_boundary": {
+    "proven": "The fixed midpoint full-meter-to-digit-slot rule is not compatible with the frozen digit-specialist input contract on the first immutable V5-1 TRAIN pilot sample; therefore it cannot satisfy the strict 60-of-60 scale-annotation gate.",
+    "not_proven": "This does not show that 2-AI, 3-AI, or 4-AI are weak, does not establish a replacement crop rule, and does not authorize threshold tuning, training, validation/final-holdout access, D11 changes, Resolver wiring, or production promotion.",
+    "next_safe_gate": "TRAIN-only slot-geometry root-cause audit. Diagnose why the midpoint rule destroys specialist-compatible digit isolation before proposing exactly one replacement geometry hypothesis."
+  },
+  "safety": {
+    "pilot_images_opened": 1,
+    "validation_images_opened": 0,
+    "final_holdout_images_opened": 0,
+    "training": false,
+    "optimizer_steps": 0,
+    "threshold_tuning": false,
+    "crop_search": false,
+    "d11_executed": false,
+    "resolver_connected": false,
+    "production_promotion_authorized": false
+  }
+}
