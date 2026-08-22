@@ -20,7 +20,11 @@ class TestMeterV51BBoxPilotNotebook(unittest.TestCase):
             "".join(cell.get("source", [])) for cell in payload["cells"]
         )
         self.assertIn(EXPECTED_CODE_SHA, text)
-        self.assertIn("discover_data_root('/content/drive/MyDrive')", text)
+        self.assertIn("MYDRIVE / 'TEST' / DATASET_NAME", text)
+        self.assertNotIn("discover_data_root('/content/drive/MyDrive')", text)
+        self.assertIn("METER V5-1 LIVE PRECHECK", text)
+        self.assertIn("threading.Thread", text)
+        self.assertIn("elapsed=", text)
         self.assertIn("DATASET_GATE=PASS", text)
         self.assertIn("FINAL_HOLDOUT=LOCKED", text)
         self.assertIn("train_pilot_30_only", text)
