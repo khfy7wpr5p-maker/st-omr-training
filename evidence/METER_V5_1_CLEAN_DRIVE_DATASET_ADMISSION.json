@@ -1,0 +1,53 @@
+{
+  "drive_verification_report": {
+    "bbox_status": "NOT_ANNOTATED",
+    "old_used_ab_families_blacklisted": 212,
+    "package_ab_only": true,
+    "per_meter": {
+      "2/4": {
+        "final_holdout": 50,
+        "total": 500,
+        "train": 400,
+        "val": 50
+      },
+      "3/4": {
+        "final_holdout": 50,
+        "total": 500,
+        "train": 400,
+        "val": 50
+      },
+      "4/4": {
+        "final_holdout": 50,
+        "total": 500,
+        "train": 400,
+        "val": 50
+      }
+    },
+    "total": 1500,
+    "unique_families": 1500,
+    "unique_samples": 1500,
+    "unique_source_images": 1500
+  },
+  "rejected_dataset": {
+    "allowed_for_bbox": false,
+    "allowed_for_final_test": false,
+    "allowed_for_training": false,
+    "name": "METER_V2_1500",
+    "status": "REJECTED_SOURCE_CONFOUND"
+  },
+  "safety_state": {
+    "checkpoint_opened": false,
+    "final_holdout_annotation_opened": false,
+    "inference_count": 0,
+    "model_evaluated": false,
+    "training": false,
+    "tuning": false
+  },
+  "schema": "st-omr-meter-v5-1-clean-drive-admission-v1",
+  "selected_drive_folder": {
+    "folder_id": "1OY6ZInOGh0Xtqb4Lkw78zx2rZTfpUasG",
+    "name": "METER_V2_1500_PACKAGE_AB_CLEAN",
+    "parent_folder_id": "13PKxIyjRgZRhqF1C9n9XRMQCYFn-aSdX",
+    "parent_name": "TEST"
+  }
+}
