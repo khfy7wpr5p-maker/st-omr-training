@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from st_omr_training.meter_v5_2_train_bbox_scale import (
     ScaleAnnotationSession,
@@ -19,7 +20,7 @@ def _require_dict(value: object, name: str) -> dict[str, object]:
     return value
 
 
-def launch_colab_scale(*, data_root: str) -> ScaleAnnotationSession:
+def launch_colab_scale(*, data_root: str, session: ScaleAnnotationSession | None = None) -> ScaleAnnotationSession:
     """Launch the TRAIN-only one-full-meter-box-per-image annotation UI."""
     try:
         from google.colab import output
@@ -27,7 +28,10 @@ def launch_colab_scale(*, data_root: str) -> ScaleAnnotationSession:
     except ImportError as exc:
         raise MeterV5_2ScaleError("V5-2 bbox scale UI requires Google Colab") from exc
 
-    session = ScaleAnnotationSession(data_root=data_root)
+    if session is None:
+        session = ScaleAnnotationSession(data_root=data_root)
+    elif session.data_root.resolve() != Path(data_root).resolve():
+        raise MeterV5_2ScaleError("provided V5-2 session belongs to a different data root")
 
     def get_callback(index: object) -> object:
         if type(index) is not int:
