@@ -38,6 +38,17 @@ The consumed V4-5 final holdout is permanently excluded from all V5 train,
 validation, and final-holdout surfaces. The current audit found **zero**
 overlap with the 150 consumed V4-5 families.
 
+The exact consumed-family exclusion set is frozen in
+`evidence/METER_V4_5_CONSUMED_FAMILIES.txt` and is bound to:
+
+- V4-5 selection SHA-256:
+  `4335a48a091912ba422c16d8fcbaaa7bbf5f7a0a43f088146a50a3e02e3ed7dc`
+- sorted 150-family list SHA-256:
+  `9d969b6bf5749bae7003c45644c50be36495ccb9b10fe3e7569ace5d413adea3`
+
+Any later inventory, selection, split, or rebuild must reproduce this exclusion
+set exactly before proceeding.
+
 ## Source-domain shortcut gate
 
 A class-balanced count is not sufficient if source package/domain predicts the
@@ -79,6 +90,30 @@ are not authorized yet.
 Current audit receipt SHA-256:
 `f30b3717654d253e9296db26b7ab965b4683cfaa32921bd1c7dc2fcc9c6c31d9`
 
+## Read-only source inventory gate
+
+Before any regeneration, reselection, copying, or split mutation, source
+capacity must be measured from the existing Windows `MASTER_INDEX.tsv`.
+
+The approved inventory implementation is
+`tools/st_omr_meter_v5_0_source_inventory_win7.ps1`. It is observation-only:
+
+- reads `MASTER_INDEX.tsv` and referenced semantic/agnostic files only;
+- admits only `package_aa` / `package_ab` candidates;
+- requires G2, the target meter flag, exact semantic meter consistency, and the
+  matching agnostic digit pair;
+- excludes the exact frozen 150 consumed V4-5 families;
+- computes symbolic-content SHA-256 identities;
+- reports per-meter/per-package raw, unique-family, and unique-content capacity;
+- reports cross-meter family and content collisions;
+- writes only a fresh isolated `V5_0_SOURCE_INVENTORY` audit directory;
+- does not modify the current dataset.
+
+The inventory also reports a **count-only** common package mix interval. This
+is feasibility evidence only. Even a feasible 250/250-style count does not
+authorize a rebuild because global family/content collisions may reduce the
+real selectable surface.
+
 ## Repair policy
 
 Do not patch only the single split leak and proceed. The source-domain
@@ -86,13 +121,20 @@ confound is the dominant blocker.
 
 Required order:
 
-1. regenerate/reselect METER_V2 candidates with source-domain stratification;
-2. preserve exactly 500/class and 400/50/50 per class;
-3. enforce family-disjoint splits globally across all classes;
-4. keep consumed V4-5 families at zero overlap;
-5. normalize all manifest schemas to `SplitRank`;
-6. rerun this integrity audit;
-7. only if status is `PASS`, freeze manifest hashes and begin bbox annotation.
+1. run the read-only source inventory and freeze its receipt;
+2. require a feasible common source mix before selector design proceeds;
+3. build a deterministic global selector from the inventory, with source-domain
+   stratification and family/content exclusion enforced before any copy;
+4. preserve exactly 500/class and 400/50/50 per class;
+5. enforce family-disjoint splits globally across all classes;
+6. keep consumed V4-5 families at zero overlap;
+7. normalize all manifest schemas to `SplitRank`;
+8. materialize only into a fresh staging destination and independently audit it;
+9. rerun this integrity audit;
+10. only if status is `PASS`, freeze manifest hashes and begin bbox annotation.
+
+The current `METER_V2_1500` surface remains unchanged until the inventory and
+selector gates have both passed.
 
 ## 4/4 policy
 
