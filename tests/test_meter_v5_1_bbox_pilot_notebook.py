@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 EXPECTED_CODE_SHA = "0146ecae4f3abb06175872bebc6b7f15644b4773"
+EXPECTED_DATASET_PATH = "/content/drive/MyDrive/TEST/METER_V2_1500_PACKAGE_AB_CLEAN"
 NOTEBOOK = Path("notebooks/st_omr_meter_v5_1_bbox_pilot_30_colab.ipynb")
 
 
@@ -20,10 +21,14 @@ class TestMeterV51BBoxPilotNotebook(unittest.TestCase):
             "".join(cell.get("source", [])) for cell in payload["cells"]
         )
         self.assertIn(EXPECTED_CODE_SHA, text)
-        self.assertIn("discover_data_root('/content/drive/MyDrive')", text)
+        self.assertIn(EXPECTED_DATASET_PATH, text)
+        self.assertNotIn("discover_data_root('/content/drive/MyDrive')", text)
         self.assertIn("DATASET_GATE=PASS", text)
         self.assertIn("FINAL_HOLDOUT=LOCKED", text)
         self.assertIn("train_pilot_30_only", text)
+        self.assertIn("V5_1_PRECHECK_STATUS.json", text)
+        self.assertIn("BACKGROUND_PRECHECK=STARTED", text)
+        self.assertIn("PRECHECK_MONITOR", text)
 
     def test_notebook_has_no_training_or_model_execution(self):
         payload = json.loads(NOTEBOOK.read_text(encoding="utf-8"))
