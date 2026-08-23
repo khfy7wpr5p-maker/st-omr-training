@@ -1,6 +1,26 @@
 # Stage 7-D13-R2 — Specialist refinement and recovery plan
 
-Status: **approved architecture plan — documentation only; no R2 training/code implementation in this package**.
+> Historical/frozen recovery plan. This document preserves the architecture decision that followed the failed D13-R1 Rest run. It is no longer the current Rest status source. The current Rest R4 shadow-PASS state and runtime boundary are recorded in `ARCHITECTURE_CURRENT.md`.
+
+Status: **historical architecture plan; R1 failure preserved, later Rest R4 recovery supersedes the active-plan status**.
+
+## 2026-08-23 execution overlay
+
+The plan below remains useful as causal history, but its original "next gate = Rest Root-Cause Audit" status is complete/superseded for Rest.
+
+Current Rest shadow outcome:
+
+```text
+Half specialist      PASS
+Quarter specialist   PASS
+Eighth specialist    PASS
+Deterministic class arbitration  PASS
+Resolver connection  CLOSED
+sealed TEST           CLOSED
+production promotion CLOSED
+```
+
+The old R1 zero-F1 Rest result remains immutable baseline evidence and must not be deleted or rewritten. The next Rest-quality work is real-image/shadow E2E validation and evidence-selected refinement if needed, not a blind replay of the failed R1 training profile.
 
 ## Why R2 exists
 
@@ -286,6 +306,6 @@ D13-R2 does not authorize:
 - deleting D13-R1 evidence;
 - treating a synthetic-validation F1 value as production PDF accuracy.
 
-## Next implementation gate
+## Historical next implementation gate
 
-The first implementation package after this architecture document is **Rest Root-Cause Audit**. It should add diagnostic/read-only tooling and evidence contracts only. No new full R2 optimizer run should start until that audit is reviewed and its selected failure cause is documented.
+The original first implementation package after this architecture document was **Rest Root-Cause Audit**. That gate is preserved here as history. Current Rest work must follow `ARCHITECTURE_CURRENT.md` and may not infer new optimizer or production authority from this historical plan.
