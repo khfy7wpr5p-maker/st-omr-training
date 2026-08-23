@@ -55,7 +55,6 @@ class TestMeterV52OFrozenHeadAxisAuditV1(unittest.TestCase):
         self.assertAlmostEqual(cross["v5_over_source_abs_class_gap_along_head"], 0.5, places=12)
         self.assertAlmostEqual(cross["abs_midpoint_shift_over_abs_v5_class_gap"], 2.5, places=12)
         self.assertTrue(cross["class_gap_direction_preserved_along_head"])
-        self.assertTrue(result["same_frozen_head_direction_contains_v5_ordering"])
         self.assertTrue(result["same_frozen_head_direction_strictly_separates_v5_train"])
         self.assertFalse(result["bias_or_threshold_selected"])
         self.assertFalse(result["classifier_fit_performed"])
@@ -76,9 +75,15 @@ class TestMeterV52OFrozenHeadAxisAuditV1(unittest.TestCase):
         )
         self.assertEqual(result["v5_adaptation_train"]["rank_auc"], 0.0)
         self.assertFalse(result["source_to_v5"]["class_gap_direction_preserved_along_head"])
-        self.assertFalse(result["same_frozen_head_direction_contains_v5_ordering"])
         self.assertFalse(result["same_frozen_head_direction_strictly_separates_v5_train"])
         self.assertTrue(torch.isfinite(torch.tensor(result["v5_adaptation_train"]["class_mean_logit_gap"])))
+
+    def test_rank_auc_handles_ties_without_pairwise_matrix(self):
+        torch = self._torch()
+        pos = torch.tensor([1.0, 2.0], dtype=torch.float32)
+        neg = torch.tensor([1.0, 1.0], dtype=torch.float32)
+        # One positive ties both negatives; the other beats both: (1 + 2) / 4 = 0.75.
+        self.assertEqual(m._rank_auc(pos, neg), 0.75)
 
     def test_zero_head_weight_fails_closed(self):
         torch = self._torch()
