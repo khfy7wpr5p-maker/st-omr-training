@@ -1,6 +1,10 @@
 # Stage 7-D4 — Specialist OMR Architecture Contract
 
-Status: **active — architecture contract only; no training**.
+> Historical/frozen architecture contract. D4 is closed and its machine-readable specialist decomposition remains an invariant for later work. This file is not the current execution-status source. Use `ARCHITECTURE_CURRENT.md` for current NoteHead/Rest/Accidental/Meter status.
+
+Status: **closed / frozen specialist architecture contract**.
+
+The current 2026-08-23 compatibility audit confirms that later Rest R4 and Meter V5 experimental work remain compatible with the D4 principles: small specialist observations, deterministic association/fusion, human-verified real spatial GT, family/split isolation, sealed TEST, and fail-closed ambiguity handling.
 
 Stage 7-D4 replaces the next-step assumption of a larger monolithic image-to-sequence model with a frozen V1 decomposition into small musical perception tasks, deterministic assembly, and independent musical validation.
 
@@ -399,8 +403,8 @@ Stage 7-D4 may close only after:
 10. explicit user merge approval is obtained;
 11. post-merge exact-main CI succeeds.
 
-## Next implementation package after D4
+## Historical next implementation package after D4
 
-The first specialist implementation package should be **StaffSet + StructureSet ground-truth extraction contract/pilot**, because every later visual specialist depends on reliable staff and measure geometry.
+The first specialist implementation package after D4 was **StaffSet + StructureSet ground-truth extraction contract/pilot**, because every later visual specialist depends on reliable staff and measure geometry.
 
-That package must prove that pinned Verovio SVG elements can be linked to canonical music and transformed into clean/light/medium raster coordinates deterministically before any specialist model is trained.
+That historical package requirement remains preserved as evidence. Current downstream status is maintained in `ARCHITECTURE_CURRENT.md`.
