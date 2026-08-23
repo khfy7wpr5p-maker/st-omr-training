@@ -7,6 +7,32 @@ Its job is to create traceable OMR training data, train candidate ST-OMR models,
 
 It is not the ScoreMosaic production runtime, a user-file store, a Guitar TAB training project, or an automatic deployment system.
 
+## Current-status authority
+
+This long-form document preserves stable architecture boundaries and closed-stage history. Some stage-status labels below are historical snapshots and are not the current operational authority.
+
+For current status, use the following order:
+
+1. frozen machine-readable/stage contracts define invariants;
+2. merged `main` defines executable repository authority;
+3. `ARCHITECTURE_CURRENT.md` defines the current merged + shadow/experimental overlay;
+4. open draft PR evidence is non-main and non-production until separately accepted/merged;
+5. historical stage delta documents preserve their original scope and do not override the current overlay.
+
+Current merged baseline at the 2026-08-23 synchronization is `a6a40b218a95c72349984ee2aee7262f467021fc`.
+
+Important current overlay facts:
+
+- NoteHead has PASS shadow evidence but is not production-wired.
+- Rest R4 `half|quarter|eighth` value-specific specialists plus deterministic arbitration have PASS shadow evidence; Resolver connection remains closed.
+- Accidental has PASS shadow evidence; deterministic association remains separate.
+- Meter has a merged runtime foundation through real D11 Presence inference implementation, while later V4/V5 work remains draft/experimental unless separately merged.
+- the V4-5 final holdout is consumed and failed; it cannot be reused for tuning.
+- Meter V5-2B is the newest inspected bounded adaptation lane, with TRAIN-safe preflight/annotation gates and VAL/FINAL_HOLDOUT still closed.
+- sealed TEST remains unavailable for development/tuning; shadow PASS is not production PASS.
+
+The 2026-08-23 architecture incompatibility audit is recorded in `ARCHITECTURE_COMPATIBILITY_AUDIT_2026-08-23.md`.
+
 ## Core pipeline
 
 ```text
@@ -382,6 +408,8 @@ Stage 8-3B paired real train/validation execution  LOCKED
 Stage 9 sealed benchmark                           LOCKED
 ```
 
+The status labels in this Stage 8 section are preserved as historical closed-stage architecture evidence. Current operational status is maintained in `ARCHITECTURE_CURRENT.md` and `STATUS.md`.
+
 Stage 8-0 freezes two experiment candidates: (A) fine-tuning from the exact Stage 7-C checkpoint identified by its accepted checkpoint/model-state hashes, and (B) the same frozen architecture initialized from scratch. The Stage 7-C Actions artifact is only a temporary location and is scheduled to expire on 2026-09-12. Stage 8-2 does not access or relocate it. If exact Candidate A bytes are unavailable or fail hash/state verification at a later execution gate, Candidate A is blocked rather than silently substituted.
 
 Real sample identity is independent of split/review state. Stage 8-0 rejects exact duplicate and family/source/target/semantic aliases. Stage 8-1 independently rebinds exact source, training-image, and MusicXML bytes to those hashes and recomputes the supported-V1 semantic fingerprint before a later loader may trust the sample. Stage 8-1 additionally performs bounded deterministic dHash64 near-duplicate review and requires one independently revalidated receipt per admitted development sample.
@@ -413,6 +441,8 @@ Stage 8-0 merged through PR #25 to `86487a4c3c41264b02bd159cd647a1318d9b9b88`; r
 Stage 8-1 final source `ed4113a25f6e12055b9277f959a4580259d37d40` merged through PR #29 to `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) passed **394/394 tests**, `pip check`, pinned runtime verification, and `compileall`. Closure synchronization PR #30 merged to exact `main` `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`; post-merge run #94 (`31705382162`) passed. This is the exact Stage 8-2 starting baseline.
 
 ## Stage roadmap
+
+The roadmap below is preserved as historical long-form stage history. Current operational status is maintained in `ARCHITECTURE_CURRENT.md`.
 
 ```text
 Stage 0   Safety and architecture baseline              ✅
