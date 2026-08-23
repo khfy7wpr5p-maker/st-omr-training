@@ -68,6 +68,9 @@ class TestMeterV52EGradientPressureAuditV1(unittest.TestCase):
         self.assertIn('"repair_training_authorized": false', source)
         self.assertIn('"replay_ratio_selected": false', source)
         self.assertIn('"threshold_tuning": false', source)
+        self.assertIn('"new_bbox": false', source)
+        self.assertIn('"new_crop_geometry": false', source)
+        self.assertIn('"new_spatial_heuristic": false', source)
 
     def test_dominance_requires_two_orders_of_magnitude(self):
         self.assertTrue(m._dominance({
