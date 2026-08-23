@@ -1,171 +1,220 @@
 # ST-OMR Training Lab Status
 
-This file is the current stage-status source for this repository. Detailed closed-stage history remains in `ARCHITECTURE.md`; the current active-lane overlay is in `ARCHITECTURE_CURRENT.md`.
+Status date: **2026-08-23**.
 
-## Current repository phase
+This file is the current stage-status source for the repository. Detailed closed-stage history remains in `ARCHITECTURE.md`; the current merged + shadow/experimental architecture overlay is in `ARCHITECTURE_CURRENT.md`.
 
-Verified baseline before Stage 7-D10 work:
+## Current authoritative baseline
 
-- `main`: `d3021a6cb64d35a5a216101b84f9aa3545527535`
-- PR #46 — Stage 7-D9 Structure refinement contract: MERGED
-- D9 post-merge main CI: run #181 (`31839302798`) — SUCCESS
-- Stage 7-D0 through Stage 7-D9: CLOSED
-
-The current active lane is **Stage 7-D10 — deterministic local barline/meter ROI derivatives**. D10 is a data-derivative gate only. It performs no model training, preserves the accepted D7 Structure core unchanged, and keeps TEST sealed.
-
-## Stage status
-
-| Stage | Description | Status |
-|---|---|---|
-| 0–6 | Deterministic music → validated synthetic dataset pipeline | ✅ Closed / main CI verified |
-| 7-A | Training contract freeze | ✅ Closed / main CI verified |
-| 7-B | Tokenizer/data/model/trainer implementation | ✅ Closed / main CI verified |
-| 7-C | Bounded baseline training + evidence | ✅ Closed / non-production baseline |
-| 7-D0 | Synthetic Curriculum v1 export-evidence identity gate | ✅ Closed |
-| 7-D1 | Synthetic corpus transport/byte/manifest acceptance | ✅ Closed |
-| 7-D2 | Synthetic V1 monolithic train/validation execution | ✅ Closed / non-production baseline |
-| 7-D3 | Validation-only semantic error diagnostics | ✅ Closed / specialist decomposition selected |
-| 7-D4 | Specialist OMR architecture + GT/fusion contract | ✅ Closed |
-| 7-D5 | StaffSet + StructureSet deterministic geometry | ✅ Closed |
-| 7-D6 | TRAIN/VALIDATION StaffSet + StructureSet derivatives | ✅ Closed / PR #43 / main CI #171 PASS |
-| 7-D7 | StaffSet + StructureSet specialist training | ✅ Closed / PR #44 / main CI #175 PASS |
-| 7-D8 | Structure validation-only diagnostics | ✅ Closed / PR #45 / main CI #177 PASS |
-| 7-D9 | Structure refinement architecture/contract | ✅ Closed / PR #46 / main CI #181 PASS |
-| 7-D10 | Deterministic barline/meter local ROI derivatives | 🔄 Active — code gate under PR #47 / external build pending / TEST sealed |
-| 8-0 | Real-data rights/provenance/fine-tuning contract | ✅ Closed / preserved |
-| 8-1 | Real-data quarantine/intake + byte validation | ✅ Closed / preserved |
-| 8-2 | Paired experiment profile | ✅ Closed / preserved |
-| 8-3A | Real pilot preparation/admission components | ⏸ Parked during specialist synthetic work |
-| 8-3B | Paired real train/validation execution | 🔒 Not started |
-| 9 | Sealed benchmark and candidate decision | 🔒 Not started — TEST sealed |
-| 10 | ScoreMosaic candidate integration | 🔒 Not started |
-
-## Frozen Synthetic Curriculum v1
+Merged `main` inspected for this synchronization:
 
 ```text
-source commit       adc8139539d3c8cd6a2e3ee4ce4de6db4dcfeb90
-config fingerprint  154bf1c3e6dfe4e6db096f8b668f29df0623cfd38352b89a04d295764c7458cb
-build id            d9320e362f162cd2ace2a830a7b93e0c21ceba2d51a4e95ef1c7a9b11a108352
-manifest SHA-256     44a963cd7dbc612fa29c2953ea8b2c8776d89ce470074e8f8b3fe25c6e165f34
-transport SHA-256    4a9f3bb337ef99386081dff29c4c1fc3047dc3ada4db13c93b6254e680918e2b
-families             512 = 410 train + 51 validation + 51 test
-images               1536 = 1230 train + 153 validation + 153 test
-targets              512 MusicXML
+main = a6a40b218a95c72349984ee2aee7262f467021fc
 ```
 
-## Accepted D6 derivative identity
+That merged baseline includes the deterministic runtime foundation through real D11 Meter Presence inference implementation and the post-PR #76 documentation synchronization.
+
+Later NoteHead/Rest/Accidental shadow acceptance and Meter V3/V4/V5 work remain open/draft evidence unless separately merged. They must not be represented as merged runtime authority.
+
+## Current state summary
+
+| Area | Current status |
+|---|---|
+| deterministic canonical music / MusicXML / renderer / degradation / dataset pipeline | ✅ Closed / verified foundation |
+| Staff / Structure specialist foundation | ✅ Closed / verified |
+| NoteHead specialist | ✅ Shadow PASS evidence / not production-wired |
+| Rest R4 half/quarter/eighth | ✅ Shadow PASS evidence / deterministic arbitration PASS / Resolver closed |
+| Accidental specialist | ✅ Shadow PASS evidence / key-local deterministic contract preserved |
+| merged Meter runtime foundation | ✅ through D11 Presence inference implementation |
+| Meter V4-5 candidate | ⛔ FINAL_HOLDOUT_FAIL / rejected / holdout consumed |
+| Meter V5 clean-domain recovery | 🔄 active draft experiment stack |
+| Meter V5-2B | 🔄 current inspected bounded adaptation lane; 298/300 preflight before replacements |
+| Rhythm specialist | 🔒 not opened |
+| StaffPosition specialist | 🔒 not opened |
+| Chord specialist | 🔒 not opened |
+| deterministic full musical fusion | 🔒 later gate |
+| real specialist Resolver E2E | 🔒 later gate |
+| Stage 9 sealed benchmark | 🔒 TEST sealed |
+| production / ScoreMosaic promotion | 🔒 not authorized |
+
+## Specialist shadow evidence
+
+### NoteHead
+
+Current shadow evidence:
 
 ```text
-derivative build ID      0faafe229f3497b1147cf0f0ac0ce4b7efe6fa31f360a6a33a3b82c986c8c519
-manifest SHA-256          e8e415eb6ba9d91a1a880709c3f31d559aa20bf5149734f45b5f84ced16afee9
-artifact binding SHA-256  3b7558f0f927ad47a61ed5afb5faa8584dca8647cf8683d4043686eb7b077ea1
-receipt SHA-256           8fe85747b77f2282be3662f0c3d180a440c88028638bf1df7ddadfbb7650fff2
-TRAIN labels              1,230 / 410 families
-VALIDATION labels           153 /  51 families
-TEST specialist records       0
+Center F1  0.9882845985
+BBox F1    0.9882845985
+Macro F1   0.9855884316
+Epochs      10/10
+Decision    PASS for shadow acceptance
 ```
 
-## Accepted D7 specialist result
+### Rest R4
+
+The old D13-R1 Rest zero-F1 outcome is historical failure evidence, not the current Rest state.
+
+Current value-specific Rest shadow evidence:
+
+| Class | Recall | False-positive reduction | Decision |
+|---|---:|---:|---|
+| half | 1.000000 | 0.812500 | PASS |
+| quarter | 0.989071 | 0.752369 | PASS |
+| eighth | 0.985612 | 0.792714 | PASS |
+
+Current Rest architecture:
 
 ```text
-run ID                 4ce2903206c7965471bb9569d379d8d9d1022d9248d80886638acfe0bd822598
-checkpoint SHA-256     5f009ca8ba68d38497a7dd25590d4dd98c537f20c5d5525bf66e288afbf417dc
-metrics SHA-256        43cd98a75c2db740b4af6ee3c8826122fa387347820d2e7d2c639ac2fe30f792
-verification SHA-256   cdc0733af1bd6c7336f5bd2a0cb12fcae269120d8b5a9a564f08db860ee21a0a
-TEST opened            false
+high-recall proposals
+        ↓
+half / quarter / eighth verifiers
+        ↓
+deterministic arbitration
+        ↓
+exactly one class -> accepted
+none / multiple -> AMBIGUOUS
+malformed / non-finite -> REJECTED
 ```
 
-Staff learned strongly (`staff_lines` Dice `0.9217`, `staff_region` Dice `0.9127`). Structure learned system/measure/clef well but left barline and meter weak.
+Resolver connection remains CLOSED. Shadow PASS is not production PASS.
 
-## Accepted D8 diagnostic finding
+### Accidental
 
-D8 used VALIDATION only, optimizer `0`, TEST `0`.
+Current shadow evidence:
 
 ```text
-D8 repository head       e0e721bf5a6d13025546fdf5eeb755647eef383f
-report SHA-256            46de5f6766f78bb567f70794a364ccd44835d09af94ef29c3f1eab5cd13ce968
-barline Dice@0.50         0.2736204205
-barline tolerant F1@2px   0.3670878904
-meter 2/4 Dice            0.3481060606
-meter 3/4 Dice            0.3528485803
-meter 4/4 Dice            0.3103351169
+Center F1   0.973754
+BBox F1     0.973754
+Macro F1    0.956454
+Steps        6150/6150
+Epochs       10/10
+Decision     PASS for shadow acceptance
 ```
 
-Threshold sweeps and 1–2 pixel tolerance did not repair the weak channels. D8 therefore selected local higher-resolution specialists rather than more whole-page epochs.
+The current real-model class surface remains `sharp|flat|natural`.
 
-## Closed D9 contract
+## Meter status
 
-D9 preserves the strong accepted D7 Structure core and freezes only local refinement for the weak sparse targets:
+### Merged `main`
+
+Merged runtime authority includes:
 
 ```text
-structure_core   -> system_region / measure_region / clef_g2 (frozen)
-barline_refiner  -> measure-end 192x128 ROI
-meter_refiner    -> measure-start 192x256 ROI, none|2/4|3/4|4/4
-structure_fusion -> deterministic fail-closed fusion to unchanged StructureSet
+Page Normalizer
+→ Geometry Engine v2
+→ Multi-staff geometry
+→ System Grouper v1
+→ Measure/System Boundaries v2
+→ logical measure ownership
+→ Runtime measure-start ROI
+→ Meter association v3
+→ provenance-bound Meter producer
+→ real checkpoint audit
+→ runtime input provenance
+→ historical D11 ROI reconstruction
+→ real D11 Presence inference implementation
+→ STOP
 ```
 
-Frozen future validation gates:
+Real digit composition and production Resolver authority remain closed on merged `main`.
+
+### V4-5 historical candidate result
+
+The one-time independent final holdout for the V4-2 candidate is consumed and failed:
 
 ```text
-TEST records                                  0
-accepted D7 core mutation                     forbidden
-new trainable parameters                      <= 1,250,000
-barline strict Dice                           >= 0.500
-barline tolerant F1 @2px                      >= 0.700
-meter none|2/4|3/4|4/4 macro F1              >= 0.800
-meter positive localization tolerant F1 @2px  >= 0.600
+accuracy    0.7466666667
+macro-F1    0.7444420022
+recall(2)   0.58
+recall(3)   0.66
+recall(4)   1.00
+decision    FINAL_HOLDOUT_FAIL
 ```
 
-D9 itself trained nothing.
+The candidate is rejected. The consumed holdout may not be rerun or reused for crop, threshold, calibration, model-selection or parameter tuning.
 
-## Active D10 boundary
+### V5 recovery lane
 
-D10 materializes the D9 local data surface from accepted D6 final-PNG geometry. The authoritative runner must consume exactly:
+V5-0 rejects the contaminated/mixed old Meter dataset surface and moves to a clean `package_ab`-only design with globally unique families and explicit train/val/final-holdout separation.
+
+V5-1 created the bounded TRAIN-only 30-sample human full-meter BBox pilot.
+
+V5-2 scale-up is not the current active optimizer path because domain/transfer evidence required a smaller causal lane.
+
+Current inspected lane: **Meter V5-2B — deterministic 2/3 specialist adaptation**.
+
+Current gate:
 
 ```text
-TRAIN        1,230 source images / 410 families
-VALIDATION     153 source images /  51 families
-TOTAL        1,383 source images / 461 families
-TEST             0
-optimizer         0
+300 TRAIN BBoxes target
+298/300 staff-containment preflight PASS
+2 non-seed TRAIN HOLD rows
+        ↓
+deterministic same-class replacement
+        ↓
+new human BBoxes
+        ↓
+mechanical QA + human visual QA
+        ↓
+require 300/300 preflight PASS
+        ↓
+only then may bounded adaptation training open
 ```
 
-For every source measure D10 emits exactly two records:
+The first 30 seeds are diagnostic-only. VAL is closed. FINAL_HOLDOUT locked. 4-AI is a frozen control. Threshold tuning and hyperparameter sweeps remain forbidden.
 
-```text
-measure-end   -> barline ROI -> barline_segment
-measure-start -> meter ROI   -> none|2/4|3/4|4/4 + meter_bbox
-```
+## Frozen synthetic foundation
 
-If the active meter continues but no current-measure meter glyph is visible, the local meter class is `none`. This preserves the accepted D6 courtesy-meter semantics.
+The accepted synthetic curriculum, family isolation and sealed-test rules remain authoritative. Historical D6/D7/D8/D9/D10 identities and metrics remain preserved in their original evidence/contract files and are not rewritten by this status synchronization.
 
-D10 binds each artifact to source PNG SHA, accepted D6 label SHA, split, measure, D9 contract fingerprint and ROI policy. Output stays outside normal Git.
+Key enduring rules:
 
-Before `COMPLETE`, an independent persisted-output verifier reopens every ROI PNG/label and rederives hashes, identities, split/family cardinality, barline/meter pair completeness and receipt evidence. Only then is `COMPLETE` written and verified again.
+- every derivative inherits family split identity;
+- AI does not generate ground truth;
+- real spatial labels require human verification and explicit admission;
+- independent validators retain veto authority;
+- TEST remains sealed for development/tuning;
+- checkpoints/datasets stay outside normal Git where required;
+- ScoreMosaic uploads and teacher corrections are not automatic training data;
+- no online/automatic learning path is enabled.
 
-### Code/review gate
+## Architecture compatibility audit
 
-Exact-head CI evidence is intentionally tracked in PR #47 rather than written into this branch-owned status file; embedding the branch's own SHA here would make the statement stale on every documentation commit.
+The 2026-08-23 compatibility audit found no P1/P2 project-level architecture break.
 
-The review tightened two important guarantees: an arbitrary subset cannot be mislabeled authoritative, and `COMPLETE` is impossible until persisted artifacts pass independent reopening/hash/shape/split verification.
+PASS:
 
-External authoritative D10 materialization remains pending.
+- specialist decomposition;
+- deterministic arbitration/fusion authority;
+- GT authority and provenance;
+- family/split isolation;
+- sealed TEST policy;
+- Rest R4 compatibility with frozen `half|quarter|eighth` V1 scope;
+- separation of shadow evidence from Resolver/production authority;
+- Meter V5 separation from merged `main` runtime authority;
+- consumed final-holdout protection.
+
+FAIL before synchronization:
+
+- current-state documentation drift.
+
+See `ARCHITECTURE_COMPATIBILITY_AUDIT_2026-08-23.md`.
 
 ## Safety boundaries
 
 - No direct commits to `main`; changes use branch/PR packages.
-- Large datasets/checkpoints stay outside normal Git.
-- D10 contains no model/optimizer/backward/checkpoint/DataLoader path.
-- D7 accepted Structure weights are untouched.
-- VALIDATION is data-only/read-only in D10.
+- Large datasets/checkpoints remain outside normal Git.
 - TEST remains sealed until Stage 9.
-- ScoreMosaic uploads and teacher corrections are not automatic training data.
-- Real geometry labels require human-verified annotation and explicit admission.
-- No online or automatic learning path is allowed.
-- Deterministic validators retain veto authority over learned candidates.
+- No threshold is relaxed after outcome inspection without a separately frozen development contract.
+- Consumed final holdouts are not recycled into tuning.
+- Private checkpoint binaries are not committed.
+- Resolver production wiring cannot be inferred from shadow PASS.
+- Production/ScoreMosaic promotion requires a separate later gate.
 
-## Next gate
+## Next gates
 
-Run the authoritative external D10 build against the accepted frozen corpus + D6 derivatives at the exact current PR #47 head recorded by GitHub. Record manifest/artifact-binding/receipt/transport evidence and confirm TEST=0 / optimizer=0. Only then may PR #47 be marked ready and merge approval requested.
-
-See `STAGE7D10_LOCAL_ROI_DERIVATIVES.md` for the active contract.
+1. Meter V5-2B: replace the two HOLD TRAIN rows deterministically, obtain new human BBoxes, rerun mechanical + visual QA, and require 300/300 preflight PASS before training.
+2. Rest R4: preserve current PASS shadow evidence; next improvement should be real-score/real-scan shadow validation and Resolver-shadow E2E rather than blind R1-style retraining.
+3. Rhythm / StaffPosition / Chord remain separate future specialist packages.
+4. Deterministic musical fusion and Stage 9 sealed benchmark remain mandatory before any production decision.
