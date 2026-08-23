@@ -1,12 +1,14 @@
 # st-omr-training
 
-Safe training and synthetic-data laboratory for ST-OMR: canonical music generation, MusicXML serialization and validation, deterministic notation rendering, controlled degradation, dataset validation/construction, training, and evaluation.
+Safe training and synthetic-data laboratory for ST-OMR: canonical music generation, MusicXML serialization and validation, deterministic notation rendering, controlled degradation, dataset validation/construction, training, specialist experiments, and evaluation.
 
 This repository is isolated from the ScoreMosaic production runtime. Its purpose is to build traceable OMR training data, train candidate ST-OMR models, and evaluate them before any later integration decision.
 
 ## Project documents
 
-- [Architecture](ARCHITECTURE.md)
+- [Long-form architecture](ARCHITECTURE.md)
+- [Current architecture overlay](ARCHITECTURE_CURRENT.md)
+- [2026-08-23 architecture compatibility audit](ARCHITECTURE_COMPATIBILITY_AUDIT_2026-08-23.md)
 - [Canonical data contract](DATA_CONTRACT.md)
 - [MusicXML contract](MUSICXML_CONTRACT.md)
 - [Renderer contract](RENDERER_CONTRACT.md)
@@ -20,7 +22,7 @@ This repository is isolated from the ScoreMosaic production runtime. Its purpose
 - [Stage 8-0 real-data and fine-tuning contract](STAGE8_REAL_DATA_CONTRACT.md)
 - [Stage 8-1 quarantine/intake byte-validation contract](STAGE8_1_INTAKE_CONTRACT.md)
 - [Stage 8-2 paired experiment run profile](STAGE8_2_RUN_PROFILE.md)
-- [Stage 8-3A pilot preparation/admission contract](STAGE8_3A_PREPARATION_CONTRACT.md)
+- [Stage 8-3A historical pilot architecture delta](ARCHITECTURE_STAGE8_3A.md)
 - [Future real-test sealing boundary](STAGE8_TEST_SEALING_BOUNDARY.md)
 - [Verovio runtime evidence](VEROVIO_RUNTIME_EVIDENCE.md)
 - [Safety and verification rules](SAFETY.md)
@@ -28,45 +30,63 @@ This repository is isolated from the ScoreMosaic production runtime. Its purpose
 
 ## Current phase
 
-The repository is public and GitHub Actions CI is active.
+Status date: **2026-08-23**.
 
-Completed and merged:
+Merged `main` baseline used by the current architecture synchronization:
 
-- Stage 0 — safety and architecture baseline;
-- Stage 1 — deterministic ST Music Generator V1;
-- Stage 2 — deterministic MusicXML 4.0 pipeline, offline XSD/semantic validation, and supported-V1 semantic round trip;
-- Stage 3 — deterministic Verovio 6.2.1 SVG renderer adapter;
-- Stage 4 — deterministic, bounded Controlled Degradation V1;
-- Stage 5 — synthetic dataset contract and independent manifest validation;
-- Stage 6 — deterministic Synthetic Dataset v1 construction and hash-addressed local persistence;
-- Stage 7-A — Baseline ST-OMR Training Contract Freeze;
-- Stage 7-B — deterministic tokenizer/data/model/trainer smoke implementation;
-- Stage 7-C — bounded synthetic-only baseline training run and accepted evidence;
-- Stage 8-0 — Real Data & Fine-Tuning Contract Freeze;
-- Stage 8-1 — Quarantine / Intake + Byte-Level Validation;
-- Stage 8-2 — Paired Experiment Run Profile Freeze.
+```text
+a6a40b218a95c72349984ee2aee7262f467021fc
+```
 
-Stage 7-C merged through PR #23 from exact source head `7a993304218fa19609ea512665148dac3eea503a` to exact `main` commit `2c2c478eb361fa90a3bccd819b623680eb12de0b`. Its closure synchronization merged through PR #24 to `main` `e56fad04e43bc6302a8cda60c6f382e83a23d734`; post-merge run #70 (`31693998756`) succeeded. Stage 7 is therefore **closed and main CI verified**.
+The merged repository contains the deterministic/synthetic foundation, Staff/Structure specialist work, runtime geometry/measure ownership, provenance-bound Meter association/producer infrastructure, historical D11 ROI reconstruction, and the real D11 Presence inference implementation.
 
-Stage 8-0 merged through PR #25 to exact `main` commit `86487a4c3c41264b02bd159cd647a1318d9b9b88`. Post-merge GitHub Actions run #75 (`31698691405`) succeeded on that exact SHA. Its closure synchronization merged through PR #26 to exact `main` `99ffaf41f9c8919827ca97edc1bc3900db29eea2`; post-merge run #77 (`31699497562`) succeeded. Stage 8-0 is therefore **closed and main CI verified**.
+Later specialist and Meter results exist in open/draft branches and must not be confused with merged runtime authority.
 
-Stage 8-1 implementation merged through PR #29 from final source head `ed4113a25f6e12055b9277f959a4580259d37d40` to exact `main` commit `d551cb27e0244477379100c45e06193ea7ca0cf8`; post-merge run #92 (`31704137450`) succeeded with **394/394 tests**. Closure synchronization PR #30 then merged to exact `main` `de5d66d30c66c97c03bc1dc60fce094a9f0d64e7`; post-merge run #94 (`31705382162`) succeeded. Stage 8-1 is therefore **closed and main CI verified**.
+### Current specialist evidence
 
-Stage 8-2 implementation merged through PR #31 from exact source head `f0ae7ff6d7206789cbe543b75664e557368233b7` to exact `main` commit `ba93736efa1411bf49020e52ddb688d63f7876c1`. Closure synchronization PR #32 merged to exact `main` `99a32ef917ba4ba5c72ef6a537c24c90a1b0c47f`; exact-main GitHub Actions run #104 (`31712294207`) succeeded. Stage 8-2 is therefore **closed and main CI verified**.
+| Specialist | Current evidence | Runtime/production authority |
+|---|---|---|
+| NoteHead | shadow PASS | not production-wired |
+| Rest R4 `half|quarter|eighth` | shadow PASS; deterministic class arbitration PASS | Resolver connection closed |
+| Accidental `sharp|flat|natural` | shadow PASS | production connection closed |
+| Meter | merged runtime foundation + active V5 draft recovery work | real composition/Resolver promotion closed |
+| Rhythm | not opened | locked |
+| StaffPosition | not opened | locked |
+| Chord | not opened | locked |
 
-Stage 8-3A — Pilot Data Preparation + Admission — is now the active package. Its first implementation freezes deterministic PNG-source→8-bit-grayscale-training-PNG preparation and fail-closed auxiliary-package triage. Real files remain external; no real bytes are committed. MEI/semantic/agnostic annotations remain auxiliary evidence and cannot bypass the existing supported-V1 MusicXML, rights, pairing, duplicate, leakage, or Stage 8-1 receipt gates.
+Rest's old D13-R1 zero-F1 result remains historical failure evidence. The current Rest R4 value-specific path has PASS shadow evidence and should move next toward real-image/shadow E2E validation rather than a blind repeat of the failed R1 profile.
 
-The closed Stage 8-2 profile still freezes the first real-data pilot as **50 admitted development pairs: 40 train + 10 validation**, with Candidate A (exact Stage 7-C checkpoint fine-tuning) and Candidate B (same architecture from scratch) bound to the same admitted manifest, Stage 8-1 receipt set, sealed-test commitment, model/tokenizer/preprocess/trainer fingerprints, deterministic data order, metric family, and bounded CPU/time budget.
+### Meter current development boundary
 
-The first 50 raw files are not automatically 50 training samples. A pair counts only after Stage 8-0 rights/pairing admission and Stage 8-1 byte/semantic/leakage validation. Rejected pairs must be replaced before the exact 40/10 pilot manifest can be frozen.
+The V4-5 candidate failed its one-time independent final holdout and is rejected. That consumed holdout is not reusable for tuning.
 
-For the first Stage 8-3A pilot, source images are intentionally restricted to existing PNG bytes. The deterministic derivative policy performs no crop, resize, rotation, or geometry normalization; it converts accepted single-frame non-transparent source PNG modes to mode `L`, strips source metadata, writes a fixed PNG encoding, and re-verifies the exact Stage 8-1 training-image structure. PDF/JPEG preparation remains outside this pilot rather than being improvised.
+The current V5 recovery direction separates clean `package_ab` data, human spatial GT, domain-transfer diagnostics, and bounded specialist adaptation. The newest inspected lane is Meter V5-2B in draft PR #98:
 
-Both held-out test partitions remain sealed. Stage 8-3B execution, Stage 9 benchmark/candidate work, and Stage 10 ScoreMosaic integration remain locked.
+```text
+300 TRAIN human full-meter BBoxes target
+298/300 staff-containment preflight PASS
+2 deterministic replacement-required HOLD rows
+        ↓
+new human BBoxes + mechanical QA + visual QA
+        ↓
+require 300/300 preflight PASS
+        ↓
+only then bounded 2-AI / 3-AI adaptation may open
+```
 
-The Stage 7-C checkpoint artifact `9177923796` remains temporary and scheduled to expire on 2026-09-12. Stage 8-3A does not load, move, copy, publish, or preserve it; if exact Candidate A bytes are unavailable or hash/state mismatched at execution time, Candidate A is blocked rather than substituted.
+The first 30 seeds remain diagnostic-only. VAL is closed. FINAL_HOLDOUT is locked. 4-AI remains frozen control. Threshold tuning, Resolver wiring and production promotion are not authorized.
 
-The Stage 7-C model remains a trainability baseline rather than a production candidate: exact sequence accuracy is 0% and token error rate is approximately 80.5% on its validation evidence.
+## Architecture authority rule
+
+Current-status interpretation is explicit:
+
+1. frozen contracts define invariants;
+2. merged `main` defines executable repository authority;
+3. `ARCHITECTURE_CURRENT.md` records the current merged + shadow/experimental overlay;
+4. open draft PR evidence is non-main/non-production until separately merged and accepted;
+5. historical stage delta documents preserve their original stage and do not override the current overlay.
+
+The 2026-08-23 compatibility audit found no P1/P2 project-level architecture break. The material failure found was documentation drift, which this synchronization package corrects.
 
 ## Core development rule
 
@@ -74,8 +94,10 @@ Each stage stays isolated behind explicit contracts and validation gates. Symbol
 
 All derivatives of one symbolic or real-source family remain in one dataset family and one train/validation/test split. Builders never validate themselves by assertion; independent validation remains a veto gate.
 
-Stage 7 training used only Stage 5/6 validated synthetic artifacts. Any later Stage 8 real data must pass the closed Stage 8-0 metadata contract and the closed Stage 8-1 byte-level handoff before a later train/validation loader may see it. The closed Stage 8-2 profile additionally requires both paired candidates to use the exact same 40/10 admitted development manifest and receipt-set identity. Stage 8-3A may prepare and triage external bytes but cannot weaken those gates. Both synthetic and real held-out test partitions remain sealed until the Stage 9 benchmark gate.
+AI/model predictions do not become ground truth. Synthetic spatial labels require pinned-renderer geometry lineage; real spatial labels require explicit human verification and admission.
 
-ScoreMosaic user uploads and teacher corrections are not automatic training data. User-derived material requires separate explicit training permission and the full quarantine/admission process. There is no online or automatic learning path, and no Stage 8 output may enter ScoreMosaic before Stage 9 candidate-quality evidence and the later Stage 10 integration gate.
+Both synthetic and real held-out test partitions remain sealed until the Stage 9 benchmark gate. A shadow specialist PASS does not authorize Resolver production wiring or ScoreMosaic promotion.
+
+ScoreMosaic user uploads and teacher corrections are not automatic training data. User-derived material requires separate explicit training permission and the full quarantine/admission process. There is no online or automatic learning path.
 
 Large datasets, model checkpoints, real user documents, private material, and rights-unclear score collections are not normal Git repository content.
