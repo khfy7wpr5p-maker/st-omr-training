@@ -385,8 +385,8 @@ def run_frozen_feature_transfer_audit_v1(
         "schema": SCHEMA,
         "question": "do_frozen_64d_digit_features_transfer_to_existing_v5_adaptation_train",
         "slot_manifest_sha256": v52b._sha_file(manifest_path),
-        "m4a_manifest_sha256": forensic.M4A_MANIFEST_SHA256,
-        "d10_manifest_sha256": forensic.D10_MANIFEST_SHA256,
+        "m4a_manifest_sha256": ret_legacy.M4A_MANIFEST_SHA256,
+        "d10_manifest_sha256": ret_legacy.D10_MANIFEST_SHA256,
         "frozen_checkpoint_sha256": {
             "2": v52b.DIGIT2_SHA256,
             "3": v52b.DIGIT3_SHA256,
@@ -397,9 +397,6 @@ def run_frozen_feature_transfer_audit_v1(
         "distance_metric": "squared_euclidean_to_historical_binary_centroids",
         "fit_or_training_performed": False,
         "numeric_pass_threshold_preregistered": False,
-        "architecture_selected": False,
-        "residual_topology_selected": False,
-        "repair_training_authorized": False,
         "per_specialist": per_specialist,
         **safety_boundary(),
     }
