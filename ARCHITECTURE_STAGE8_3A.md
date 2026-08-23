@@ -1,8 +1,10 @@
 # Current Architecture Delta — Stage 8-3A
 
-Status: **current Stage 8 architecture status for the active Stage 8-3A package**.
+> Historical/frozen stage delta. This document preserves the Stage 8-3A architecture as it was defined for that package. It is no longer the repository's current operational-status authority. For current merged + shadow/experimental state, use `ARCHITECTURE_CURRENT.md`; for current stage summary, use `STATUS.md`.
 
-This document is a narrow current-state supplement to `ARCHITECTURE.md`. The long-form architecture remains authoritative for stable pipeline boundaries; where its Stage 8 status labels still say Stage 8-2 is active or Stage 8-3A is locked, those labels are stale and this document plus `STATUS.md` supersede them until the long-form file can be consolidated safely.
+Status: **historical Stage 8-3A architecture snapshot; contract semantics preserved**.
+
+This document is a narrow stage-specific supplement to `ARCHITECTURE.md`. Its Stage 8 status labels describe the original Stage 8-3A package state and must not override the current architecture overlay.
 
 ## Current gate map
 
