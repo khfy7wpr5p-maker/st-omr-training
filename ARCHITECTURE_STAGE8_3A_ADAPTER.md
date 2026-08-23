@@ -1,6 +1,8 @@
 # Stage 8-3A Adapter Architecture Delta
 
-PR #34 adds one guarded auxiliary target path inside the already-active Stage 8-3A package.
+> Historical/frozen stage delta. This file preserves the original Stage 8-3A adapter architecture and is not current operational-status authority. Use `ARCHITECTURE_CURRENT.md` for the live merged + shadow/experimental overlay.
+
+PR #34 added one guarded auxiliary target path inside the then-active Stage 8-3A package.
 
 ```text
 source PNG -> deterministic training PNG
@@ -20,4 +22,4 @@ training PNG + MusicXML + required evidence
 
 The adapter does not change the frozen V1 surface. Representation disagreement and unsupported notation fail closed. Conversion success is not data admission.
 
-Gate status remains: Stage 0 through 8-2 closed; Stage 8-3A active; Stage 8-3B, Stage 9 and Stage 10 locked.
+Historical gate status for this package: Stage 0 through 8-2 closed; Stage 8-3A active; Stage 8-3B, Stage 9 and Stage 10 locked. Current project status is intentionally not inferred from this historical delta.
