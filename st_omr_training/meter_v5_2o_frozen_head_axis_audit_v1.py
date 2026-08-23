@@ -85,18 +85,40 @@ def _scalar_stats(values) -> dict[str, float]:
 
 
 def _rank_auc(positive_logits, negative_logits) -> float:
+    """Exact Mann-Whitney rank AUC without allocating an O(P*N) matrix."""
     torch, _nn = v52b._import_torch()
     pos = positive_logits.detach().cpu().to(dtype=torch.float64).reshape(-1)
     neg = negative_logits.detach().cpu().to(dtype=torch.float64).reshape(-1)
     _finite_tensor(pos, name="positive-logits")
     _finite_tensor(neg, name="negative-logits")
-    if pos.numel() == 0 or neg.numel() == 0:
+    n_pos = int(pos.numel())
+    n_neg = int(neg.numel())
+    if n_pos == 0 or n_neg == 0:
         _fail("rank AUC requires both classes")
-    delta = pos[:, None] - neg[None, :]
-    wins = float((delta > 0.0).sum().item())
-    ties = float((delta == 0.0).sum().item())
-    total = float(delta.numel())
-    return (wins + 0.5 * ties) / total
+
+    items = [(float(value), 1) for value in pos.tolist()]
+    items.extend((float(value), 0) for value in neg.tolist())
+    items.sort(key=lambda item: item[0])
+
+    positive_rank_sum = 0.0
+    index = 0
+    while index < len(items):
+        end = index + 1
+        score = items[index][0]
+        while end < len(items) and items[end][0] == score:
+            end += 1
+        # Ranks are one-based. The block spans ranks index+1 through end.
+        average_rank = ((index + 1) + end) / 2.0
+        positive_in_block = sum(label for _value, label in items[index:end])
+        positive_rank_sum += float(positive_in_block) * average_rank
+        index = end
+
+    auc = (
+        positive_rank_sum - (n_pos * (n_pos + 1) / 2.0)
+    ) / float(n_pos * n_neg)
+    if not math.isfinite(auc) or not (0.0 <= auc <= 1.0):
+        _fail(f"invalid rank AUC: {auc}")
+    return auc
 
 
 def _domain_head_metrics(*, features, targets, head_weight, head_bias: float, boundary_logit: float) -> dict[str, object]:
@@ -223,9 +245,6 @@ def head_axis_transfer_metrics_v1(
             ),
             "class_gap_direction_preserved_along_head": bool(source_gap * v5_gap > 0.0),
         },
-        "same_frozen_head_direction_contains_v5_ordering": bool(
-            float(v5["rank_auc"]) > 0.5 and float(v5["class_mean_logit_gap"]) > 0.0
-        ),
         "same_frozen_head_direction_strictly_separates_v5_train": bool(
             v5["strictly_separable_under_same_head_direction"]
         ),
