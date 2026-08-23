@@ -131,6 +131,12 @@ class TestMeterV52TBoundedClassBalancedHeadRepairV1(unittest.TestCase):
             model.head.weight.reshape(-1)[0] = 2.0
             model.head.bias.zero_()
         frozen_state = t.v52p._frozen_state_snapshot(model)
+        frozen_fingerprint = t._state_fingerprint_without_numpy_v1(model)
+        self.assertEqual(len(frozen_fingerprint), 64)
+        self.assertEqual(
+            frozen_fingerprint,
+            t._state_fingerprint_without_numpy_v1(copy.deepcopy(model)),
+        )
 
         def rows(values):
             result = []
@@ -159,6 +165,7 @@ class TestMeterV52TBoundedClassBalancedHeadRepairV1(unittest.TestCase):
             enforce_preregistered_counts=False,
         )
         invariants = t.v52p._verify_only_head_weight_changed(model, frozen_state)
+        self.assertNotEqual(frozen_fingerprint, t._state_fingerprint_without_numpy_v1(model))
         self.assertTrue(invariants["only_head_weight_changed"])
         self.assertTrue(invariants["backbone_bit_identical"])
         self.assertTrue(invariants["head_bias_bit_identical"])

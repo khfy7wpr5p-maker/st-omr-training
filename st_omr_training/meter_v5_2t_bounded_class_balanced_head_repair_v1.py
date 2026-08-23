@@ -12,6 +12,7 @@ later gates.
 """
 from __future__ import annotations
 
+import hashlib
 import math
 from pathlib import Path
 from typing import Callable, Final, Mapping
@@ -367,6 +368,24 @@ def _candidate_path(directory: Path, digit: str) -> Path:
     return directory / f"digit{digit}_v5_2t_bounded_class_balanced_candidate.pt"
 
 
+def _state_fingerprint_without_numpy_v1(model) -> str:
+    """Hash exact tensor state without relying on optional NumPy."""
+    torch, _nn = v52b._import_torch()
+    digest = hashlib.sha256()
+    for name, tensor in sorted(model.state_dict().items()):
+        cpu = tensor.detach().cpu().contiguous()
+        digest.update(name.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(cpu.dtype).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(repr(tuple(cpu.shape)).encode("ascii"))
+        digest.update(b"\0")
+        raw = bytes(cpu.view(torch.uint8).reshape(-1).tolist())
+        digest.update(raw)
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def _save_candidate(
     *,
     model,
@@ -378,7 +397,7 @@ def _save_candidate(
     invariants: Mapping[str, object],
 ) -> dict[str, object]:
     torch, _nn = v52b._import_torch()
-    state_fingerprint = v52b._state_fingerprint(model)
+    state_fingerprint = _state_fingerprint_without_numpy_v1(model)
     payload = {
         "model_state_dict": {
             name: tensor.detach().cpu() for name, tensor in model.state_dict().items()
@@ -454,7 +473,7 @@ def _load_candidate(
             _fail(f"{digit}-AI candidate metadata changed: {key}")
     model = v52b._build_digit_model().cpu()
     model.load_state_dict(dict(state), strict=True)
-    if metadata.get("state_fingerprint") != v52b._state_fingerprint(model):
+    if metadata.get("state_fingerprint") != _state_fingerprint_without_numpy_v1(model):
         _fail(f"{digit}-AI candidate state fingerprint mismatch")
     geometry = metadata.get("fit_geometry")
     if not isinstance(geometry, Mapping) or geometry.get("gate") != "PASS":
