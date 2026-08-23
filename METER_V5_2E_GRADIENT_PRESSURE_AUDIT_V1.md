@@ -65,16 +65,22 @@ V5-2E may compute loss/gradient-pressure statistics for hypothetical scalar posi
 
 It may also report what historical TRAIN replay pressure would exist at the frozen source checkpoint. It must not select or authorize a replay ratio automatically.
 
+## Preregistered dominance indicator
+
+For reporting only, V5-2E marks target-positive pressure as "two-orders dominant" when the absolute positive-to-negative pressure ratio is at least `100x`. If negative pressure is exactly zero while positive pressure is nonzero, the indicator is also true and the ratio is represented as a non-finite state rather than written as JSON infinity.
+
+This threshold is a diagnostic evidence flag only. It is not a training gate, does not tune any model threshold, and cannot authorize a repair.
+
 ## Interpretation boundary
 
 V5-2E may conclude that one-sided loss pressure is strongly supported if:
 
-- V5 positive pressure at the frozen checkpoint dominates V5 negative pressure by orders of magnitude; and
+- V5 positive pressure at the frozen checkpoint dominates V5 negative pressure by at least two orders of magnitude; and
 - historical negative pressure that would resist positive collapse is absent from the V5-only training objective.
 
-It must not claim that `pos_weight=5.0` alone is the unique root cause unless the evidence isolates that effect from the underlying V5/source-domain mismatch.
+It must not claim that `pos_weight=5.0` alone is the unique root cause unless the evidence isolates that effect from the underlying V5/source-domain mismatch. The same pressure audit at the diagnostic counterfactual `w=1.0` is used specifically to test whether the one-sided pressure exists even without the 5x positive scaling.
 
-The expected conservative conclusion is allowed to be:
+The conservative root-cause class may be:
 
 `ROOT_CAUSE_CLASS=V5_ONLY_DOMAIN_ADAPTATION_WITH_UNCONSTRAINED_SOURCE_FORGETTING`
 
