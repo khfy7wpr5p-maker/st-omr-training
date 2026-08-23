@@ -1,11 +1,13 @@
 """Numerical evidence hardening for the preregistered Meter V5-2P repair.
 
 This module does not change the V5-2P architecture, objective, solver settings,
-data surfaces, thresholds, or performance-gate order.  It instruments the exact
+data surfaces, thresholds, or performance-gate order. It instruments the exact
 existing LBFGS solve, records termination state, independently recomputes the
 final objective gradient, verifies float64->float32 copy-back, and stops before
-historical retention.  Historical retention remains the only evidence that can
-establish source-domain preservation at the unchanged runtime thresholds.
+historical retention. Numerical integrity is a safety check only; convergence
+status is evidence and does not create a new performance gate. Historical
+retention remains the only evidence that can establish source-domain
+preservation at the unchanged runtime thresholds.
 """
 from __future__ import annotations
 
@@ -21,7 +23,37 @@ from . import meter_v5_2p_fixed_bias_head_repair_v1 as v52p
 
 SCHEMA: Final[str] = "st-omr-meter-v5-2p-numerical-evidence-guard-v1"
 REPORT_NAME: Final[str] = "v5_2p_numerical_evidence_guard_v1.json"
+LOSS_NON_INCREASE_TOLERANCE: Final[float] = 1e-10
 ProgressCallback = Callable[[int, int, str], None]
+
+_REQUIRED_SPECIALIST_EVIDENCE: Final[tuple[str, ...]] = (
+    "trainable_parameter_count",
+    "only_head_weight_changed",
+    "backbone_bit_identical",
+    "head_bias_bit_identical",
+    "threshold_unchanged",
+    "solver_final_loss_finite",
+    "solver_final_loss_not_above_initial",
+    "float32_copy_back_bit_exact",
+    "float32_copy_back_loss_finite",
+    "float32_copy_back_loss_not_above_initial",
+    "lbfgs_termination",
+)
+_REQUIRED_CONVERGENCE_EVIDENCE: Final[tuple[str, ...]] = (
+    "final_gradient_inf_norm",
+    "final_gradient_l2_norm",
+    "final_gradient_finite",
+    "gradient_tolerance_met",
+    "n_iter",
+    "func_evals",
+    "closure_evaluations",
+    "iteration_limit_reached",
+    "evaluation_limit_reached",
+    "termination_reason_exposed",
+    "termination_evidence_class",
+    "convergence_proven",
+    "convergence_claim",
+)
 
 
 class MeterV5_2PNumericalEvidenceError(RuntimeError):
@@ -45,6 +77,9 @@ def evidence_contract() -> dict[str, object]:
         "v5_2p_solver_contract": v52p.solver_contract(),
         "v5_2p_performance_gate_order": list(v52p.gate_order()),
         "instrumentation_only": True,
+        "numerical_integrity_is_safety_gate_only": True,
+        "convergence_evidence_is_performance_gate": False,
+        "convergence_unproven_creates_integrity_hold": False,
         "retention_executed_by_this_module": False,
         "first30_executed_by_this_module": False,
     }
@@ -58,32 +93,37 @@ def _termination_evidence_v1(
     final_gradient_inf_norm: float,
     final_gradient_l2_norm: float,
 ) -> dict[str, object]:
-    for name, value in {
-        "final_gradient_inf_norm": final_gradient_inf_norm,
-        "final_gradient_l2_norm": final_gradient_l2_norm,
-    }.items():
-        if not math.isfinite(value) or value < 0.0:
-            _fail(f"invalid {name}: {value}")
     if n_iter < 0 or func_evals < 0 or closure_evaluations < 0:
         _fail("negative LBFGS state counter")
 
-    gradient_tolerance_met = final_gradient_inf_norm <= v52p.LBFGS_TOLERANCE_GRAD
+    gradient_finite = (
+        math.isfinite(final_gradient_inf_norm)
+        and math.isfinite(final_gradient_l2_norm)
+        and final_gradient_inf_norm >= 0.0
+        and final_gradient_l2_norm >= 0.0
+    )
+    gradient_tolerance_met = (
+        gradient_finite and final_gradient_inf_norm <= v52p.LBFGS_TOLERANCE_GRAD
+    )
     iteration_limit_reached = n_iter >= v52p.LBFGS_MAX_ITER
     evaluation_limit_reached = func_evals >= v52p.LBFGS_MAX_EVAL
     terminated_before_limits = not iteration_limit_reached and not evaluation_limit_reached
 
-    if gradient_tolerance_met:
+    if not gradient_finite:
+        evidence_class = "FINAL_GRADIENT_NONFINITE_CONVERGENCE_NOT_PROVEN"
+        convergence_proven = False
+    elif gradient_tolerance_met:
         evidence_class = "PROVEN_FINAL_GRADIENT_TOLERANCE"
         convergence_proven = True
     elif iteration_limit_reached:
-        evidence_class = "MAX_ITER_REACHED_CONVERGENCE_NOT_PROVEN"
+        evidence_class = "MAX_ITER_REACHED_TERMINATION_REASON_NOT_EXPOSED_CONVERGENCE_NOT_PROVEN"
         convergence_proven = False
     elif evaluation_limit_reached:
-        evidence_class = "MAX_EVAL_REACHED_CONVERGENCE_NOT_PROVEN"
+        evidence_class = "MAX_EVAL_REACHED_TERMINATION_REASON_NOT_EXPOSED_CONVERGENCE_NOT_PROVEN"
         convergence_proven = False
     else:
         # torch.optim.LBFGS does not expose a stable public termination-reason
-        # field.  Do not infer tolerance_change convergence from private state.
+        # field. Do not infer tolerance_change convergence from private state.
         evidence_class = "TERMINATED_BEFORE_LIMIT_REASON_NOT_EXPOSED_CONVERGENCE_NOT_PROVEN"
         convergence_proven = False
 
@@ -98,23 +138,76 @@ def _termination_evidence_v1(
         "tolerance_change": v52p.LBFGS_TOLERANCE_CHANGE,
         "final_gradient_inf_norm": float(final_gradient_inf_norm),
         "final_gradient_l2_norm": float(final_gradient_l2_norm),
+        "final_gradient_finite": gradient_finite,
         "gradient_tolerance_met": gradient_tolerance_met,
         "iteration_limit_reached": iteration_limit_reached,
         "evaluation_limit_reached": evaluation_limit_reached,
         "terminated_before_limits": terminated_before_limits,
+        "termination_reason_exposed": False,
         "termination_reason_exposed_by_torch_lbfgs": False,
         "termination_evidence_class": evidence_class,
         "convergence_proven": convergence_proven,
+        "convergence_claim": "PROVEN" if convergence_proven else "UNPROVEN",
     }
 
 
-def _guard_decision_v1(per_specialist: Mapping[str, Mapping[str, object]]) -> dict[str, object]:
+def _convergence_evidence_v1(
+    per_specialist: Mapping[str, Mapping[str, object]],
+) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for digit in ("2", "3"):
+        item = per_specialist.get(digit)
+        termination = item.get("lbfgs_termination") if isinstance(item, Mapping) else None
+        if not isinstance(termination, Mapping):
+            result[digit] = {
+                "evidence_present": False,
+                "convergence_proven": False,
+                "convergence_claim": "UNPROVEN",
+                "termination_reason_exposed": False,
+                "termination_evidence_class": "MISSING_CONVERGENCE_EVIDENCE",
+            }
+            continue
+        result[digit] = {
+            "evidence_present": all(name in termination for name in _REQUIRED_CONVERGENCE_EVIDENCE),
+            **{name: termination.get(name) for name in termination},
+        }
+    return result
+
+
+def _numerical_integrity_gate_v1(
+    per_specialist: Mapping[str, Mapping[str, object]],
+    *,
+    observed_lbfgs_solves: int = 2,
+) -> dict[str, object]:
     reasons: list[str] = []
+    if observed_lbfgs_solves != 2:
+        reasons.append(f"LBFGS_CAPTURE_COUNT_MISMATCH:{observed_lbfgs_solves}")
+
     for digit in ("2", "3"):
         item = per_specialist.get(digit)
         if not isinstance(item, Mapping):
             reasons.append(f"{digit}-AI_EVIDENCE_MISSING")
             continue
+
+        missing = [name for name in _REQUIRED_SPECIALIST_EVIDENCE if name not in item]
+        if missing:
+            reasons.append(f"{digit}-AI_REQUIRED_EVIDENCE_MISSING:{','.join(missing)}")
+
+        termination = item.get("lbfgs_termination")
+        if not isinstance(termination, Mapping):
+            reasons.append(f"{digit}-AI_CONVERGENCE_EVIDENCE_MISSING")
+        else:
+            missing_termination = [
+                name for name in _REQUIRED_CONVERGENCE_EVIDENCE if name not in termination
+            ]
+            if missing_termination:
+                reasons.append(
+                    f"{digit}-AI_REQUIRED_CONVERGENCE_EVIDENCE_MISSING:"
+                    f"{','.join(missing_termination)}"
+                )
+            if termination.get("final_gradient_finite") is not True:
+                reasons.append(f"{digit}-AI_FINAL_GRADIENT_NONFINITE")
+
         if item.get("trainable_parameter_count") != v52p.EXPECTED_FEATURE_DIM:
             reasons.append(f"{digit}-AI_TRAINABLE_PARAMETER_COUNT_CHANGED")
         if item.get("only_head_weight_changed") is not True:
@@ -135,14 +228,37 @@ def _guard_decision_v1(per_specialist: Mapping[str, Mapping[str, object]]) -> di
             reasons.append(f"{digit}-AI_FLOAT32_COPY_BACK_LOSS_NONFINITE")
         if item.get("float32_copy_back_loss_not_above_initial") is not True:
             reasons.append(f"{digit}-AI_FLOAT32_COPY_BACK_LOSS_INCREASED")
-        termination = item.get("lbfgs_termination")
-        if not isinstance(termination, Mapping) or termination.get("convergence_proven") is not True:
-            reasons.append(f"{digit}-AI_LBFGS_CONVERGENCE_NOT_PROVEN")
 
     return {
         "gate": "PASS" if not reasons else "HOLD",
         "reasons": reasons,
         "historical_retention_authorized_after_separate_review": not reasons,
+        "historical_preservation_claimed": False,
+    }
+
+
+def _guard_decision_v1(
+    per_specialist: Mapping[str, Mapping[str, object]],
+    *,
+    observed_lbfgs_solves: int = 2,
+) -> dict[str, object]:
+    """Separate safety integrity from non-gating convergence evidence."""
+    integrity = _numerical_integrity_gate_v1(
+        per_specialist,
+        observed_lbfgs_solves=observed_lbfgs_solves,
+    )
+    convergence = _convergence_evidence_v1(per_specialist)
+    return {
+        "numerical_integrity_gate": integrity,
+        "convergence_evidence": convergence,
+        # Compatibility aliases intentionally reflect integrity only. An
+        # UNPROVEN convergence claim does not add a HOLD reason.
+        "gate": integrity["gate"],
+        "reasons": integrity["reasons"],
+        "historical_retention_authorized_after_separate_review": integrity[
+            "historical_retention_authorized_after_separate_review"
+        ],
+        "historical_preservation_claimed": False,
     }
 
 
@@ -209,10 +325,11 @@ def _evaluate_weight_state_v1(
         historical_targets=y_hist,
     )
     total.backward()
-    if weight_for_grad.grad is None or not bool(torch.isfinite(weight_for_grad.grad).all().item()):
-        _fail(f"{digit}-AI final objective gradient missing/non-finite")
+    if weight_for_grad.grad is None:
+        _fail(f"{digit}-AI final objective gradient missing")
     final_grad_l2 = float(torch.linalg.vector_norm(weight_for_grad.grad).item())
     final_grad_inf = float(torch.max(torch.abs(weight_for_grad.grad)).item())
+    final_gradient_finite = bool(torch.isfinite(weight_for_grad.grad).all().item())
 
     reevaluated_total = float(total.detach().item())
     fit_final = float(fit.get("final_total_loss"))
@@ -221,7 +338,7 @@ def _evaluate_weight_state_v1(
         _fail(f"{digit}-AI solver loss evidence non-finite")
     if not math.isclose(reevaluated_total, fit_final, rel_tol=1e-10, abs_tol=1e-12):
         _fail(f"{digit}-AI final float64 objective does not reproduce fit report")
-    solver_not_above_initial = reevaluated_total <= initial_total + 1e-10
+    solver_not_above_initial = reevaluated_total <= initial_total + LOSS_NON_INCREASE_TOLERANCE
     if not solver_not_above_initial:
         _fail(f"{digit}-AI final float64 objective increased above initial")
 
@@ -245,7 +362,7 @@ def _evaluate_weight_state_v1(
     copy_total_value = float(copy_total.item())
     if not math.isfinite(copy_total_value):
         _fail(f"{digit}-AI float32 copy-back objective non-finite")
-    copy_not_above_initial = copy_total_value <= initial_total + 1e-10
+    copy_not_above_initial = copy_total_value <= initial_total + LOSS_NON_INCREASE_TOLERANCE
     if not copy_not_above_initial:
         _fail(f"{digit}-AI float32 copy-back objective increased above initial")
 
@@ -282,6 +399,8 @@ def _evaluate_weight_state_v1(
         final_gradient_inf_norm=final_grad_inf,
         final_gradient_l2_norm=final_grad_l2,
     )
+    if termination["final_gradient_finite"] != final_gradient_finite:
+        _fail(f"{digit}-AI final gradient finiteness evidence mismatch")
 
     return {
         "trainable_surface": "head.weight-only-64-parameters",
@@ -313,6 +432,40 @@ def _evaluate_weight_state_v1(
     }
 
 
+def _base_report_v1(
+    *,
+    ann: Path,
+    per_specialist: Mapping[str, Mapping[str, object]],
+    decision: Mapping[str, object],
+    observed_lbfgs_solves: int,
+) -> dict[str, object]:
+    return {
+        "schema": SCHEMA,
+        "base_training_schema": v52p.SCHEMA,
+        "base_training_report_sha256": v52b._sha_file(ann / v52p.TRAINING_REPORT_NAME),
+        "evidence_contract": evidence_contract(),
+        "per_specialist": dict(per_specialist),
+        "numerical_integrity_gate": decision["numerical_integrity_gate"],
+        "convergence_evidence": decision["convergence_evidence"],
+        "numerical_guard": decision,
+        "observed_lbfgs_solves": observed_lbfgs_solves,
+        "expected_lbfgs_solves": 2,
+        "evidence_autograd_used_for_final_gradient_only": True,
+        "evidence_optimizer_steps": 0,
+        "training_architecture_changed": False,
+        "objective_changed": False,
+        "solver_settings_changed": False,
+        "thresholds_changed": False,
+        "historical_retention_executed": False,
+        "first30_diagnostic_executed": False,
+        "v5_validation_opened": False,
+        "final_holdout_locked": True,
+        "digit4_frozen": True,
+        "production_promotion_authorized": False,
+        "historical_preservation_claimed": False,
+    }
+
+
 def train_with_numerical_evidence_guard_v1(
     data_root: str | Path,
     *,
@@ -326,7 +479,8 @@ def train_with_numerical_evidence_guard_v1(
     """Run the exact V5-2P solve once, then stop after numerical evidence.
 
     This function deliberately does not run historical retention or first-30.
-    A later call may proceed only after the evidence report is reviewed.
+    A later call may proceed only after the numerical integrity report is
+    reviewed. An UNPROVEN convergence claim alone does not block retention.
     """
     root = Path(data_root)
     ann = root / v51.ANNOTATIONS_DIR
@@ -350,7 +504,15 @@ def train_with_numerical_evidence_guard_v1(
         _restore_lbfgs_step(torch, original_step)
 
     if len(captures) != 2:
-        _fail(f"expected exactly two LBFGS solves, observed {len(captures)}")
+        decision = _guard_decision_v1({}, observed_lbfgs_solves=len(captures))
+        report = _base_report_v1(
+            ann=ann,
+            per_specialist={},
+            decision=decision,
+            observed_lbfgs_solves=len(captures),
+        )
+        v51._atomic_write_json(evidence_path, report)
+        return report
 
     frozen_models = v52n._frozen_models(
         digit2_frozen=Path(digit2_frozen),
@@ -387,28 +549,13 @@ def train_with_numerical_evidence_guard_v1(
             historical_targets=historical_targets[digit],
         )
 
-    decision = _guard_decision_v1(per_specialist)
-    report = {
-        "schema": SCHEMA,
-        "base_training_schema": v52p.SCHEMA,
-        "base_training_report_sha256": v52b._sha_file(ann / v52p.TRAINING_REPORT_NAME),
-        "evidence_contract": evidence_contract(),
-        "per_specialist": per_specialist,
-        "numerical_guard": decision,
-        "evidence_autograd_used_for_final_gradient_only": True,
-        "evidence_optimizer_steps": 0,
-        "training_architecture_changed": False,
-        "objective_changed": False,
-        "solver_settings_changed": False,
-        "thresholds_changed": False,
-        "historical_retention_executed": False,
-        "first30_diagnostic_executed": False,
-        "v5_validation_opened": False,
-        "final_holdout_locked": True,
-        "digit4_frozen": True,
-        "production_promotion_authorized": False,
-        "historical_preservation_claimed": False,
-    }
+    decision = _guard_decision_v1(per_specialist, observed_lbfgs_solves=len(captures))
+    report = _base_report_v1(
+        ann=ann,
+        per_specialist=per_specialist,
+        decision=decision,
+        observed_lbfgs_solves=len(captures),
+    )
     v51._atomic_write_json(evidence_path, report)
     return report
 
