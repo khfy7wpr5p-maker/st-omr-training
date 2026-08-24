@@ -45,6 +45,7 @@ jobs:
               "verovio": "6.2.1",
               "CairoSVG": "2.8.2",
               "Pillow": "12.3.0",
+              "scipy": "1.18.0",
               "torch": "2.13.0+cpu",
           }
           for package, version in expected.items():
