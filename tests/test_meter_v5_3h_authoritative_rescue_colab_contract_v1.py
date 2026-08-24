@@ -1,0 +1,108 @@
+import json
+from pathlib import Path
+import unittest
+
+
+class TestMeterV53HAuthoritativeRescueColabContract(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.path = (
+            Path(__file__).resolve().parents[1]
+            / "notebooks"
+            / "st_omr_meter_v5_3h_authoritative_rescue_training_colab.ipynb"
+        )
+        cls.notebook = json.loads(cls.path.read_text(encoding="utf-8"))
+        cls.code_cells = [
+            cell for cell in cls.notebook["cells"] if cell.get("cell_type") == "code"
+        ]
+        cls.source = "".join(cls.code_cells[0]["source"])
+
+    def test_notebook_is_single_run_exact_head_and_ci_pinned(self):
+        self.assertEqual(self.notebook["nbformat"], 4)
+        self.assertEqual(len(self.code_cells), 1)
+        compile(self.source, str(self.path), "exec")
+        self.assertIn(
+            'EXPECTED_HEAD = "b36a9d2f5daade2c3568cac8cbc736ca75ca435f"',
+            self.source,
+        )
+        self.assertIn("EXPECTED_CI_RUN_ID = 32769348282", self.source)
+        self.assertIn(
+            '["git", "-C", str(REPO), "fetch", "origin", EXPECTED_HEAD, "--depth", "1"]',
+            self.source,
+        )
+        self.assertIn(
+            '["git", "-C", str(REPO), "checkout", "--detach", EXPECTED_HEAD]',
+            self.source,
+        )
+
+    def test_notebook_executes_only_one_authoritative_rescue_entry(self):
+        self.assertEqual(
+            self.source.count("run_authoritative_rescue_training_v1("), 1
+        )
+        self.assertIn("confirmation=rescue.APPROVAL_TOKEN", self.source)
+        forbidden = (
+            "run_historical_retention_gate",
+            "evaluate_diagnostic_gate",
+            "tune_threshold(",
+            "select_threshold(",
+            "torch.optim",
+            "optimizer.step",
+            "run_validation",
+        )
+        for token in forbidden:
+            with self.subTest(token=token):
+                self.assertNotIn(token, self.source)
+
+    def test_notebook_pins_runtime_and_fails_closed_on_rerun(self):
+        required = (
+            '"torch": "2.13.0+cpu"',
+            '"scipy": "1.18.0"',
+            "Refusing overwrite/rerun",
+            "FETCH_HEAD mismatch",
+            "Post-run HEAD mismatch",
+            "Saved report mismatch",
+            "rescue artifact SHA mismatch",
+            "v5_3g_execution_envelope_",
+        )
+        for token in required:
+            with self.subTest(token=token):
+                self.assertIn(token, self.source)
+
+    def test_notebook_verifies_exact_counts_and_state_isolation(self):
+        required = (
+            "v53e.EXPECTED_TRAIN_GROUP_COUNTS",
+            '"frozen_state_bit_identical"',
+            '"frozen_state_before"',
+            '"frozen_state_after"',
+            '"optimizer_steps"',
+            "v53e.FIXED_OPTIMIZER_STEPS",
+            '"numerical_integrity_gate"',
+            '"frozen_state_isolation_gate"',
+            '"candidate_configuration_count"',
+        )
+        for token in required:
+            with self.subTest(token=token):
+                self.assertIn(token, self.source)
+
+    def test_notebook_keeps_all_later_gates_closed(self):
+        required = (
+            '"train_performance_gate_executed": False',
+            '"historical_validation_opened": False',
+            '"first30_opened": False',
+            '"v5_reserve_opened": False',
+            '"v5_validation_opened": False',
+            '"final_holdout_locked": True',
+            '"digit4_frozen": True',
+            '"threshold_tuning": False',
+            '"hyperparameter_sweep": False',
+            '"automatic_second_configuration": False',
+            '"runtime_authority_changed": False',
+            '"production_promotion": False',
+        )
+        for token in required:
+            with self.subTest(token=token):
+                self.assertIn(token, self.source)
+
+
+if __name__ == "__main__":
+    unittest.main()
