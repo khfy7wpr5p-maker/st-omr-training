@@ -81,6 +81,20 @@ class TestMeterV5_3AColabExecutionContractV1(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.source)
 
+    def test_notebook_renders_hold_without_optional_runtime_evidence(self):
+        self.assertIn(
+            'runtime_gate = specialist.get("runtime_float32_gate")',
+            self.source,
+        )
+        self.assertIn(
+            '"NOT_RUN_DUE_TO_CANDIDATE_SELECTION_HOLD"',
+            self.source,
+        )
+        self.assertNotIn(
+            'print("RUNTIME FLOAT32 GATE =", specialist["runtime_float32_gate"])',
+            self.source,
+        )
+
     def test_notebook_keeps_later_gates_closed(self):
         required = (
             '"linear_head_candidate_fit_authorized": True',
