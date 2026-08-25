@@ -36,11 +36,9 @@ class TestMeterV53HAuthoritativeRescueColabContract(unittest.TestCase):
         )
 
     def test_notebook_executes_only_one_authoritative_rescue_entry(self):
-        self.assertEqual(
-            self.source.count("run_authoritative_rescue_training_v1("), 1
-        )
+        self.assertEqual(self.source.count("run_authoritative_rescue_training_v1("), 1)
         self.assertIn("confirmation=rescue.APPROVAL_TOKEN", self.source)
-        forbidden = (
+        for token in (
             "run_historical_retention_gate",
             "evaluate_diagnostic_gate",
             "tune_threshold(",
@@ -48,44 +46,61 @@ class TestMeterV53HAuthoritativeRescueColabContract(unittest.TestCase):
             "torch.optim",
             "optimizer.step",
             "run_validation",
-        )
-        for token in forbidden:
+        ):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.source)
 
-    def test_notebook_pins_runtime_and_fails_closed_on_rerun(self):
-        required = (
+    def test_notebook_uses_isolated_pinned_runtime(self):
+        for token in (
+            'VENV = Path("/content/st-omr-v5-3h-venv")',
+            'VENV_PYTHON = VENV / "bin" / "python"',
+            '[sys.executable, "-m", "venv", str(VENV)]',
+            'env["PYTHONNOUSERSITE"] = "1"',
+            '[str(VENV_PYTHON), "-m", "pip", "check"]',
+            'sys.prefix == sys.base_prefix',
             '"torch": "2.13.0+cpu"',
             '"scipy": "1.18.0"',
+            '"isolated_runtime": True',
+        ):
+            with self.subTest(token=token):
+                self.assertIn(token, self.source)
+        self.assertNotIn('[sys.executable, "-m", "pip", "install"', self.source)
+
+    def test_notebook_fails_closed_and_verifies_authoritative_receipt(self):
+        for token in (
             "Refusing overwrite/rerun",
             "FETCH_HEAD mismatch",
             "Post-run HEAD mismatch",
-            "Saved report mismatch",
+            "Authoritative report not written",
             "rescue artifact SHA mismatch",
             "v5_3g_execution_envelope_",
-        )
-        for token in required:
+            '"single_authoritative_execution_completed": True',
+            '"candidate_configuration_count": 1',
+            '"numerical_integrity_gate": "PASS"',
+            '"frozen_state_isolation_gate": "PASS"',
+        ):
             with self.subTest(token=token):
                 self.assertIn(token, self.source)
 
-    def test_notebook_verifies_exact_counts_and_state_isolation(self):
-        required = (
+    def test_notebook_verifies_exact_counts_and_frozen_state(self):
+        for token in (
             "v53e.EXPECTED_TRAIN_GROUP_COUNTS",
+            '"v5_frozen_false_negative_positive": 90',
+            '"historical_frozen_false_negative_positive": 14',
+            '"historical_frozen_false_negative_positive": 12',
+            '"historical_frozen_true_negative": 25254',
+            '"historical_frozen_true_negative": 25364',
             '"frozen_state_bit_identical"',
             '"frozen_state_before"',
             '"frozen_state_after"',
             '"optimizer_steps"',
-            "v53e.FIXED_OPTIMIZER_STEPS",
-            '"numerical_integrity_gate"',
-            '"frozen_state_isolation_gate"',
-            '"candidate_configuration_count"',
-        )
-        for token in required:
+            'execution.get("optimizer_steps") != 110',
+        ):
             with self.subTest(token=token):
                 self.assertIn(token, self.source)
 
-    def test_notebook_keeps_all_later_gates_closed(self):
-        required = (
+    def test_notebook_keeps_later_gates_closed(self):
+        for token in (
             '"train_performance_gate_executed": False',
             '"historical_validation_opened": False',
             '"first30_opened": False',
@@ -98,8 +113,7 @@ class TestMeterV53HAuthoritativeRescueColabContract(unittest.TestCase):
             '"automatic_second_configuration": False',
             '"runtime_authority_changed": False',
             '"production_promotion": False',
-        )
-        for token in required:
+        ):
             with self.subTest(token=token):
                 self.assertIn(token, self.source)
 
