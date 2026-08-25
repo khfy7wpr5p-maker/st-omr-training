@@ -13,18 +13,27 @@ The notebook contains exactly one code cell and exactly one call to
 
 ## Runtime binding
 
-Before importing ST-OMR code, the wrapper:
+Before importing ST-OMR training code, the wrapper:
 
 1. mounts Google Drive;
 2. verifies the existing V5, specialist-checkpoint, M4A and D10 roots;
 3. fetches the exact V5-3G commit;
 4. checks out that commit detached;
 5. requires a clean repository worktree;
-6. installs the repository's pinned runtime requirements;
-7. verifies the exact package versions and `pip check`.
+6. verifies that no V5-3G/V5-3H output already exists;
+7. creates a fresh isolated Python venv under `/content/st-omr-v5-3h-venv`;
+8. installs only the repository's pinned runtime requirements inside that venv;
+9. runs `pip check` inside the venv, not against Colab's global environment;
+10. verifies the exact runtime package versions before the authoritative worker is launched.
 
-The training execution therefore cannot silently run against a different Git
-HEAD or a drifted training runtime.
+The isolated worker also requires `PYTHONNOUSERSITE=1`. Therefore unrelated Colab
+packages such as preinstalled `torchvision`, `torchaudio`, IPython or notebook
+support packages cannot participate in dependency resolution or training imports.
+
+This specifically prevents the host-runtime conflict in which Colab's
+`torchvision 0.26.0+cpu` requires `torch==2.11.0` while the preregistered V5-3H
+runtime requires `torch==2.13.0+cpu`. The project pin is not changed and the
+host package is not used as a reason to weaken `pip check`.
 
 ## One-shot output boundary
 
@@ -36,12 +45,14 @@ exists:
 - V5-3G temporary artifact directory;
 - V5-3H execution envelope.
 
-No overwrite or automatic rerun path exists.
+No overwrite or automatic second training configuration exists. Recreating the
+isolated venv after a pre-training environment failure is not a model rerun and
+does not alter authoritative evidence.
 
 ## Single authorized execution
 
-The wrapper locates the exact frozen 2-AI and 3-AI checkpoint hashes and calls
-only the V5-3G authoritative entry with its exact approval token.
+The isolated worker locates the exact frozen 2-AI and 3-AI checkpoint hashes and
+calls only the V5-3G authoritative entry with its exact approval token.
 
 V5-3G itself:
 
@@ -62,16 +73,17 @@ The wrapper accepts the run only if:
 - exactly one candidate configuration is recorded;
 - numerical integrity = PASS;
 - frozen-state isolation = PASS;
-- both specialists have exact group counts;
+- both specialists have the exact preregistered group counts;
 - both specialists completed exactly 110 steps;
-- all V5-3F finite-value guards are true;
 - frozen state before and after is identical;
+- V5-3F did not open checkpoint-write or protected-evaluation paths;
 - rescue artifacts exist, were reload-verified and match their recorded SHA256;
 - repository HEAD remains exactly the pinned V5-3G SHA;
 - repository worktree remains clean.
 
-It then writes one hash-bound execution envelope containing the report SHA,
-rescue artifact SHAs and four-group feature fingerprints.
+It then atomically writes one hash-bound execution envelope containing the
+report SHA, rescue artifact SHAs, four-group feature fingerprints and isolated
+runtime evidence.
 
 ## Explicit stop
 
