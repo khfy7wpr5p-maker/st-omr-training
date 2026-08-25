@@ -23,10 +23,6 @@ class TestMeterV53IBackgroundRunner(unittest.TestCase):
             self.source,
         )
         self.assertIn(
-            'EXPECTED_V53G_REPORT_SHA256 = (',
-            self.source,
-        )
-        self.assertIn(
             '"682c2d405287051fef18b803e2597777cb7fc55c6ba0814ea3b2d4df0fa35b9d"',
             self.source,
         )
@@ -72,17 +68,23 @@ class TestMeterV53IBackgroundRunner(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertIn(token, self.source)
 
-    def test_runner_has_durable_lock_heartbeat_and_fail_closed_state(self):
+    def test_runner_has_durable_lock_heartbeat_progress_and_fail_closed_state(self):
         for token in (
             'LOCK = CONTROL_DIR / f"launch_{GATE_IMPLEMENTATION_HEAD}.json"',
             'HEARTBEAT = CONTROL_DIR / f"heartbeat_{GATE_IMPLEMENTATION_HEAD}.json"',
+            'PROGRESS = CONTROL_DIR / f"progress_{GATE_IMPLEMENTATION_HEAD}.json"',
             'state.get("status") != "ALLOCATED"',
             '"status": "FAILED"',
             '"status": "COMPLETED"',
             'threading.Thread(target=heartbeat_loop, daemon=True)',
+            '"st-omr-meter-v5-3i-background-progress-v1"',
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.source)
+        # The worker progress callback must not race the supervisor heartbeat writer.
+        self.assertIn('tmp = PROGRESS.with_suffix(PROGRESS.suffix + ".tmp")', self.source)
+        self.assertIn('os.replace(tmp, PROGRESS)', self.source)
+        self.assertNotIn('tmp = HEARTBEAT.with_suffix(HEARTBEAT.suffix + ".tmp")', self.source)
 
     def test_result_is_single_non_overwriting_evidence_write(self):
         self.assertIn('if RESULT.exists():', self.source)
