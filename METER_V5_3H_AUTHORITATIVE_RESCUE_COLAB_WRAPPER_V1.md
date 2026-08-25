@@ -21,19 +21,24 @@ Before importing ST-OMR training code, the wrapper:
 4. checks out that commit detached;
 5. requires a clean repository worktree;
 6. verifies that no V5-3G/V5-3H output already exists;
-7. creates a fresh isolated Python venv under `/content/st-omr-v5-3h-venv`;
-8. installs only the repository's pinned runtime requirements inside that venv;
-9. runs `pip check` inside the venv, not against Colab's global environment;
-10. verifies the exact runtime package versions before the authoritative worker is launched.
+7. creates a fresh isolated Python venv under `/content/st-omr-v5-3h-venv` with `--without-pip`;
+8. uses the already-running host `pip` only as a controller with `pip --python <venv-python>` to install the repository's pinned requirements into that venv;
+9. runs `pip --python <venv-python> check` against the isolated target environment;
+10. verifies the exact runtime package versions from the isolated interpreter before the authoritative worker is launched.
+
+The `--without-pip` bootstrap is intentional. Colab's Debian-style system Python
+may have the stdlib `venv` module while omitting `ensurepip`; a normal
+`python -m venv` then exits before training. Creating the venv without bundled
+pip avoids that host packaging dependency, while `pip --python` still targets
+only the isolated interpreter. This environment-bootstrap change does not alter
+model code, optimizer configuration, thresholds, data selection, or any
+protected evaluation surface.
 
 The isolated worker also requires `PYTHONNOUSERSITE=1`. Therefore unrelated Colab
 packages such as preinstalled `torchvision`, `torchaudio`, IPython or notebook
-support packages cannot participate in dependency resolution or training imports.
-
-This specifically prevents the host-runtime conflict in which Colab's
-`torchvision 0.26.0+cpu` requires `torch==2.11.0` while the preregistered V5-3H
-runtime requires `torch==2.13.0+cpu`. The project pin is not changed and the
-host package is not used as a reason to weaken `pip check`.
+support packages cannot participate in training imports. The preregistered
+project pin remains `torch==2.13.0+cpu`; it is not weakened to match Colab's host
+packages.
 
 ## One-shot output boundary
 
@@ -83,7 +88,7 @@ The wrapper accepts the run only if:
 
 It then atomically writes one hash-bound execution envelope containing the
 report SHA, rescue artifact SHAs, four-group feature fingerprints and isolated
-runtime evidence.
+runtime evidence, including the exact venv bootstrap mechanism.
 
 ## Explicit stop
 
