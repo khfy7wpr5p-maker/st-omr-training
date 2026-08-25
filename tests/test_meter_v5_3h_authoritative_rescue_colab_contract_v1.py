@@ -50,21 +50,38 @@ class TestMeterV53HAuthoritativeRescueColabContract(unittest.TestCase):
             with self.subTest(token=token):
                 self.assertNotIn(token, self.source)
 
-    def test_notebook_uses_isolated_pinned_runtime(self):
+    def test_notebook_uses_colab_safe_isolated_pinned_runtime(self):
         for token in (
             'VENV = Path("/content/st-omr-v5-3h-venv")',
             'VENV_PYTHON = VENV / "bin" / "python"',
-            '[sys.executable, "-m", "venv", str(VENV)]',
+            '[sys.executable, "-m", "venv", "--without-pip", str(VENV)]',
+            'VENV_PYTHON.is_file()',
+            'PIP_TARGET = [sys.executable, "-m", "pip", "--python", str(VENV_PYTHON)]',
+            'PIP_TARGET + ["check"]',
             'env["PYTHONNOUSERSITE"] = "1"',
-            '[str(VENV_PYTHON), "-m", "pip", "check"]',
             'sys.prefix == sys.base_prefix',
             '"torch": "2.13.0+cpu"',
             '"scipy": "1.18.0"',
             '"isolated_runtime": True',
+            '"venv_bootstrap": "stdlib-venv-without-pip+host-pip--python"',
         ):
             with self.subTest(token=token):
                 self.assertIn(token, self.source)
-        self.assertNotIn('[sys.executable, "-m", "pip", "install"', self.source)
+        self.assertNotIn('[sys.executable, "-m", "venv", str(VENV)]', self.source)
+        self.assertNotIn('[str(VENV_PYTHON), "-m", "pip"', self.source)
+
+    def test_environment_bootstrap_precedes_authoritative_worker(self):
+        output_guard = self.source.index('print("OUTPUT GUARD = PASS")')
+        venv_bootstrap = self.source.index('"--without-pip"')
+        pip_check = self.source.index('PIP_TARGET + ["check"]')
+        worker_launch = self.source.index(
+            'subprocess.check_call([str(VENV_PYTHON), "-c", worker]'
+        )
+        authoritative_entry = self.source.index("run_authoritative_rescue_training_v1(")
+        self.assertLess(output_guard, venv_bootstrap)
+        self.assertLess(venv_bootstrap, pip_check)
+        self.assertLess(pip_check, worker_launch)
+        self.assertLess(pip_check, authoritative_entry)
 
     def test_notebook_fails_closed_and_verifies_authoritative_receipt(self):
         for token in (
