@@ -49,6 +49,7 @@ RESULT = ANN / "v5_3i_train_acceptance_gate_v1.json"
 CONTROL_DIR = ANN / "v5_3i_background_control"
 LOCK = CONTROL_DIR / f"launch_{GATE_IMPLEMENTATION_HEAD}.json"
 HEARTBEAT = CONTROL_DIR / f"heartbeat_{GATE_IMPLEMENTATION_HEAD}.json"
+PROGRESS = CONTROL_DIR / f"progress_{GATE_IMPLEMENTATION_HEAD}.json"
 
 REPO = Path("/content/st-omr-v5-3i-gate")
 VENV = Path("/content/st-omr-v5-3i-venv")
@@ -218,7 +219,7 @@ SOURCE_REPORT = ANN / "v5_3g_authoritative_rescue_training_report.json"
 SOURCE_ENVELOPE = ANN / f"v5_3g_execution_envelope_{V53G_HEAD}.json"
 RESCUE_DIR = ANN / "v5_3g_authoritative_rescue_artifacts"
 RESULT = ANN / "v5_3i_train_acceptance_gate_v1.json"
-HEARTBEAT = ANN / "v5_3i_background_control" / f"heartbeat_{GATE_IMPLEMENTATION_HEAD}.json"
+PROGRESS = ANN / "v5_3i_background_control" / f"progress_{GATE_IMPLEMENTATION_HEAD}.json"
 
 if sys.prefix == sys.base_prefix or os.environ.get("PYTHONNOUSERSITE") != "1":
     raise RuntimeError("isolated V5-3I worker boundary missing")
@@ -255,7 +256,7 @@ print("MODULE/CHECKPOINT/SAFETY = PASS", flush=True)
 
 def progress(done, total, phase):
     payload = {
-        "schema": "st-omr-meter-v5-3i-background-heartbeat-v1",
+        "schema": "st-omr-meter-v5-3i-background-progress-v1",
         "gate_implementation_head": GATE_IMPLEMENTATION_HEAD,
         "status": "GATE_EVALUATING",
         "phase": phase,
@@ -263,9 +264,9 @@ def progress(done, total, phase):
         "total": int(total),
         "utc": datetime.now(timezone.utc).isoformat(),
     }
-    tmp = HEARTBEAT.with_suffix(HEARTBEAT.suffix + ".tmp")
+    tmp = PROGRESS.with_suffix(PROGRESS.suffix + ".tmp")
     tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.replace(tmp, HEARTBEAT)
+    os.replace(tmp, PROGRESS)
 
 result = gate.run_train_acceptance_gate_v1(
     DATA_ROOT,
