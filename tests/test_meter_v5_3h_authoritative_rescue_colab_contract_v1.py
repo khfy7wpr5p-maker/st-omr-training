@@ -1,5 +1,8 @@
 import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 
@@ -69,6 +72,33 @@ class TestMeterV53HAuthoritativeRescueColabContract(unittest.TestCase):
                 self.assertIn(token, self.source)
         self.assertNotIn('[sys.executable, "-m", "venv", str(VENV)]', self.source)
         self.assertNotIn('[str(VENV_PYTHON), "-m", "pip"', self.source)
+
+    def test_colab_safe_bootstrap_mechanism_executes_without_ensurepip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "isolated"
+            subprocess.check_call(
+                [sys.executable, "-m", "venv", "--without-pip", str(root)]
+            )
+            python = root / "bin" / "python"
+            self.assertTrue(python.is_file())
+            output = subprocess.check_output(
+                [
+                    sys.executable,
+                    "-m",
+                    "pip",
+                    "--python",
+                    str(python),
+                    "check",
+                ],
+                text=True,
+            )
+            self.assertIn("No broken requirements found", output)
+            prefixes = subprocess.check_output(
+                [python, "-c", "import sys; print(sys.prefix); print(sys.base_prefix)"],
+                text=True,
+            ).splitlines()
+            self.assertEqual(Path(prefixes[0]), root)
+            self.assertNotEqual(prefixes[0], prefixes[1])
 
     def test_environment_bootstrap_precedes_authoritative_worker(self):
         output_guard = self.source.index('print("OUTPUT GUARD = PASS")')
