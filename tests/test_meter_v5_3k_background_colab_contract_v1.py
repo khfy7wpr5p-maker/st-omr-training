@@ -63,12 +63,14 @@ class TestMeterV53KBackgroundColabContract(unittest.TestCase):
         self.assertNotIn("run_authoritative_rescue_training_v1", called_names)
         self.assertNotIn("execute_rescue_tensor_harness_v1", called_names)
         self.assertNotIn("run_historical_retention_gate", called_names)
-        for forbidden in (
-            "torch.optim.",
-            ".backward(",
-            "optimizer.step(",
-        ):
-            self.assertNotIn(forbidden, launch)
+        self.assertNotIn("backward", called_names)
+        self.assertNotIn("step", called_names)
+        # The launch cell intentionally carries these strings as fail-closed
+        # source guards for the detached runner. Their textual presence is safe;
+        # only direct calls from the launch cell are forbidden.
+        self.assertIn('"torch.optim."', launch)
+        self.assertIn('".backward("', launch)
+        self.assertIn('"optimizer.step("', launch)
 
     def test_status_and_final_cells_are_read_only(self):
         status, final = self._code_cells()[1:]
