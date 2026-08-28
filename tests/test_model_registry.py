@@ -46,9 +46,20 @@ _SHA5 = "5" * 64
 _GIT = "a" * 40
 
 
-def _binding(record_id: str, *, tokenizer_version=None, representation_version=None, tokenizer_fp=None):
+def _binding(
+    record_id: str,
+    *,
+    tokenizer_version=None,
+    representation_version=None,
+    tokenizer_fp=None,
+    record_fp=None,
+):
+    record = registry_by_id().get(record_id)
+    if record_fp is None:
+        record_fp = record.fingerprint() if record is not None else _SHA5
     return ModelArtifactBinding(
         record_id=record_id,
+        registry_record_fingerprint_sha256=record_fp,
         repository_sha=_GIT,
         checkpoint_sha256=_SHA,
         model_fingerprint_sha256=_SHA2,
@@ -134,6 +145,17 @@ class ModelRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ModelRegistryError, "requires tokenizer fingerprint"):
             validate_artifact_binding(replace(binding, tokenizer_fingerprint_sha256=None))
 
+    def test_artifact_is_bound_to_exact_registry_record_fingerprint(self) -> None:
+        binding = _binding("specialist.staff.d7.v1")
+        original = registry_by_id()["specialist.staff.d7.v1"]
+        drifted = replace(original, source_version=original.source_version + "-drift")
+        drifted_registry = tuple(
+            drifted if record.record_id == original.record_id else record
+            for record in SEED_MODEL_REGISTRY
+        )
+        with self.assertRaisesRegex(ModelRegistryError, "registry-record fingerprint mismatch"):
+            validate_artifact_binding(binding, drifted_registry)
+
     def test_tokenizer_free_visual_artifact_rejects_spurious_tokenizer_identity(self) -> None:
         binding = _binding("specialist.staff.d7.v1")
         self.assertEqual(validate_artifact_binding(binding).record_id, "specialist.staff.d7.v1")
@@ -156,6 +178,8 @@ class ModelRegistryTests(unittest.TestCase):
             replace(_binding("specialist.staff.d7.v1"), checkpoint_sha256="ABC")
         with self.assertRaisesRegex(ModelRegistryError, "repository_sha"):
             replace(_binding("specialist.staff.d7.v1"), repository_sha="b" * 39)
+        with self.assertRaisesRegex(ModelRegistryError, "registry_record_fingerprint_sha256"):
+            replace(_binding("specialist.staff.d7.v1"), registry_record_fingerprint_sha256="BAD")
 
     def test_model_cards_are_deterministic_and_do_not_overclaim(self) -> None:
         record = registry_by_id()["candidate.poly-2d-transformer.v1"]
