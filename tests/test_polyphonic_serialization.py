@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-
-import pytest
+import unittest
 
 from st_omr_training.polyphonic_representation import (
     Barline,
@@ -144,7 +143,9 @@ def _score() -> PolyScore:
             ClefAssignment(staff=1, sign="G", line=2),
             ClefAssignment(staff=2, sign="F", line=4),
         ),
-        events=(grace, chord, voice_two, rest),
+        # Canonical V2 order is onset/voice/staff/event_id. Grace is zero-duration
+        # but still obeys the same deterministic ordering surface.
+        events=(chord, grace, voice_two, rest),
         barlines=(
             Barline(
                 location=BarlineLocation.RIGHT,
@@ -164,141 +165,133 @@ def _text_tokens(text: str) -> tuple[str, ...]:
     )
 
 
-def test_versions_and_vocabulary_are_frozen_and_closed() -> None:
-    assert POLYPHONIC_SERIALIZATION_VERSION == "st-omr-polyphonic-serialization-v1"
-    assert POLYPHONIC_TOKENIZER_VERSION == "st-omr-polyphonic-tokenizer-v1"
-    assert len(TOKEN_VOCABULARY) == len(set(TOKEN_VOCABULARY))
-    assert TOKEN_VOCABULARY[PAD_TOKEN_ID] == "PAD"
-    assert TOKEN_VOCABULARY[BOS_TOKEN_ID] == "BOS"
-    assert TOKEN_VOCABULARY[EOS_TOKEN_ID] == "EOS"
-    assert all(ID_TO_TOKEN[index] == token for token, index in TOKEN_TO_ID.items())
-    assert len(tokenizer_fingerprint()) == 64
+class PolyphonicSerializationTests(unittest.TestCase):
+    def test_versions_and_vocabulary_are_frozen_and_closed(self) -> None:
+        self.assertEqual(POLYPHONIC_SERIALIZATION_VERSION, "st-omr-polyphonic-serialization-v1")
+        self.assertEqual(POLYPHONIC_TOKENIZER_VERSION, "st-omr-polyphonic-tokenizer-v1")
+        self.assertEqual(len(TOKEN_VOCABULARY), len(set(TOKEN_VOCABULARY)))
+        self.assertEqual(TOKEN_VOCABULARY[PAD_TOKEN_ID], "PAD")
+        self.assertEqual(TOKEN_VOCABULARY[BOS_TOKEN_ID], "BOS")
+        self.assertEqual(TOKEN_VOCABULARY[EOS_TOKEN_ID], "EOS")
+        self.assertTrue(all(ID_TO_TOKEN[index] == token for token, index in TOKEN_TO_ID.items()))
+        self.assertEqual(len(tokenizer_fingerprint()), 64)
+
+    def test_canonical_json_roundtrip_preserves_exact_score_and_hash(self) -> None:
+        score = _score()
+        canonical = serialize_polyphonic_score(score)
+
+        self.assertTrue(canonical.isascii())
+        restored = parse_canonical_polyphonic_json(canonical)
+        restored_bytes = parse_canonical_polyphonic_json(canonical.encode("ascii"))
+
+        self.assertEqual(restored, score)
+        self.assertEqual(restored_bytes, score)
+        self.assertEqual(restored.canonical_sha256(), score.canonical_sha256())
+        self.assertEqual(serialize_polyphonic_score(restored), canonical)
+
+    def test_structured_token_roundtrip_preserves_polyphony_cross_staff_and_unicode(self) -> None:
+        score = _score()
+        target = tokenize_polyphonic_score(score)
+
+        self.assertEqual(target.tokens[0], "BOS")
+        self.assertEqual(target.tokens[-1], "EOS")
+        self.assertIn("KEY:voice", target.tokens)
+        self.assertIn("KEY:staff", target.tokens)
+        self.assertIn("KEY:onset", target.tokens)
+        self.assertIn("KEY:staff_override", target.tokens)
+        self.assertNotIn("Piyano-α", target.tokens)
+        self.assertNotIn("e-grâce-00", target.tokens)
+        self.assertTrue(all(token in TOKEN_TO_ID for token in target.tokens))
+
+        self.assertEqual(detokenize_polyphonic_target(target), score)
+        self.assertEqual(detokenize_polyphonic_ids(target.token_ids), score)
+        self.assertEqual(parse_polyphonic_tokens(target.tokens), score)
+        self.assertEqual(decode_token_ids(target.token_ids), target.tokens)
+        self.assertEqual(encode_tokens(target.tokens), target.token_ids)
+
+    def test_validate_roundtrip_checks_json_tokens_ids_and_hash(self) -> None:
+        score = _score()
+        target = validate_roundtrip(score)
+        self.assertIsInstance(target, TokenizedPolyphonicTarget)
+        self.assertEqual(target.representation_sha256, score.canonical_sha256())
+
+    def test_canonical_json_rejects_equivalent_but_noncanonical_text(self) -> None:
+        canonical = serialize_polyphonic_score(_score())
+        with self.assertRaisesRegex(PolyphonicSerializationError, "not canonical"):
+            parse_canonical_polyphonic_json(" " + canonical)
+
+    def test_payload_rejects_unknown_key_and_wrong_scalar_types(self) -> None:
+        payload = _score().canonical_payload()
+        payload["unknown"] = 1
+        with self.assertRaisesRegex(PolyphonicSerializationError, "invalid keys"):
+            parse_polyphonic_payload(payload)
+
+        payload = _score().canonical_payload()
+        payload["parts"][0]["staff_count"] = True
+        with self.assertRaisesRegex(PolyphonicSerializationError, "plain integer"):
+            parse_polyphonic_payload(payload)
+
+    def test_payload_rejects_invalid_enum_without_coercion(self) -> None:
+        payload = _score().canonical_payload()
+        payload["parts"][0]["measures"][0]["events"][0]["kind"] = "unknown-kind"
+        with self.assertRaisesRegex(PolyphonicSerializationError, "unsupported value"):
+            parse_polyphonic_payload(payload)
+
+    def test_token_stream_rejects_noncanonical_object_key_order(self) -> None:
+        tokens = (
+            "BOS",
+            "OBJ_START",
+            "KEY:representation_version",
+            *_text_tokens("st-omr-polyphonic-representation-v2"),
+            "KEY:parts",
+            "ARR_START",
+            "ARR_END",
+            "OBJ_END",
+            "EOS",
+        )
+        with self.assertRaisesRegex(PolyphonicSerializationError, "canonical-sorted"):
+            parse_polyphonic_tokens(tokens)
+
+    def test_token_stream_rejects_unknown_ids_pad_and_nested_envelopes(self) -> None:
+        target = tokenize_polyphonic_score(_score())
+
+        with self.assertRaisesRegex(PolyphonicSerializationError, "outside frozen"):
+            decode_token_ids(target.token_ids[:-1] + (len(TOKEN_VOCABULARY) + 99,))
+        with self.assertRaisesRegex(PolyphonicSerializationError, "PAD"):
+            encode_tokens(("BOS", "PAD", "EOS"))
+        with self.assertRaisesRegex(PolyphonicSerializationError, "nested BOS/EOS"):
+            parse_polyphonic_tokens(("BOS", "BOS", "EOS"))
+
+    def test_detokenizer_detects_representation_hash_tampering(self) -> None:
+        target = tokenize_polyphonic_score(_score())
+        tampered = replace(target, representation_sha256="0" * 64)
+        with self.assertRaisesRegex(PolyphonicSerializationError, "hash mismatch"):
+            detokenize_polyphonic_target(tampered)
+
+    def test_tokenized_target_rejects_token_id_mismatch_and_fingerprint_drift(self) -> None:
+        target = tokenize_polyphonic_score(_score())
+        with self.assertRaisesRegex(PolyphonicSerializationError, "tokens/token_ids mismatch"):
+            replace(target, token_ids=target.token_ids[:-1] + (BOS_TOKEN_ID,))
+        with self.assertRaisesRegex(PolyphonicSerializationError, "fingerprint mismatch"):
+            replace(target, tokenizer_fingerprint="0" * 64)
+
+    def test_integer_token_form_is_canonical(self) -> None:
+        tokens = (
+            "BOS",
+            "OBJ_START",
+            "KEY:parts",
+            "INT_START",
+            "DIGIT_0",
+            "DIGIT_1",
+            "INT_END",
+            "KEY:representation_version",
+            *_text_tokens("st-omr-polyphonic-representation-v2"),
+            "OBJ_END",
+            "EOS",
+        )
+        with self.assertRaisesRegex(PolyphonicSerializationError, "leading zero"):
+            parse_polyphonic_tokens(tokens)
 
 
-def test_canonical_json_roundtrip_preserves_exact_score_and_hash() -> None:
-    score = _score()
-    canonical = serialize_polyphonic_score(score)
-
-    assert canonical.isascii()
-    restored = parse_canonical_polyphonic_json(canonical)
-    restored_bytes = parse_canonical_polyphonic_json(canonical.encode("ascii"))
-
-    assert restored == score
-    assert restored_bytes == score
-    assert restored.canonical_sha256() == score.canonical_sha256()
-    assert serialize_polyphonic_score(restored) == canonical
-
-
-def test_structured_token_roundtrip_preserves_polyphony_cross_staff_and_unicode() -> None:
-    score = _score()
-    target = tokenize_polyphonic_score(score)
-
-    assert target.tokens[0] == "BOS"
-    assert target.tokens[-1] == "EOS"
-    assert "KEY:voice" in target.tokens
-    assert "KEY:staff" in target.tokens
-    assert "KEY:onset" in target.tokens
-    assert "KEY:staff_override" in target.tokens
-    assert "Piyano-α" not in target.tokens
-    assert "e-grâce-00" not in target.tokens
-    assert all(token in TOKEN_TO_ID for token in target.tokens)
-
-    assert detokenize_polyphonic_target(target) == score
-    assert detokenize_polyphonic_ids(target.token_ids) == score
-    assert parse_polyphonic_tokens(target.tokens) == score
-    assert decode_token_ids(target.token_ids) == target.tokens
-    assert encode_tokens(target.tokens) == target.token_ids
-
-
-def test_validate_roundtrip_checks_json_tokens_ids_and_hash() -> None:
-    score = _score()
-    target = validate_roundtrip(score)
-    assert isinstance(target, TokenizedPolyphonicTarget)
-    assert target.representation_sha256 == score.canonical_sha256()
-
-
-def test_canonical_json_rejects_equivalent_but_noncanonical_text() -> None:
-    canonical = serialize_polyphonic_score(_score())
-    with pytest.raises(PolyphonicSerializationError, match="not canonical"):
-        parse_canonical_polyphonic_json(" " + canonical)
-
-
-def test_payload_rejects_unknown_key_and_wrong_scalar_types() -> None:
-    payload = _score().canonical_payload()
-    payload["unknown"] = 1
-    with pytest.raises(PolyphonicSerializationError, match="invalid keys"):
-        parse_polyphonic_payload(payload)
-
-    payload = _score().canonical_payload()
-    payload["parts"][0]["staff_count"] = True
-    with pytest.raises(PolyphonicSerializationError, match="plain integer"):
-        parse_polyphonic_payload(payload)
-
-
-def test_payload_rejects_invalid_enum_without_coercion() -> None:
-    payload = _score().canonical_payload()
-    payload["parts"][0]["measures"][0]["events"][0]["kind"] = "unknown-kind"
-    with pytest.raises(PolyphonicSerializationError, match="unsupported value"):
-        parse_polyphonic_payload(payload)
-
-
-def test_token_stream_rejects_noncanonical_object_key_order() -> None:
-    tokens = (
-        "BOS",
-        "OBJ_START",
-        "KEY:representation_version",
-        *_text_tokens("st-omr-polyphonic-representation-v2"),
-        "KEY:parts",
-        "ARR_START",
-        "ARR_END",
-        "OBJ_END",
-        "EOS",
-    )
-    with pytest.raises(PolyphonicSerializationError, match="canonical-sorted"):
-        parse_polyphonic_tokens(tokens)
-
-
-def test_token_stream_rejects_unknown_ids_pad_and_nested_envelopes() -> None:
-    target = tokenize_polyphonic_score(_score())
-
-    with pytest.raises(PolyphonicSerializationError, match="outside frozen"):
-        decode_token_ids(target.token_ids[:-1] + (len(TOKEN_VOCABULARY) + 99,))
-    with pytest.raises(PolyphonicSerializationError, match="PAD"):
-        encode_tokens(("BOS", "PAD", "EOS"))
-    with pytest.raises(PolyphonicSerializationError, match="nested BOS/EOS"):
-        parse_polyphonic_tokens(("BOS", "BOS", "EOS"))
-
-
-def test_detokenizer_detects_representation_hash_tampering() -> None:
-    target = tokenize_polyphonic_score(_score())
-    tampered = replace(target, representation_sha256="0" * 64)
-    with pytest.raises(PolyphonicSerializationError, match="hash mismatch"):
-        detokenize_polyphonic_target(tampered)
-
-
-def test_tokenized_target_rejects_token_id_mismatch_and_fingerprint_drift() -> None:
-    target = tokenize_polyphonic_score(_score())
-    with pytest.raises(PolyphonicSerializationError, match="tokens/token_ids mismatch"):
-        replace(target, token_ids=target.token_ids[:-1] + (BOS_TOKEN_ID,))
-    with pytest.raises(PolyphonicSerializationError, match="fingerprint mismatch"):
-        replace(target, tokenizer_fingerprint="0" * 64)
-
-
-def test_integer_token_form_is_canonical() -> None:
-    # Root key order is valid; malformed integer is reached inside representation_version
-    # replacement payload only after a complete small object is parsed.
-    tokens = (
-        "BOS",
-        "OBJ_START",
-        "KEY:parts",
-        "INT_START",
-        "DIGIT_0",
-        "DIGIT_1",
-        "INT_END",
-        "KEY:representation_version",
-        *_text_tokens("st-omr-polyphonic-representation-v2"),
-        "OBJ_END",
-        "EOS",
-    )
-    with pytest.raises(PolyphonicSerializationError, match="leading zero"):
-        parse_polyphonic_tokens(tokens)
+if __name__ == "__main__":
+    unittest.main()
