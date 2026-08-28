@@ -244,7 +244,8 @@ class Poly2DTrainingBatch:
             raise Poly2DTrainingError("image batch size does not match sample_ids")
         if height <= 0 or width <= 0 or height * width > MAX_POLY_2D_TRAINING_PIXELS:
             raise Poly2DTrainingError("image dimensions exceed the TR-POLY-08A tensor boundary")
-        assert_finite_tensor("TR-POLY-08A images", self.images)
+        if not bool(torch.isfinite(self.images).all()):
+            raise Poly2DTrainingError("images contain NaN or Infinity")
         if bool((self.images < 0).any()) or bool((self.images > 1).any()):
             raise Poly2DTrainingError("images must stay in normalized [0,1] range")
         for tensor, name in (
