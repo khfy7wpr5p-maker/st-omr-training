@@ -4,7 +4,7 @@
 
 TR-POLY-08 introduces the first bounded Polyphonic Representation V2 model candidate.
 
-It is a **research prototype**, not a winning model, not a production recognizer, and not a ScoreMosaic runtime component.
+It is a **research architecture prototype**, not a trained candidate, not a winning model, not a production recognizer, and not a ScoreMosaic runtime component.
 
 No benchmark result is claimed in this package. Common comparison remains TR-POLY-09.
 
@@ -69,22 +69,25 @@ The decoder consumes V2 token IDs and uses:
 - causal self-attention;
 - cross-attention to the complete 2D visual memory.
 
-The model only exposes a teacher-forced forward surface in TR-POLY-08. Greedy/beam decoding, constrained semantic decoding, training orchestration and checkpoint selection are separate stages.
+The model only exposes a teacher-forced forward surface in TR-POLY-08. Greedy/beam decoding, constrained semantic decoding, loss/optimizer, split enforcement, training orchestration and checkpoint selection are separate stages.
 
-## Registry transition
+## Registry transition and checkpoint gate
 
-TR-POLY-07 registered `candidate.poly-2d-transformer.v1` as `planned`.
+TR-POLY-07 registered `candidate.poly-2d-transformer.v1` as a future candidate identity.
 
-TR-POLY-08 changes the same research identity to:
+TR-POLY-08 now binds that identity to the actual prototype source:
 
-- lifecycle: `training_implemented`;
-- authority: `experimental`;
+- lifecycle: `architecture_only`;
+- authority: `none`;
 - source module: `st_omr_training.poly_2d_transformer`;
-- source version: `st-omr-poly-2d-transformer-v1`.
+- source version: `st-omr-poly-2d-transformer-v1`;
+- V2 representation/tokenizer: explicitly bound.
 
-This does **not** mean a trained checkpoint exists. Any later checkpoint evidence must still provide the exact registry-row fingerprint, repository SHA, checkpoint/model/profile/dataset/runtime hashes, V2 tokenizer fingerprint and V2 representation identity.
+`architecture_only` is deliberate even though executable forward code exists. The registry lifecycle is about **admissible learned evidence**, not merely whether a Python class can run. TR-POLY-08 does not provide a complete bounded training surface, therefore `validate_artifact_binding()` continues to reject checkpoint evidence for this candidate.
 
-Because the registry-row fingerprint changes, a hypothetical old artifact binding to the former planned row cannot be silently reused.
+A later package may open the checkpoint gate only after it supplies explicit loss/optimizer behavior, TRAIN-only update enforcement, validation non-mutation, bounded orchestration and exact artifact provenance.
+
+Because the registry-row fingerprint changes, a hypothetical artifact binding to an older row cannot be silently reused.
 
 ## Tests / architecture guards
 
@@ -101,7 +104,8 @@ The focused contract tests verify:
 - bounded parameter count;
 - deterministic profile fingerprint;
 - fail-closed image/token/config inputs;
-- V2 PAD identity is retained.
+- V2 PAD identity is retained;
+- registry checkpoint evidence remains closed for the prototype.
 
 ## Explicit non-goals
 
@@ -110,6 +114,7 @@ TR-POLY-08 does not:
 - train on TRAIN/VALIDATION/TEST;
 - access sealed TEST;
 - create, load or select a checkpoint;
+- admit checkpoint evidence for the new candidate;
 - claim improved accuracy;
 - run OLiMPiC/GrandStaff benchmarking;
 - implement MusicXML → V2 import;
@@ -122,4 +127,4 @@ TR-POLY-08 does not:
 
 ## Next gate
 
-TR-POLY-09 must place the frozen CNN-GRU baseline and this 2D candidate behind the same benchmark identity and evaluation contract before any comparative claim is made.
+Before a common benchmark can compare a **trained** 2D candidate, a bounded training package must first open the registry checkpoint gate with exact evidence controls. TR-POLY-09 remains the common-benchmark comparison stage after such an artifact exists; implementation alone is not comparative evidence.
