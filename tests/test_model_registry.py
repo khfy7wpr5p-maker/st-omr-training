@@ -27,6 +27,7 @@ from st_omr_training.model_registry import (
     validate_artifact_binding,
     validate_registry,
 )
+from st_omr_training.poly_2d_transformer import POLY_2D_TRANSFORMER_VERSION
 from st_omr_training.poly_evaluation_contract import (
     POLY_EVALUATION_CONTRACT_VERSION as ACTUAL_EVALUATION_CONTRACT_VERSION,
 )
@@ -37,7 +38,6 @@ from st_omr_training.stage7d7_specialist_training import STAFF_MODEL_VERSION, ST
 from st_omr_training.training_model import BASELINE_MODEL_VERSION
 from st_omr_training.training_tokens import TOKENIZER_VERSION
 
-
 _SHA = "1" * 64
 _SHA2 = "2" * 64
 _SHA3 = "3" * 64
@@ -46,14 +46,7 @@ _SHA5 = "5" * 64
 _GIT = "a" * 40
 
 
-def _binding(
-    record_id: str,
-    *,
-    tokenizer_version=None,
-    representation_version=None,
-    tokenizer_fp=None,
-    record_fp=None,
-):
+def _binding(record_id: str, *, tokenizer_version=None, representation_version=None, tokenizer_fp=None, record_fp=None):
     record = registry_by_id().get(record_id)
     if record_fp is None:
         record_fp = record.fingerprint() if record is not None else _SHA5
@@ -82,13 +75,14 @@ class ModelRegistryTests(unittest.TestCase):
         self.assertEqual(V2_TOKENIZER_VERSION, POLYPHONIC_TOKENIZER_VERSION)
         self.assertEqual(POLY_EVALUATION_CONTRACT_VERSION, ACTUAL_EVALUATION_CONTRACT_VERSION)
 
-    def test_seed_registry_consolidates_existing_implemented_model_versions(self) -> None:
+    def test_seed_registry_consolidates_existing_model_versions(self) -> None:
         records = registry_by_id()
         self.assertEqual(records["baseline.cnn-gru.v1"].source_version, BASELINE_MODEL_VERSION)
         self.assertEqual(records["specialist.staff.d7.v1"].source_version, STAFF_MODEL_VERSION)
         self.assertEqual(records["specialist.structure.d7.v1"].source_version, STRUCTURE_MODEL_VERSION)
         self.assertEqual(records["refiner.barline.d11.v1"].source_version, BARLINE_MODEL_VERSION)
         self.assertEqual(records["refiner.meter.d11.v1"].source_version, METER_MODEL_VERSION)
+        self.assertEqual(records["candidate.poly-2d-transformer.v1"].source_version, POLY_2D_TRANSFORMER_VERSION)
 
     def test_registry_is_unique_deterministic_and_order_independent(self) -> None:
         records = validate_registry()
@@ -122,37 +116,41 @@ class ModelRegistryTests(unittest.TestCase):
                 polyphonic_v2_capable=True,
             )
 
-    def test_polyphonic_candidate_is_bound_to_frozen_v2_target_surface(self) -> None:
+    def test_polyphonic_2d_prototype_is_registered_without_checkpoint_authority(self) -> None:
         candidate = registry_by_id()["candidate.poly-2d-transformer.v1"]
         self.assertTrue(candidate.polyphonic_v2_capable)
         self.assertIs(candidate.semantic_scope, SemanticScope.POLYPHONIC_V2)
         self.assertEqual(candidate.representation_version, V2_REPRESENTATION_VERSION)
         self.assertEqual(candidate.tokenizer_version, V2_TOKENIZER_VERSION)
-        self.assertIs(candidate.lifecycle, ModelLifecycle.PLANNED)
+        self.assertEqual(candidate.source_module, "st_omr_training.poly_2d_transformer")
+        self.assertEqual(candidate.source_version, POLY_2D_TRANSFORMER_VERSION)
+        self.assertIs(candidate.lifecycle, ModelLifecycle.ARCHITECTURE_ONLY)
         self.assertIs(candidate.authority, ResearchAuthority.NONE)
+        self.assertFalse(candidate.production_authority)
 
     def test_baseline_artifact_requires_exact_tokenizer_binding(self) -> None:
-        binding = _binding(
-            "baseline.cnn-gru.v1",
-            tokenizer_version=V1_TOKENIZER_VERSION,
-            tokenizer_fp=_SHA,
-        )
-        record = validate_artifact_binding(binding)
-        self.assertEqual(record.record_id, "baseline.cnn-gru.v1")
-
+        binding = _binding("baseline.cnn-gru.v1", tokenizer_version=V1_TOKENIZER_VERSION, tokenizer_fp=_SHA)
+        self.assertEqual(validate_artifact_binding(binding).record_id, "baseline.cnn-gru.v1")
         with self.assertRaisesRegex(ModelRegistryError, "tokenizer version"):
             validate_artifact_binding(replace(binding, tokenizer_version=V2_TOKENIZER_VERSION))
         with self.assertRaisesRegex(ModelRegistryError, "requires tokenizer fingerprint"):
             validate_artifact_binding(replace(binding, tokenizer_fingerprint_sha256=None))
 
+    def test_polyphonic_2d_prototype_cannot_register_checkpoint_evidence_yet(self) -> None:
+        binding = _binding(
+            "candidate.poly-2d-transformer.v1",
+            tokenizer_version=V2_TOKENIZER_VERSION,
+            representation_version=V2_REPRESENTATION_VERSION,
+            tokenizer_fp=_SHA,
+        )
+        with self.assertRaisesRegex(ModelRegistryError, "does not admit checkpoint evidence"):
+            validate_artifact_binding(binding)
+
     def test_artifact_is_bound_to_exact_registry_record_fingerprint(self) -> None:
         binding = _binding("specialist.staff.d7.v1")
         original = registry_by_id()["specialist.staff.d7.v1"]
         drifted = replace(original, source_version=original.source_version + "-drift")
-        drifted_registry = tuple(
-            drifted if record.record_id == original.record_id else record
-            for record in SEED_MODEL_REGISTRY
-        )
+        drifted_registry = tuple(drifted if r.record_id == original.record_id else r for r in SEED_MODEL_REGISTRY)
         with self.assertRaisesRegex(ModelRegistryError, "registry-record fingerprint mismatch"):
             validate_artifact_binding(binding, drifted_registry)
 
@@ -166,6 +164,7 @@ class ModelRegistryTests(unittest.TestCase):
         for record_id in (
             "specialist.notehead.declared.v1",
             "candidate.poly-2d-transformer.v1",
+            "candidate.relation-graph.v1",
             "fusion.context-validator.v1",
         ):
             with self.assertRaisesRegex(ModelRegistryError, "does not admit checkpoint evidence"):
@@ -192,11 +191,7 @@ class ModelRegistryTests(unittest.TestCase):
         self.assertEqual(len(model_card_sha256(record)), 64)
 
     def test_evidence_binding_requires_exact_poly_evaluation_contract(self) -> None:
-        evidence = ModelEvidenceBinding(
-            artifact_binding_sha256=_SHA,
-            benchmark_identity_sha256=_SHA2,
-            metrics_sha256=_SHA3,
-        )
+        evidence = ModelEvidenceBinding(artifact_binding_sha256=_SHA, benchmark_identity_sha256=_SHA2, metrics_sha256=_SHA3)
         self.assertEqual(len(evidence.fingerprint()), 64)
         with self.assertRaisesRegex(ModelRegistryError, "evaluation contract version"):
             replace(evidence, evaluation_contract_version="wrong-contract")
