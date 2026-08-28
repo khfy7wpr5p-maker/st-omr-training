@@ -166,6 +166,10 @@ class PolyEvaluationContractTests(unittest.TestCase):
         self.assertIs(validate_comparison_benchmark((first, same)), first)
         with self.assertRaises(PolyEvaluationContractError):
             validate_comparison_benchmark((first, changed))
+        with self.assertRaises(PolyEvaluationContractError):
+            validate_comparison_benchmark(({"benchmark_id": "raw"},))
+        with self.assertRaises(PolyEvaluationContractError):
+            validate_comparison_benchmark(("raw-benchmark-id",))
 
     def test_sample_descriptor_keeps_split_complexity_and_robustness(self) -> None:
         descriptor = BenchmarkSampleDescriptor(
