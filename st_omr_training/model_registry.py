@@ -1,9 +1,7 @@
 """Deterministic research model registry for ST-OMR.
 
-TR-POLY-07 consolidates model-family identity, lifecycle, target contracts and
-checkpoint evidence boundaries without changing any trainer, checkpoint or
-runtime path. Registry presence is descriptive only: it never grants
-production authority.
+Registry presence is descriptive only. It never proves performance and never
+grants production authority.
 """
 
 from __future__ import annotations
@@ -15,11 +13,9 @@ import json
 import re
 from typing import Final
 
-
 MODEL_REGISTRY_VERSION: Final[str] = "st-omr-model-registry-v1"
 MODEL_CARD_SCHEMA_VERSION: Final[str] = "st-omr-model-card-v1"
 MODEL_ARTIFACT_BINDING_VERSION: Final[str] = "st-omr-model-artifact-binding-v1"
-
 V1_TOKENIZER_VERSION: Final[str] = "st-omr-semantic-tokenizer-v1"
 V2_REPRESENTATION_VERSION: Final[str] = "st-omr-polyphonic-representation-v2"
 V2_TOKENIZER_VERSION: Final[str] = "st-omr-polyphonic-tokenizer-v1"
@@ -31,7 +27,7 @@ _ASCII_ID = re.compile(r"^[a-z0-9][a-z0-9._:-]*$")
 
 
 class ModelRegistryError(ValueError):
-    """Raised when a registry or artifact binding fails closed."""
+    pass
 
 
 class ModelKind(str, Enum):
@@ -65,28 +61,22 @@ class SemanticScope(str, Enum):
 
 
 def _canonical_json_bytes(payload: object) -> bytes:
-    return json.dumps(
-        payload,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=True,
-        allow_nan=False,
-    ).encode("ascii")
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("ascii")
 
 
-def _require_ascii_identifier(value: object, name: str) -> str:
+def _ascii_id(value: object, name: str) -> str:
     if not isinstance(value, str) or _ASCII_ID.fullmatch(value) is None:
         raise ModelRegistryError(f"{name} must be a canonical lowercase ASCII identifier")
     return value
 
 
-def _require_sha256(value: object, name: str) -> str:
+def _sha256(value: object, name: str) -> str:
     if not isinstance(value, str) or _SHA256.fullmatch(value) is None:
         raise ModelRegistryError(f"{name} must be lowercase SHA-256 hex")
     return value
 
 
-def _require_git_sha(value: object, name: str) -> str:
+def _git_sha(value: object, name: str) -> str:
     if not isinstance(value, str) or _GIT_SHA40.fullmatch(value) is None:
         raise ModelRegistryError(f"{name} must be lowercase git SHA-40 hex")
     return value
@@ -109,7 +99,7 @@ class ModelRegistryRecord:
     production_authority: bool = False
 
     def __post_init__(self) -> None:
-        _require_ascii_identifier(self.record_id, "record_id")
+        _ascii_id(self.record_id, "record_id")
         if not isinstance(self.model_kind, ModelKind):
             raise ModelRegistryError("model_kind must be ModelKind")
         if not isinstance(self.lifecycle, ModelLifecycle):
@@ -122,18 +112,11 @@ class ModelRegistryRecord:
             raise ModelRegistryError("source_module must name an st_omr_training module")
         if not isinstance(self.source_version, str) or not self.source_version or not self.source_version.isascii():
             raise ModelRegistryError("source_version must be non-empty ASCII")
-        if (
-            not isinstance(self.task_ids, tuple)
-            or not self.task_ids
-            or len(set(self.task_ids)) != len(self.task_ids)
-        ):
+        if not isinstance(self.task_ids, tuple) or not self.task_ids or len(set(self.task_ids)) != len(self.task_ids):
             raise ModelRegistryError("task_ids must be a non-empty unique tuple")
         for task_id in self.task_ids:
-            _require_ascii_identifier(task_id, "task_id")
-        for name, value in (
-            ("tokenizer_version", self.tokenizer_version),
-            ("representation_version", self.representation_version),
-        ):
+            _ascii_id(task_id, "task_id")
+        for name, value in (("tokenizer_version", self.tokenizer_version), ("representation_version", self.representation_version)):
             if value is not None and (not isinstance(value, str) or not value or not value.isascii()):
                 raise ModelRegistryError(f"{name} must be None or non-empty ASCII")
         for name, value in (
@@ -178,8 +161,6 @@ class ModelRegistryRecord:
 
 @dataclass(frozen=True, slots=True)
 class ModelArtifactBinding:
-    """Exact checkpoint/evidence identity for one implemented learned record."""
-
     record_id: str
     registry_record_fingerprint_sha256: str
     repository_sha: str
@@ -194,9 +175,9 @@ class ModelArtifactBinding:
     binding_version: str = MODEL_ARTIFACT_BINDING_VERSION
 
     def __post_init__(self) -> None:
-        _require_ascii_identifier(self.record_id, "record_id")
-        _require_sha256(self.registry_record_fingerprint_sha256, "registry_record_fingerprint_sha256")
-        _require_git_sha(self.repository_sha, "repository_sha")
+        _ascii_id(self.record_id, "record_id")
+        _sha256(self.registry_record_fingerprint_sha256, "registry_record_fingerprint_sha256")
+        _git_sha(self.repository_sha, "repository_sha")
         for name, value in (
             ("checkpoint_sha256", self.checkpoint_sha256),
             ("model_fingerprint_sha256", self.model_fingerprint_sha256),
@@ -204,13 +185,10 @@ class ModelArtifactBinding:
             ("dataset_manifest_sha256", self.dataset_manifest_sha256),
             ("runtime_fingerprint_sha256", self.runtime_fingerprint_sha256),
         ):
-            _require_sha256(value, name)
+            _sha256(value, name)
         if self.tokenizer_fingerprint_sha256 is not None:
-            _require_sha256(self.tokenizer_fingerprint_sha256, "tokenizer_fingerprint_sha256")
-        for name, value in (
-            ("tokenizer_version", self.tokenizer_version),
-            ("representation_version", self.representation_version),
-        ):
+            _sha256(self.tokenizer_fingerprint_sha256, "tokenizer_fingerprint_sha256")
+        for name, value in (("tokenizer_version", self.tokenizer_version), ("representation_version", self.representation_version)):
             if value is not None and (not isinstance(value, str) or not value or not value.isascii()):
                 raise ModelRegistryError(f"{name} must be None or non-empty ASCII")
         if self.binding_version != MODEL_ARTIFACT_BINDING_VERSION:
@@ -225,17 +203,15 @@ class ModelArtifactBinding:
 
 @dataclass(frozen=True, slots=True)
 class ModelEvidenceBinding:
-    """Binds one exact artifact to one exact benchmark result surface."""
-
     artifact_binding_sha256: str
     benchmark_identity_sha256: str
     metrics_sha256: str
     evaluation_contract_version: str = POLY_EVALUATION_CONTRACT_VERSION
 
     def __post_init__(self) -> None:
-        _require_sha256(self.artifact_binding_sha256, "artifact_binding_sha256")
-        _require_sha256(self.benchmark_identity_sha256, "benchmark_identity_sha256")
-        _require_sha256(self.metrics_sha256, "metrics_sha256")
+        _sha256(self.artifact_binding_sha256, "artifact_binding_sha256")
+        _sha256(self.benchmark_identity_sha256, "benchmark_identity_sha256")
+        _sha256(self.metrics_sha256, "metrics_sha256")
         if self.evaluation_contract_version != POLY_EVALUATION_CONTRACT_VERSION:
             raise ModelRegistryError("evaluation contract version mismatch")
 
@@ -247,177 +223,41 @@ class ModelEvidenceBinding:
 
 
 SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
-    ModelRegistryRecord(
-        record_id="baseline.cnn-gru.v1",
-        model_kind=ModelKind.SEQUENCE_BASELINE,
-        lifecycle=ModelLifecycle.FROZEN_REFERENCE,
-        authority=ResearchAuthority.REFERENCE_ONLY,
-        semantic_scope=SemanticScope.V1_SINGLE_VOICE,
-        source_module="st_omr_training.training_model",
-        source_version="st-omr-cnn-gru-baseline-v1",
-        task_ids=("sequence_omr",),
-        tokenizer_version=V1_TOKENIZER_VERSION,
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.staff.d7.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.TRAINING_IMPLEMENTED,
-        authority=ResearchAuthority.EXPERIMENTAL,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d7_specialist_training",
-        source_version="stage7d7-staff-dense-segmentation-v1",
-        task_ids=("staff_geometry",),
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.structure.d7.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.TRAINING_IMPLEMENTED,
-        authority=ResearchAuthority.EXPERIMENTAL,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d7_specialist_training",
-        source_version="stage7d7-structure-dense-segmentation-v1",
-        task_ids=("structure",),
-    ),
-    ModelRegistryRecord(
-        record_id="refiner.barline.d11.v1",
-        model_kind=ModelKind.LOCAL_REFINER,
-        lifecycle=ModelLifecycle.TRAINING_IMPLEMENTED,
-        authority=ResearchAuthority.SHADOW_ONLY,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d11_barline_meter_training",
-        source_version="stage7d11-barline-refiner-v1",
-        task_ids=("barline",),
-    ),
-    ModelRegistryRecord(
-        record_id="refiner.meter.d11.v1",
-        model_kind=ModelKind.LOCAL_REFINER,
-        lifecycle=ModelLifecycle.TRAINING_IMPLEMENTED,
-        authority=ResearchAuthority.SHADOW_ONLY,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d11_barline_meter_training",
-        source_version="stage7d11-meter-refiner-v1",
-        task_ids=("meter",),
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.notehead.declared.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.ARCHITECTURE_ONLY,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d4_specialist_architecture",
-        source_version="stage7d4-specialist-omr-architecture-v1",
-        task_ids=("notehead",),
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.rest.declared.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.ARCHITECTURE_ONLY,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d4_specialist_architecture",
-        source_version="stage7d4-specialist-omr-architecture-v1",
-        task_ids=("rest",),
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.accidental.declared.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.ARCHITECTURE_ONLY,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d4_specialist_architecture",
-        source_version="stage7d4-specialist-omr-architecture-v1",
-        task_ids=("accidental",),
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.rhythm.declared.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.ARCHITECTURE_ONLY,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d4_specialist_architecture",
-        source_version="stage7d4-specialist-omr-architecture-v1",
-        task_ids=("rhythm",),
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.staff-position.declared.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.ARCHITECTURE_ONLY,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d4_specialist_architecture",
-        source_version="stage7d4-specialist-omr-architecture-v1",
-        task_ids=("staff_position",),
-    ),
-    ModelRegistryRecord(
-        record_id="specialist.chord-grouping.declared.v1",
-        model_kind=ModelKind.VISUAL_SPECIALIST,
-        lifecycle=ModelLifecycle.ARCHITECTURE_ONLY,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.LOCAL_VISUAL_EVIDENCE,
-        source_module="st_omr_training.stage7d4_specialist_architecture",
-        source_version="stage7d4-specialist-omr-architecture-v1",
-        task_ids=("chord_grouping",),
-    ),
-    ModelRegistryRecord(
-        record_id="fusion.context-validator.v1",
-        model_kind=ModelKind.DETERMINISTIC_FUSION,
-        lifecycle=ModelLifecycle.DETERMINISTIC,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.DETERMINISTIC_V1_FUSION,
-        source_module="st_omr_training.stage7d4_specialist_architecture",
-        source_version="stage7d4-specialist-omr-architecture-v1",
-        task_ids=("context_validation",),
-        checkpoint_required_for_evidence=False,
-    ),
-    ModelRegistryRecord(
-        record_id="candidate.poly-2d-transformer.v1",
-        model_kind=ModelKind.CANDIDATE_FAMILY,
-        lifecycle=ModelLifecycle.PLANNED,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.POLYPHONIC_V2,
-        source_module="st_omr_training.model_registry",
-        source_version="tr-poly-08-planned-2d-transformer-v1",
-        task_ids=("polyphonic_sequence_omr",),
-        tokenizer_version=V2_TOKENIZER_VERSION,
-        representation_version=V2_REPRESENTATION_VERSION,
-        polyphonic_v2_capable=True,
-    ),
-    ModelRegistryRecord(
-        record_id="candidate.relation-graph.v1",
-        model_kind=ModelKind.CANDIDATE_FAMILY,
-        lifecycle=ModelLifecycle.PLANNED,
-        authority=ResearchAuthority.NONE,
-        semantic_scope=SemanticScope.POLYPHONIC_V2,
-        source_module="st_omr_training.model_registry",
-        source_version="tr-poly-11-planned-relation-graph-v1",
-        task_ids=("polyphonic_relation_graph",),
-        representation_version=V2_REPRESENTATION_VERSION,
-        polyphonic_v2_capable=True,
-    ),
+    ModelRegistryRecord("baseline.cnn-gru.v1", ModelKind.SEQUENCE_BASELINE, ModelLifecycle.FROZEN_REFERENCE, ResearchAuthority.REFERENCE_ONLY, SemanticScope.V1_SINGLE_VOICE, "st_omr_training.training_model", "st-omr-cnn-gru-baseline-v1", ("sequence_omr",), tokenizer_version=V1_TOKENIZER_VERSION),
+    ModelRegistryRecord("specialist.staff.d7.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.TRAINING_IMPLEMENTED, ResearchAuthority.EXPERIMENTAL, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d7_specialist_training", "stage7d7-staff-dense-segmentation-v1", ("staff_geometry",)),
+    ModelRegistryRecord("specialist.structure.d7.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.TRAINING_IMPLEMENTED, ResearchAuthority.EXPERIMENTAL, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d7_specialist_training", "stage7d7-structure-dense-segmentation-v1", ("structure",)),
+    ModelRegistryRecord("refiner.barline.d11.v1", ModelKind.LOCAL_REFINER, ModelLifecycle.TRAINING_IMPLEMENTED, ResearchAuthority.SHADOW_ONLY, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d11_barline_meter_training", "stage7d11-barline-refiner-v1", ("barline",)),
+    ModelRegistryRecord("refiner.meter.d11.v1", ModelKind.LOCAL_REFINER, ModelLifecycle.TRAINING_IMPLEMENTED, ResearchAuthority.SHADOW_ONLY, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d11_barline_meter_training", "stage7d11-meter-refiner-v1", ("meter",)),
+    ModelRegistryRecord("specialist.notehead.declared.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.ARCHITECTURE_ONLY, ResearchAuthority.NONE, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d4_specialist_architecture", "stage7d4-specialist-omr-architecture-v1", ("notehead",)),
+    ModelRegistryRecord("specialist.rest.declared.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.ARCHITECTURE_ONLY, ResearchAuthority.NONE, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d4_specialist_architecture", "stage7d4-specialist-omr-architecture-v1", ("rest",)),
+    ModelRegistryRecord("specialist.accidental.declared.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.ARCHITECTURE_ONLY, ResearchAuthority.NONE, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d4_specialist_architecture", "stage7d4-specialist-omr-architecture-v1", ("accidental",)),
+    ModelRegistryRecord("specialist.rhythm.declared.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.ARCHITECTURE_ONLY, ResearchAuthority.NONE, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d4_specialist_architecture", "stage7d4-specialist-omr-architecture-v1", ("rhythm",)),
+    ModelRegistryRecord("specialist.staff-position.declared.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.ARCHITECTURE_ONLY, ResearchAuthority.NONE, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d4_specialist_architecture", "stage7d4-specialist-omr-architecture-v1", ("staff_position",)),
+    ModelRegistryRecord("specialist.chord-grouping.declared.v1", ModelKind.VISUAL_SPECIALIST, ModelLifecycle.ARCHITECTURE_ONLY, ResearchAuthority.NONE, SemanticScope.LOCAL_VISUAL_EVIDENCE, "st_omr_training.stage7d4_specialist_architecture", "stage7d4-specialist-omr-architecture-v1", ("chord_grouping",)),
+    ModelRegistryRecord("fusion.context-validator.v1", ModelKind.DETERMINISTIC_FUSION, ModelLifecycle.DETERMINISTIC, ResearchAuthority.NONE, SemanticScope.DETERMINISTIC_V1_FUSION, "st_omr_training.stage7d4_specialist_architecture", "stage7d4-specialist-omr-architecture-v1", ("context_validation",), checkpoint_required_for_evidence=False),
+    ModelRegistryRecord("candidate.poly-2d-transformer.v1", ModelKind.CANDIDATE_FAMILY, ModelLifecycle.TRAINING_IMPLEMENTED, ResearchAuthority.EXPERIMENTAL, SemanticScope.POLYPHONIC_V2, "st_omr_training.poly_2d_transformer", "st-omr-poly-2d-transformer-v1", ("polyphonic_sequence_omr",), tokenizer_version=V2_TOKENIZER_VERSION, representation_version=V2_REPRESENTATION_VERSION, polyphonic_v2_capable=True),
+    ModelRegistryRecord("candidate.relation-graph.v1", ModelKind.CANDIDATE_FAMILY, ModelLifecycle.PLANNED, ResearchAuthority.NONE, SemanticScope.POLYPHONIC_V2, "st_omr_training.model_registry", "tr-poly-11-planned-relation-graph-v1", ("polyphonic_relation_graph",), representation_version=V2_REPRESENTATION_VERSION, polyphonic_v2_capable=True),
 )
 
 
 def validate_registry(records: object = SEED_MODEL_REGISTRY) -> tuple[ModelRegistryRecord, ...]:
     if not isinstance(records, tuple) or not records:
         raise ModelRegistryError("registry must be a non-empty tuple")
-    seen_ids: set[str] = set()
-    normalized: list[ModelRegistryRecord] = []
+    seen: set[str] = set()
+    result: list[ModelRegistryRecord] = []
     for record in records:
         if not isinstance(record, ModelRegistryRecord):
             raise ModelRegistryError("registry entries must be ModelRegistryRecord")
-        if record.record_id in seen_ids:
+        if record.record_id in seen:
             raise ModelRegistryError("duplicate registry record_id")
-        seen_ids.add(record.record_id)
-        normalized.append(record)
-    return tuple(normalized)
+        seen.add(record.record_id)
+        result.append(record)
+    return tuple(result)
 
 
 def registry_fingerprint(records: object = SEED_MODEL_REGISTRY) -> str:
     validated = validate_registry(records)
-    payload = {
-        "registry_version": MODEL_REGISTRY_VERSION,
-        "records": [record.canonical_payload() for record in sorted(validated, key=lambda item: item.record_id)],
-    }
+    payload = {"registry_version": MODEL_REGISTRY_VERSION, "records": [r.canonical_payload() for r in sorted(validated, key=lambda item: item.record_id)]}
     return sha256(_canonical_json_bytes(payload)).hexdigest()
 
 
@@ -425,10 +265,7 @@ def registry_by_id(records: object = SEED_MODEL_REGISTRY) -> dict[str, ModelRegi
     return {record.record_id: record for record in validate_registry(records)}
 
 
-def validate_artifact_binding(
-    binding: ModelArtifactBinding,
-    records: object = SEED_MODEL_REGISTRY,
-) -> ModelRegistryRecord:
+def validate_artifact_binding(binding: ModelArtifactBinding, records: object = SEED_MODEL_REGISTRY) -> ModelRegistryRecord:
     if not isinstance(binding, ModelArtifactBinding):
         raise ModelRegistryError("binding must be ModelArtifactBinding")
     record = registry_by_id(records).get(binding.record_id)
