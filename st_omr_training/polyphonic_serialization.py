@@ -1,15 +1,9 @@
 """TR-POLY-06 strict parser and lossless tokenizer for Polyphonic Representation V2.
 
-The codec is intentionally additive. It does not alter the frozen V1 tokenizer.
-It provides two deterministic round-trip surfaces for the V2 object model:
-
-1. strict canonical JSON <-> ``PolyScore``;
-2. a closed-vocabulary structured token stream <-> canonical V2 payload.
-
-The structured token stream is not raw JSON text. Known semantic field names are
-first-class key tokens; arbitrary text and integers are encoded with bounded
-byte/digit sub-tokens. This keeps the vocabulary closed while preserving event
-IDs, source measure labels and other open-text evidence exactly.
+This module is additive to the frozen V1 target surface. It provides a strict
+canonical-JSON parser and a closed-vocabulary structured token codec for the V2
+polyphonic object model. No dataset, model, or MusicXML runtime behavior lives
+here.
 """
 
 from __future__ import annotations
@@ -18,7 +12,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 import json
 from types import MappingProxyType
-from typing import Final, Iterable
+from typing import Final
 
 from .polyphonic_representation import (
     Barline,
@@ -119,7 +113,6 @@ _PAYLOAD_KEYS: Final[tuple[str, ...]] = tuple(
         }
     )
 )
-
 _CONTROL_TOKENS: Final[tuple[str, ...]] = (
     "PAD",
     "BOS",
@@ -167,18 +160,51 @@ def _canonical_json_bytes(payload: object) -> bytes:
 
 
 def tokenizer_fingerprint() -> str:
-    payload = {
-        "serialization_version": POLYPHONIC_SERIALIZATION_VERSION,
-        "tokenizer_version": POLYPHONIC_TOKENIZER_VERSION,
-        "representation_version": POLYPHONIC_REPRESENTATION_VERSION,
-        "vocabulary": list(TOKEN_VOCABULARY),
-    }
-    return sha256(_canonical_json_bytes(payload)).hexdigest()
+    return sha256(
+        _canonical_json_bytes(
+            {
+                "serialization_version": POLYPHONIC_SERIALIZATION_VERSION,
+                "tokenizer_version": POLYPHONIC_TOKENIZER_VERSION,
+                "representation_version": POLYPHONIC_REPRESENTATION_VERSION,
+                "vocabulary": list(TOKEN_VOCABULARY),
+            }
+        )
+    ).hexdigest()
+
+
+def _require_utf8_text(value: str, path: str) -> str:
+    try:
+        encoded = value.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise PolyphonicSerializationError(f"{path} must be valid UTF-8 text") from exc
+    if len(encoded) > MAX_TEXT_BYTES:
+        raise PolyphonicSerializationError(f"{path} exceeds codec text-byte limit")
+    return value
+
+
+def _validate_utf8_payload(value: object, path: str = "$", depth: int = 0) -> None:
+    if depth > MAX_NESTING_DEPTH:
+        raise PolyphonicSerializationError("payload exceeds codec nesting limit")
+    if isinstance(value, str):
+        _require_utf8_text(value, path)
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _validate_utf8_payload(item, f"{path}[{index}]", depth + 1)
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if not isinstance(key, str):
+                raise PolyphonicSerializationError(f"{path} object keys must be text")
+            _require_utf8_text(key, f"{path}.<key>")
+            _validate_utf8_payload(item, f"{path}.{key}", depth + 1)
 
 
 def _mapping(value: object, path: str, keys: set[str]) -> dict[str, object]:
     if not isinstance(value, dict):
         raise PolyphonicSerializationError(f"{path} must be an object")
+    if any(not isinstance(key, str) for key in value):
+        raise PolyphonicSerializationError(f"{path} object keys must be text")
     supplied = set(value)
     if supplied != keys:
         missing = sorted(keys - supplied)
@@ -186,8 +212,6 @@ def _mapping(value: object, path: str, keys: set[str]) -> dict[str, object]:
         raise PolyphonicSerializationError(
             f"{path} has invalid keys; missing={missing}, unknown={unknown}"
         )
-    if any(not isinstance(key, str) for key in value):
-        raise PolyphonicSerializationError(f"{path} object keys must be text")
     return value
 
 
@@ -200,7 +224,7 @@ def _list(value: object, path: str) -> list[object]:
 def _text(value: object, path: str) -> str:
     if not isinstance(value, str):
         raise PolyphonicSerializationError(f"{path} must be text")
-    return value
+    return _require_utf8_text(value, path)
 
 
 def _plain_int(value: object, path: str) -> int:
@@ -210,15 +234,11 @@ def _plain_int(value: object, path: str) -> int:
 
 
 def _optional_int(value: object, path: str) -> int | None:
-    if value is None:
-        return None
-    return _plain_int(value, path)
+    return None if value is None else _plain_int(value, path)
 
 
 def _optional_text(value: object, path: str) -> str | None:
-    if value is None:
-        return None
-    return _text(value, path)
+    return None if value is None else _text(value, path)
 
 
 def _optional_bool(value: object, path: str) -> bool | None:
@@ -252,23 +272,20 @@ def _pitch(value: object, path: str) -> PitchSpelling:
         alter=_plain_int(item["alter"], f"{path}.alter"),
         octave=_plain_int(item["octave"], f"{path}.octave"),
         display_accidental=_enum(
-            DisplayAccidentalV2,
-            item["display_accidental"],
-            f"{path}.display_accidental",
+            DisplayAccidentalV2, item["display_accidental"], f"{path}.display_accidental"
         ),
     )
 
 
 def _note_atom(value: object, path: str) -> NoteAtom:
     item = _mapping(value, path, {"atom_id", "pitch", "ties", "staff_override"})
-    ties = tuple(
-        _enum(TieState, tie, f"{path}.ties[{index}]")
-        for index, tie in enumerate(_list(item["ties"], f"{path}.ties"))
-    )
     return NoteAtom(
         atom_id=_text(item["atom_id"], f"{path}.atom_id"),
         pitch=_pitch(item["pitch"], f"{path}.pitch"),
-        ties=ties,
+        ties=tuple(
+            _enum(TieState, tie, f"{path}.ties[{index}]")
+            for index, tie in enumerate(_list(item["ties"], f"{path}.ties"))
+        ),
         staff_override=_optional_int(item["staff_override"], f"{path}.staff_override"),
     )
 
@@ -282,11 +299,7 @@ def _beam(value: object, path: str) -> BeamMark:
 
 
 def _tuplet(value: object, path: str) -> TupletMark:
-    item = _mapping(
-        value,
-        path,
-        {"number", "actual_notes", "normal_notes", "boundary"},
-    )
+    item = _mapping(value, path, {"number", "actual_notes", "normal_notes", "boundary"})
     return TupletMark(
         number=_plain_int(item["number"], f"{path}.number"),
         actual_notes=_plain_int(item["actual_notes"], f"{path}.actual_notes"),
@@ -322,8 +335,10 @@ def _event(value: object, path: str) -> PolyEvent:
             "grace",
         },
     )
-    note_type = None if item["note_type"] is None else _enum(
-        NoteType, item["note_type"], f"{path}.note_type"
+    note_type = (
+        None
+        if item["note_type"] is None
+        else _enum(NoteType, item["note_type"], f"{path}.note_type")
     )
     stem = None if item["stem"] is None else _enum(
         StemDirection, item["stem"], f"{path}.stem"
@@ -441,6 +456,7 @@ def _part(value: object, path: str) -> PolyPart:
 def parse_polyphonic_payload(payload: object) -> PolyScore:
     """Parse a strict V2 canonical payload into the frozen object model."""
 
+    _validate_utf8_payload(payload)
     root = _mapping(payload, "$", {"parts", "representation_version"})
     version = _text(root["representation_version"], "$.representation_version")
     if version != POLYPHONIC_REPRESENTATION_VERSION:
@@ -460,6 +476,8 @@ def parse_polyphonic_payload(payload: object) -> PolyScore:
 def serialize_polyphonic_score(score: object) -> str:
     if not isinstance(score, PolyScore):
         raise PolyphonicSerializationError("score must be PolyScore")
+    payload = score.canonical_payload()
+    _validate_utf8_payload(payload)
     encoded = score.canonical_json().encode("ascii")
     if len(encoded) > MAX_CANONICAL_JSON_BYTES:
         raise PolyphonicSerializationError("canonical V2 JSON exceeds codec size limit")
@@ -467,11 +485,7 @@ def serialize_polyphonic_score(score: object) -> str:
 
 
 def parse_canonical_polyphonic_json(data: object) -> PolyScore:
-    """Parse only the exact canonical JSON emitted by V2.
-
-    Equivalent-but-noncanonical JSON (whitespace, different key order, alternate
-    escaping, or unknown fields) is rejected to preserve reproducible hashes.
-    """
+    """Parse only the exact canonical JSON emitted by V2."""
 
     if isinstance(data, bytes):
         if len(data) > MAX_CANONICAL_JSON_BYTES:
@@ -490,7 +504,6 @@ def parse_canonical_polyphonic_json(data: object) -> PolyScore:
         text = data
     else:
         raise PolyphonicSerializationError("canonical V2 JSON must be str or bytes")
-
     try:
         payload = json.loads(text)
     except (json.JSONDecodeError, RecursionError) as exc:
@@ -505,15 +518,13 @@ def _emit_integer(value: int, tokens: list[str]) -> None:
     tokens.append("INT_START")
     if value < 0:
         tokens.append("INT_NEG")
-    for digit in str(abs(value)):
-        tokens.append(f"DIGIT_{digit}")
+    tokens.extend(f"DIGIT_{digit}" for digit in str(abs(value)))
     tokens.append("INT_END")
 
 
 def _emit_text(value: str, tokens: list[str]) -> None:
+    _require_utf8_text(value, "token text")
     encoded = value.encode("utf-8")
-    if len(encoded) > MAX_TEXT_BYTES:
-        raise PolyphonicSerializationError("text value exceeds tokenizer byte limit")
     tokens.append("TEXT_START")
     tokens.extend(f"BYTE_{byte:02X}" for byte in encoded)
     tokens.append("TEXT_END")
@@ -538,8 +549,10 @@ def _emit_value(value: object, tokens: list[str], depth: int) -> None:
             _emit_value(item, tokens, depth + 1)
         tokens.append("ARR_END")
     elif isinstance(value, dict):
+        if any(not isinstance(key, str) for key in value):
+            raise PolyphonicSerializationError("payload tokenizer object keys must be text")
         keys = sorted(value)
-        if any(not isinstance(key, str) or key not in _PAYLOAD_KEYS for key in keys):
+        if any(key not in _PAYLOAD_KEYS for key in keys):
             raise PolyphonicSerializationError("payload contains an unsupported tokenizer key")
         tokens.append("OBJ_START")
         for key in keys:
@@ -555,6 +568,8 @@ def _emit_value(value: object, tokens: list[str], depth: int) -> None:
 def encode_tokens(tokens: object, *, allow_pad: bool = False) -> tuple[int, ...]:
     if not isinstance(tokens, tuple) or any(not isinstance(token, str) for token in tokens):
         raise PolyphonicSerializationError("tokens must be an immutable tuple of strings")
+    if len(tokens) > MAX_TOKEN_COUNT:
+        raise PolyphonicSerializationError("token stream exceeds codec token limit")
     result: list[int] = []
     for token in tokens:
         token_id = TOKEN_TO_ID.get(token)
@@ -563,8 +578,6 @@ def encode_tokens(tokens: object, *, allow_pad: bool = False) -> tuple[int, ...]
         if token == "PAD" and not allow_pad:
             raise PolyphonicSerializationError("PAD is batching-only")
         result.append(token_id)
-    if len(result) > MAX_TOKEN_COUNT:
-        raise PolyphonicSerializationError("token stream exceeds codec token limit")
     return tuple(result)
 
 
@@ -615,7 +628,7 @@ class TokenizedPolyphonicTarget:
 def tokenize_polyphonic_score(score: object) -> TokenizedPolyphonicTarget:
     if not isinstance(score, PolyScore):
         raise PolyphonicSerializationError("score must be PolyScore")
-    serialize_polyphonic_score(score)  # applies canonical size gate
+    serialize_polyphonic_score(score)
     tokens: list[str] = ["BOS"]
     _emit_value(score.canonical_payload(), tokens, 0)
     tokens.append("EOS")
@@ -735,7 +748,7 @@ def parse_polyphonic_tokens(tokens: object) -> PolyScore:
         raise PolyphonicSerializationError("tokens must be an immutable tuple of strings")
     if len(tokens) > MAX_TOKEN_COUNT:
         raise PolyphonicSerializationError("token stream exceeds codec token limit")
-    encode_tokens(tokens)  # vocabulary and PAD gate
+    encode_tokens(tokens)
     if len(tokens) < 3 or tokens[0] != "BOS" or tokens[-1] != "EOS":
         raise PolyphonicSerializationError("semantic token stream requires exactly one BOS/EOS envelope")
     if "BOS" in tokens[1:-1] or "EOS" in tokens[1:-1]:
