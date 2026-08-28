@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import tempfile
 from pathlib import Path
 import unittest
@@ -9,7 +10,9 @@ from st_omr_training.external_benchmark_harness import (
     BenchmarkDatasetKind,
     BenchmarkManifestRow,
     ExternalBenchmarkHarnessError,
+    ExternalBenchmarkSpec,
     REQUIRED_BENCHMARK_KINDS,
+    TargetFormat,
     benchmark_spec,
     create_admission,
     directory_tree_sha256,
@@ -20,7 +23,10 @@ from st_omr_training.external_benchmark_harness import (
     validate_commercial_evidence,
     validate_manifest_rows,
 )
-from st_omr_training.external_dataset_registry import EXTERNAL_DATASET_CANDIDATES
+from st_omr_training.external_dataset_registry import (
+    EXTERNAL_DATASET_CANDIDATES,
+    RegistryState,
+)
 
 
 SHA_A = "a" * 64
@@ -45,6 +51,19 @@ def _rows() -> tuple[BenchmarkManifestRow, ...]:
             image_relpath="images/system-2.png",
             target_relpath="targets/system-2.lmx",
             system_id="system-2",
+        ),
+    )
+
+
+def _test_only_row() -> tuple[BenchmarkManifestRow, ...]:
+    return (
+        BenchmarkManifestRow(
+            sample_id=SHA_A,
+            family_id="score-1",
+            split="test",
+            image_relpath="images/system-1.png",
+            target_relpath="targets/system-1.target",
+            system_id="system-1",
         ),
     )
 
@@ -168,6 +187,52 @@ class ExternalBenchmarkHarnessTests(unittest.TestCase):
                 data_artifact_sha256=SHA_C,
                 admission_mode=AdmissionMode.STRICT_REGISTRY,
             )
+
+    def test_strict_research_only_record_never_becomes_commercial_evidence(self) -> None:
+        record = next(item for item in EXTERNAL_DATASET_CANDIDATES if item.dataset_name == "MUSCIMA++")
+        pinned = replace(
+            record,
+            registry_state=RegistryState.INSTALL_PINNED,
+            artifact_sha256=SHA_C,
+        )
+        spec = ExternalBenchmarkSpec(
+            kind=BenchmarkDatasetKind.MUSE_OMR_BENCHMARK,
+            benchmark_id="research-only-regression",
+            benchmark_version="1",
+            dataset_name=pinned.dataset_name,
+            dataset_component=pinned.dataset_component,
+            target_format=TargetFormat.MUSICXML,
+            declared_splits=("test",),
+            system_level=False,
+        )
+        admission = create_admission(
+            spec=spec,
+            registry_record=pinned,
+            rows=_test_only_row(),
+            data_artifact_sha256=SHA_C,
+            admission_mode=AdmissionMode.STRICT_REGISTRY,
+        )
+        self.assertFalse(admission.commercial_evidence_eligible)
+        with self.assertRaises(ExternalBenchmarkHarnessError):
+            validate_commercial_evidence(admission)
+
+    def test_strict_commercial_clean_record_can_be_commercial_evidence(self) -> None:
+        spec = benchmark_spec(BenchmarkDatasetKind.MUSE_OMR_BENCHMARK)
+        record = matching_registry_record(spec, EXTERNAL_DATASET_CANDIDATES)
+        pinned = replace(
+            record,
+            registry_state=RegistryState.INSTALL_PINNED,
+            artifact_sha256=SHA_C,
+        )
+        admission = create_admission(
+            spec=spec,
+            registry_record=pinned,
+            rows=_test_only_row(),
+            data_artifact_sha256=SHA_C,
+            admission_mode=AdmissionMode.STRICT_REGISTRY,
+        )
+        self.assertTrue(admission.commercial_evidence_eligible)
+        validate_commercial_evidence(admission)
 
     def test_directory_hash_is_deterministic_and_content_sensitive(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

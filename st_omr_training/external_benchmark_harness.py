@@ -141,6 +141,7 @@ class ExternalBenchmarkAdmission:
     spec: ExternalBenchmarkSpec
     admission_mode: AdmissionMode
     registry_record_sha256: str
+    registry_data_use_class: DataUseClass
     data_artifact_sha256: str
     dataset_manifest_sha256: str
     split_manifest_sha256: str
@@ -152,6 +153,8 @@ class ExternalBenchmarkAdmission:
         if not isinstance(self.admission_mode, AdmissionMode):
             raise ExternalBenchmarkHarnessError("admission_mode must be AdmissionMode")
         _require_sha256("registry_record_sha256", self.registry_record_sha256)
+        if not isinstance(self.registry_data_use_class, DataUseClass):
+            raise ExternalBenchmarkHarnessError("registry_data_use_class must be DataUseClass")
         _require_sha256("data_artifact_sha256", self.data_artifact_sha256)
         _require_sha256("dataset_manifest_sha256", self.dataset_manifest_sha256)
         _require_sha256("split_manifest_sha256", self.split_manifest_sha256)
@@ -164,7 +167,10 @@ class ExternalBenchmarkAdmission:
 
     @property
     def commercial_evidence_eligible(self) -> bool:
-        return self.admission_mode is AdmissionMode.STRICT_REGISTRY
+        return (
+            self.admission_mode is AdmissionMode.STRICT_REGISTRY
+            and self.registry_data_use_class is DataUseClass.COMMERCIAL_CLEAN
+        )
 
     def benchmark_identity(self) -> BenchmarkIdentity:
         return BenchmarkIdentity(
@@ -413,6 +419,7 @@ def create_admission(
         spec=spec,
         admission_mode=admission_mode,
         registry_record_sha256=registry_record.canonical_sha256(),
+        registry_data_use_class=registry_record.data_use_class,
         data_artifact_sha256=data_artifact_sha256,
         dataset_manifest_sha256=manifest_sha256(values, spec),
         split_manifest_sha256=split_manifest_sha256(values, spec),
@@ -425,7 +432,7 @@ def validate_commercial_evidence(admission: ExternalBenchmarkAdmission) -> None:
         raise ExternalBenchmarkHarnessError("admission must be ExternalBenchmarkAdmission")
     if not admission.commercial_evidence_eligible:
         raise ExternalBenchmarkHarnessError(
-            "research-override benchmark evidence is not commercial/production evidence"
+            "benchmark evidence requires strict COMMERCIAL_CLEAN registry admission"
         )
 
 
