@@ -421,11 +421,21 @@ class PolyMeasure:
         if len({event.event_id for event in self.events}) != len(self.events):
             raise PolyphonicRepresentationError("duplicate event id within measure")
         capacity = self.time_signature.capacity
+        active_end_by_voice: dict[int, Fraction] = {}
         for event in self.events:
             if event.onset.fraction > capacity:
                 raise PolyphonicRepresentationError("event onset exceeds measure capacity")
             if event.grace is None and event.end > capacity:
                 raise PolyphonicRepresentationError("event end exceeds measure capacity")
+            if event.grace is not None:
+                continue
+            previous_end = active_end_by_voice.get(event.voice)
+            if previous_end is not None and event.onset.fraction < previous_end:
+                raise PolyphonicRepresentationError(
+                    "positive-duration events in one logical voice must not overlap; "
+                    "simultaneous noteheads belong in one chord event"
+                )
+            active_end_by_voice[event.voice] = event.end
 
 
 @dataclass(frozen=True, slots=True)
@@ -445,10 +455,13 @@ class PolyPart:
             range(1, len(self.measures) + 1)
         ):
             raise PolyphonicRepresentationError("measure_index must be sequential from 1")
+        expected_staffs = set(range(1, self.staff_count + 1))
         for measure in self.measures:
-            for clef in measure.clefs:
-                if clef.staff > self.staff_count:
-                    raise PolyphonicRepresentationError("clef references staff outside part")
+            assigned_staffs = {clef.staff for clef in measure.clefs}
+            if assigned_staffs != expected_staffs:
+                raise PolyphonicRepresentationError(
+                    "every measure must carry exactly one clef assignment for every part staff"
+                )
             for event in measure.events:
                 if event.staff > self.staff_count:
                     raise PolyphonicRepresentationError("event references staff outside part")
