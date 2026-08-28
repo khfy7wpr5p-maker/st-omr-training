@@ -2,7 +2,7 @@
 
 TR-POLY-07 consolidates model-family identity, lifecycle, target contracts and
 checkpoint evidence boundaries without changing any trainer, checkpoint or
-runtime path.  Registry presence is descriptive only: it never grants
+runtime path. Registry presence is descriptive only: it never grants
 production authority.
 """
 
@@ -160,8 +160,8 @@ class ModelRegistryRecord:
                 raise ModelRegistryError("polyphonic_v2_capable requires POLYPHONIC_V2 semantic scope")
             if self.representation_version != V2_REPRESENTATION_VERSION:
                 raise ModelRegistryError("polyphonic V2 records must bind the frozen V2 representation")
-            if self.tokenizer_version != V2_TOKENIZER_VERSION:
-                raise ModelRegistryError("polyphonic V2 learned records must bind the frozen V2 tokenizer")
+            if self.tokenizer_version is not None and self.tokenizer_version != V2_TOKENIZER_VERSION:
+                raise ModelRegistryError("tokenized polyphonic V2 records must bind the frozen V2 tokenizer")
 
     def canonical_payload(self) -> dict[str, object]:
         payload = asdict(self)
@@ -181,6 +181,7 @@ class ModelArtifactBinding:
     """Exact checkpoint/evidence identity for one implemented learned record."""
 
     record_id: str
+    registry_record_fingerprint_sha256: str
     repository_sha: str
     checkpoint_sha256: str
     model_fingerprint_sha256: str
@@ -194,6 +195,7 @@ class ModelArtifactBinding:
 
     def __post_init__(self) -> None:
         _require_ascii_identifier(self.record_id, "record_id")
+        _require_sha256(self.registry_record_fingerprint_sha256, "registry_record_fingerprint_sha256")
         _require_git_sha(self.repository_sha, "repository_sha")
         for name, value in (
             ("checkpoint_sha256", self.checkpoint_sha256),
@@ -255,7 +257,6 @@ SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
         source_version="st-omr-cnn-gru-baseline-v1",
         task_ids=("sequence_omr",),
         tokenizer_version=V1_TOKENIZER_VERSION,
-        checkpoint_required_for_evidence=True,
     ),
     ModelRegistryRecord(
         record_id="specialist.staff.d7.v1",
@@ -266,7 +267,6 @@ SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
         source_module="st_omr_training.stage7d7_specialist_training",
         source_version="stage7d7-staff-dense-segmentation-v1",
         task_ids=("staff_geometry",),
-        checkpoint_required_for_evidence=True,
     ),
     ModelRegistryRecord(
         record_id="specialist.structure.d7.v1",
@@ -277,7 +277,6 @@ SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
         source_module="st_omr_training.stage7d7_specialist_training",
         source_version="stage7d7-structure-dense-segmentation-v1",
         task_ids=("structure",),
-        checkpoint_required_for_evidence=True,
     ),
     ModelRegistryRecord(
         record_id="refiner.barline.d11.v1",
@@ -288,7 +287,6 @@ SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
         source_module="st_omr_training.stage7d11_barline_meter_training",
         source_version="stage7d11-barline-refiner-v1",
         task_ids=("barline",),
-        checkpoint_required_for_evidence=True,
     ),
     ModelRegistryRecord(
         record_id="refiner.meter.d11.v1",
@@ -299,7 +297,6 @@ SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
         source_module="st_omr_training.stage7d11_barline_meter_training",
         source_version="stage7d11-meter-refiner-v1",
         task_ids=("meter",),
-        checkpoint_required_for_evidence=True,
     ),
     ModelRegistryRecord(
         record_id="specialist.notehead.declared.v1",
@@ -383,7 +380,6 @@ SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
         task_ids=("polyphonic_sequence_omr",),
         tokenizer_version=V2_TOKENIZER_VERSION,
         representation_version=V2_REPRESENTATION_VERSION,
-        checkpoint_required_for_evidence=True,
         polyphonic_v2_capable=True,
     ),
     ModelRegistryRecord(
@@ -395,9 +391,7 @@ SEED_MODEL_REGISTRY: Final[tuple[ModelRegistryRecord, ...]] = (
         source_module="st_omr_training.model_registry",
         source_version="tr-poly-11-planned-relation-graph-v1",
         task_ids=("polyphonic_relation_graph",),
-        tokenizer_version=V2_TOKENIZER_VERSION,
         representation_version=V2_REPRESENTATION_VERSION,
-        checkpoint_required_for_evidence=True,
         polyphonic_v2_capable=True,
     ),
 )
@@ -440,6 +434,8 @@ def validate_artifact_binding(
     record = registry_by_id(records).get(binding.record_id)
     if record is None:
         raise ModelRegistryError("artifact binding references unknown registry record")
+    if binding.registry_record_fingerprint_sha256 != record.fingerprint():
+        raise ModelRegistryError("artifact binding registry-record fingerprint mismatch")
     if record.lifecycle in (ModelLifecycle.ARCHITECTURE_ONLY, ModelLifecycle.PLANNED, ModelLifecycle.DETERMINISTIC):
         raise ModelRegistryError("record lifecycle does not admit checkpoint evidence")
     if not record.checkpoint_required_for_evidence:
