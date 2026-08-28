@@ -67,13 +67,14 @@ def _require_sha256(name: str, value: object) -> str:
 
 
 def _require_safe_relative_path(name: str, value: object) -> str:
-    text = _require_text(name, value).replace("\\", "/")
-    path = PurePosixPath(text)
-    if path.is_absolute() or ".." in path.parts or "." in path.parts:
+    raw = _require_text(name, value).replace("\\", "/")
+    path = PurePosixPath(raw)
+    if path.is_absolute() or ".." in path.parts:
         raise ExternalBenchmarkHarnessError(f"{name} must be a safe relative path")
-    if text.startswith("/") or text.endswith("/"):
+    normalized = path.as_posix()
+    if normalized in {"", "."} or raw.startswith("/") or raw.endswith("/"):
         raise ExternalBenchmarkHarnessError(f"{name} must point to a file")
-    return text
+    return normalized
 
 
 def _canonical_json_bytes(payload: object) -> bytes:
@@ -131,8 +132,16 @@ class BenchmarkManifestRow:
         _require_text("family_id", self.family_id)
         if self.split not in {"train", "validation", "test"}:
             raise ExternalBenchmarkHarnessError("split must be train, validation, or test")
-        _require_safe_relative_path("image_relpath", self.image_relpath)
-        _require_safe_relative_path("target_relpath", self.target_relpath)
+        object.__setattr__(
+            self,
+            "image_relpath",
+            _require_safe_relative_path("image_relpath", self.image_relpath),
+        )
+        object.__setattr__(
+            self,
+            "target_relpath",
+            _require_safe_relative_path("target_relpath", self.target_relpath),
+        )
         _require_text("system_id", self.system_id)
 
 
@@ -140,8 +149,8 @@ class BenchmarkManifestRow:
 class ExternalBenchmarkAdmission:
     spec: ExternalBenchmarkSpec
     admission_mode: AdmissionMode
-    registry_record_sha256: str
-    registry_data_use_class: DataUseClass
+    registry_record_sha256s: tuple[str, ...]
+    registry_data_use_classes: tuple[DataUseClass, ...]
     data_artifact_sha256: str
     dataset_manifest_sha256: str
     split_manifest_sha256: str
@@ -152,9 +161,22 @@ class ExternalBenchmarkAdmission:
             raise ExternalBenchmarkHarnessError("spec must be ExternalBenchmarkSpec")
         if not isinstance(self.admission_mode, AdmissionMode):
             raise ExternalBenchmarkHarnessError("admission_mode must be AdmissionMode")
-        _require_sha256("registry_record_sha256", self.registry_record_sha256)
-        if not isinstance(self.registry_data_use_class, DataUseClass):
-            raise ExternalBenchmarkHarnessError("registry_data_use_class must be DataUseClass")
+        if (
+            not isinstance(self.registry_record_sha256s, tuple)
+            or not self.registry_record_sha256s
+            or len(set(self.registry_record_sha256s)) != len(self.registry_record_sha256s)
+        ):
+            raise ExternalBenchmarkHarnessError("registry_record_sha256s must be a non-empty unique tuple")
+        for value in self.registry_record_sha256s:
+            _require_sha256("registry_record_sha256", value)
+        if (
+            not isinstance(self.registry_data_use_classes, tuple)
+            or len(self.registry_data_use_classes) != len(self.registry_record_sha256s)
+            or any(not isinstance(value, DataUseClass) for value in self.registry_data_use_classes)
+        ):
+            raise ExternalBenchmarkHarnessError(
+                "registry_data_use_classes must align with registry record hashes"
+            )
         _require_sha256("data_artifact_sha256", self.data_artifact_sha256)
         _require_sha256("dataset_manifest_sha256", self.dataset_manifest_sha256)
         _require_sha256("split_manifest_sha256", self.split_manifest_sha256)
@@ -169,7 +191,10 @@ class ExternalBenchmarkAdmission:
     def commercial_evidence_eligible(self) -> bool:
         return (
             self.admission_mode is AdmissionMode.STRICT_REGISTRY
-            and self.registry_data_use_class is DataUseClass.COMMERCIAL_CLEAN
+            and all(
+                value is DataUseClass.COMMERCIAL_CLEAN
+                for value in self.registry_data_use_classes
+            )
         )
 
     def benchmark_identity(self) -> BenchmarkIdentity:
@@ -259,6 +284,29 @@ def matching_registry_record(
     return matches[0]
 
 
+def required_registry_records(
+    spec: ExternalBenchmarkSpec,
+    records: Iterable[ExternalDatasetRecord],
+) -> tuple[ExternalDatasetRecord, ...]:
+    values = tuple(records)
+    primary = matching_registry_record(spec, values)
+    required: list[ExternalDatasetRecord] = [primary]
+    if spec.kind is BenchmarkDatasetKind.GRANDSTAFF_LMX:
+        originals = tuple(
+            record
+            for record in values
+            if isinstance(record, ExternalDatasetRecord)
+            and record.dataset_name == "GrandStaff"
+            and record.dataset_component == "original pianoform dataset"
+        )
+        if len(originals) != 1:
+            raise ExternalBenchmarkHarnessError(
+                "GrandStaff-LMX requires exactly one original GrandStaff registry component"
+            )
+        required.append(originals[0])
+    return tuple(required)
+
+
 def validate_manifest_rows(
     rows: Iterable[BenchmarkManifestRow],
     spec: ExternalBenchmarkSpec,
@@ -301,7 +349,7 @@ def validate_manifest_rows(
     )
 
 
-def manifest_sha256(
+def source_manifest_sha256(
     rows: Iterable[BenchmarkManifestRow],
     spec: ExternalBenchmarkSpec,
 ) -> str:
@@ -312,6 +360,28 @@ def manifest_sha256(
         "rows": [asdict(row) for row in values],
     }
     return sha256(_canonical_json_bytes(payload)).hexdigest()
+
+
+def admitted_dataset_manifest_sha256(
+    rows: Iterable[BenchmarkManifestRow],
+    spec: ExternalBenchmarkSpec,
+    data_artifact_sha256: str,
+) -> str:
+    artifact = _require_sha256("data_artifact_sha256", data_artifact_sha256)
+    payload = {
+        "harness_version": EXTERNAL_BENCHMARK_HARNESS_VERSION,
+        "source_manifest_sha256": source_manifest_sha256(rows, spec),
+        "data_artifact_sha256": artifact,
+    }
+    return sha256(_canonical_json_bytes(payload)).hexdigest()
+
+
+def manifest_sha256(
+    rows: Iterable[BenchmarkManifestRow],
+    spec: ExternalBenchmarkSpec,
+) -> str:
+    """Backward-compatible name for the unbound source-manifest hash."""
+    return source_manifest_sha256(rows, spec)
 
 
 def split_manifest_sha256(
@@ -382,46 +452,63 @@ def directory_tree_sha256(root: str | Path) -> str:
     return sha256(_canonical_json_bytes(entries)).hexdigest()
 
 
+def _validate_strict_registry_records(
+    spec: ExternalBenchmarkSpec,
+    records: tuple[ExternalDatasetRecord, ...],
+    data_artifact_sha256: str,
+) -> None:
+    for record in records:
+        if (
+            record.registry_state is not RegistryState.INSTALL_PINNED
+            or record.evaluation_allowed is not True
+            or record.artifact_sha256 is None
+        ):
+            raise ExternalBenchmarkHarnessError(
+                "strict benchmark admission requires every dataset component to be "
+                "INSTALL_PINNED and evaluation-permitted"
+            )
+    if spec.kind is not BenchmarkDatasetKind.GRANDSTAFF_LMX:
+        if len(records) != 1 or records[0].artifact_sha256 != data_artifact_sha256:
+            raise ExternalBenchmarkHarnessError(
+                "strict single-component admission requires exact artifact SHA-256 equality"
+            )
+
+
 def create_admission(
     *,
     spec: ExternalBenchmarkSpec,
-    registry_record: ExternalDatasetRecord,
+    registry_records: Iterable[ExternalDatasetRecord],
     rows: Iterable[BenchmarkManifestRow],
     data_artifact_sha256: str,
     admission_mode: AdmissionMode,
     research_override_reference: str | None = None,
 ) -> ExternalBenchmarkAdmission:
-    if not isinstance(registry_record, ExternalDatasetRecord):
-        raise ExternalBenchmarkHarnessError("registry_record must be ExternalDatasetRecord")
-    if (
-        registry_record.dataset_name != spec.dataset_name
-        or registry_record.dataset_component != spec.dataset_component
-    ):
-        raise ExternalBenchmarkHarnessError("registry record does not match benchmark spec")
     _require_sha256("data_artifact_sha256", data_artifact_sha256)
     values = validate_manifest_rows(rows, spec)
+    required_records = required_registry_records(spec, registry_records)
 
     if admission_mode is AdmissionMode.STRICT_REGISTRY:
-        if (
-            registry_record.registry_state is not RegistryState.INSTALL_PINNED
-            or registry_record.evaluation_allowed is not True
-            or registry_record.artifact_sha256 != data_artifact_sha256
-        ):
-            raise ExternalBenchmarkHarnessError(
-                "strict benchmark admission requires matching INSTALL_PINNED evaluation permission"
-            )
+        _validate_strict_registry_records(spec, required_records, data_artifact_sha256)
     elif admission_mode is AdmissionMode.RESEARCH_OVERRIDE:
         _require_text("research_override_reference", research_override_reference)
     else:
         raise ExternalBenchmarkHarnessError("unsupported admission_mode")
 
+    record_hashes = tuple(record.canonical_sha256() for record in required_records)
+    if len(set(record_hashes)) != len(record_hashes):
+        raise ExternalBenchmarkHarnessError("required registry components must be distinct")
+
     return ExternalBenchmarkAdmission(
         spec=spec,
         admission_mode=admission_mode,
-        registry_record_sha256=registry_record.canonical_sha256(),
-        registry_data_use_class=registry_record.data_use_class,
+        registry_record_sha256s=record_hashes,
+        registry_data_use_classes=tuple(record.data_use_class for record in required_records),
         data_artifact_sha256=data_artifact_sha256,
-        dataset_manifest_sha256=manifest_sha256(values, spec),
+        dataset_manifest_sha256=admitted_dataset_manifest_sha256(
+            values,
+            spec,
+            data_artifact_sha256,
+        ),
         split_manifest_sha256=split_manifest_sha256(values, spec),
         research_override_reference=research_override_reference,
     )
