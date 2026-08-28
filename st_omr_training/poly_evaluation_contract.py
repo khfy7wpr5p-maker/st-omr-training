@@ -288,6 +288,11 @@ def validate_comparison_benchmark(
     values = tuple(benchmark_identities)
     if not values:
         raise PolyEvaluationContractError("at least one benchmark identity is required")
+    for value in values:
+        if not isinstance(value, BenchmarkIdentity):
+            raise PolyEvaluationContractError(
+                "benchmark identities must be BenchmarkIdentity values"
+            )
     first = values[0]
     for value in values[1:]:
         if value != first:
