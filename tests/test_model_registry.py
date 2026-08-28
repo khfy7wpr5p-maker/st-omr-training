@@ -75,7 +75,7 @@ class ModelRegistryTests(unittest.TestCase):
         self.assertEqual(V2_TOKENIZER_VERSION, POLYPHONIC_TOKENIZER_VERSION)
         self.assertEqual(POLY_EVALUATION_CONTRACT_VERSION, ACTUAL_EVALUATION_CONTRACT_VERSION)
 
-    def test_seed_registry_consolidates_existing_implemented_model_versions(self) -> None:
+    def test_seed_registry_consolidates_existing_model_versions(self) -> None:
         records = registry_by_id()
         self.assertEqual(records["baseline.cnn-gru.v1"].source_version, BASELINE_MODEL_VERSION)
         self.assertEqual(records["specialist.staff.d7.v1"].source_version, STAFF_MODEL_VERSION)
@@ -116,7 +116,7 @@ class ModelRegistryTests(unittest.TestCase):
                 polyphonic_v2_capable=True,
             )
 
-    def test_polyphonic_2d_candidate_is_implemented_but_still_experimental(self) -> None:
+    def test_polyphonic_2d_prototype_is_registered_without_checkpoint_authority(self) -> None:
         candidate = registry_by_id()["candidate.poly-2d-transformer.v1"]
         self.assertTrue(candidate.polyphonic_v2_capable)
         self.assertIs(candidate.semantic_scope, SemanticScope.POLYPHONIC_V2)
@@ -124,8 +124,8 @@ class ModelRegistryTests(unittest.TestCase):
         self.assertEqual(candidate.tokenizer_version, V2_TOKENIZER_VERSION)
         self.assertEqual(candidate.source_module, "st_omr_training.poly_2d_transformer")
         self.assertEqual(candidate.source_version, POLY_2D_TRANSFORMER_VERSION)
-        self.assertIs(candidate.lifecycle, ModelLifecycle.TRAINING_IMPLEMENTED)
-        self.assertIs(candidate.authority, ResearchAuthority.EXPERIMENTAL)
+        self.assertIs(candidate.lifecycle, ModelLifecycle.ARCHITECTURE_ONLY)
+        self.assertIs(candidate.authority, ResearchAuthority.NONE)
         self.assertFalse(candidate.production_authority)
 
     def test_baseline_artifact_requires_exact_tokenizer_binding(self) -> None:
@@ -136,16 +136,15 @@ class ModelRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(ModelRegistryError, "requires tokenizer fingerprint"):
             validate_artifact_binding(replace(binding, tokenizer_fingerprint_sha256=None))
 
-    def test_polyphonic_2d_artifact_requires_v2_tokenizer_and_representation(self) -> None:
+    def test_polyphonic_2d_prototype_cannot_register_checkpoint_evidence_yet(self) -> None:
         binding = _binding(
             "candidate.poly-2d-transformer.v1",
             tokenizer_version=V2_TOKENIZER_VERSION,
             representation_version=V2_REPRESENTATION_VERSION,
             tokenizer_fp=_SHA,
         )
-        self.assertEqual(validate_artifact_binding(binding).record_id, "candidate.poly-2d-transformer.v1")
-        with self.assertRaisesRegex(ModelRegistryError, "representation version"):
-            validate_artifact_binding(replace(binding, representation_version=None))
+        with self.assertRaisesRegex(ModelRegistryError, "does not admit checkpoint evidence"):
+            validate_artifact_binding(binding)
 
     def test_artifact_is_bound_to_exact_registry_record_fingerprint(self) -> None:
         binding = _binding("specialist.staff.d7.v1")
@@ -164,6 +163,7 @@ class ModelRegistryTests(unittest.TestCase):
     def test_unimplemented_and_deterministic_records_cannot_masquerade_as_checkpoint_evidence(self) -> None:
         for record_id in (
             "specialist.notehead.declared.v1",
+            "candidate.poly-2d-transformer.v1",
             "candidate.relation-graph.v1",
             "fusion.context-validator.v1",
         ):
