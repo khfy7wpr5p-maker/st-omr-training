@@ -100,6 +100,7 @@ They are `planned`, have no inference authority, and are bound to the frozen Pol
 Any learned model result used as comparable evidence must identify:
 
 - registry record ID;
+- exact registry-record fingerprint SHA-256;
 - exact repository SHA-40;
 - checkpoint SHA-256;
 - model fingerprint SHA-256;
@@ -108,6 +109,8 @@ Any learned model result used as comparable evidence must identify:
 - runtime fingerprint SHA-256;
 - tokenizer version/fingerprint when the model is tokenizer-bound;
 - representation version when applicable.
+
+The registry-record fingerprint is checked against the current row. Reusing the same `record_id` after changing model kind, lifecycle, authority, source version, tasks, target contract or checkpoint policy therefore invalidates old artifact evidence instead of silently reinterpreting it.
 
 An architecture-only, planned or deterministic registry record cannot accept a learned checkpoint binding.
 
