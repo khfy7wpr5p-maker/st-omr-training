@@ -46,6 +46,7 @@ from .polyphonic_representation import POLYPHONIC_REPRESENTATION_VERSION
 from .polyphonic_serialization import POLYPHONIC_TOKENIZER_VERSION, tokenizer_fingerprint
 from .training_model import (
     TORCH_PINNED_VERSION,
+    TrainingRuntimeError,
     assert_model_finite,
     count_trainable_parameters,
     model_state_sha256,
@@ -63,10 +64,20 @@ MAX_METADATA_BYTES: Final[int] = 256 * 1024
 MAX_RECEIPT_BYTES: Final[int] = 16 * 1024
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _GIT_SHA40 = re.compile(r"^[0-9a-f]{40}$")
+_REQUIRED_ARTIFACT_FILENAMES: Final[frozenset[str]] = frozenset(
+    {CHECKPOINT_FILENAME, METADATA_FILENAME, RECEIPT_FILENAME}
+)
 
 
 class Poly2DCheckpointError(Poly2DTrainingError):
     """Raised when a checkpoint artifact or reload verification fails closed."""
+
+
+def _assert_checkpoint_model_finite(model: TinyPoly2DTransformer, context: str) -> None:
+    try:
+        assert_model_finite(model)
+    except TrainingRuntimeError as exc:
+        raise Poly2DCheckpointError(f"{context} contains non-finite model state") from exc
 
 
 def _canonical_json_bytes(payload: object) -> bytes:
@@ -312,6 +323,14 @@ def _validate_artifact_directory(directory: Path) -> tuple[Path, Path, Path]:
         raise TypeError("directory must be pathlib.Path")
     if directory.is_symlink() or not directory.is_dir():
         raise Poly2DCheckpointError("checkpoint artifact directory must be a regular non-symlink directory")
+    try:
+        entry_names = frozenset(entry.name for entry in directory.iterdir())
+    except OSError as exc:
+        raise Poly2DCheckpointError("checkpoint artifact directory could not be enumerated") from exc
+    if entry_names != _REQUIRED_ARTIFACT_FILENAMES:
+        raise Poly2DCheckpointError(
+            "checkpoint artifact directory must contain exactly model.pt, metadata.json, and receipt.json"
+        )
     checkpoint_path = directory / CHECKPOINT_FILENAME
     metadata_path = directory / METADATA_FILENAME
     receipt_path = directory / RECEIPT_FILENAME
@@ -370,7 +389,7 @@ def load_and_verify_poly_2d_checkpoint(directory: Path) -> LoadedPoly2DCheckpoin
         raise Poly2DCheckpointError("checkpoint state_dict is incompatible with the model config") from exc
     if incompatibility.missing_keys or incompatibility.unexpected_keys:
         raise Poly2DCheckpointError("checkpoint state_dict did not load strictly")
-    assert_model_finite(model)
+    _assert_checkpoint_model_finite(model, "reloaded checkpoint")
     if count_trainable_parameters(model) != metadata.parameter_count:
         raise Poly2DCheckpointError("checkpoint parameter count mismatch")
     actual_state_sha = model_state_sha256(model)
@@ -407,7 +426,7 @@ def _write_checkpoint_artifact(
     output_directory: Path,
 ) -> Poly2DCheckpointReceipt:
     _parent, temporary = _preflight_output_directory(output_directory)
-    assert_model_finite(model)
+    _assert_checkpoint_model_finite(model, "checkpoint model before persistence")
     if model_state_sha256(model) != metadata.final_state_sha256:
         raise Poly2DCheckpointError("model state differs from checkpoint metadata before persistence")
     if count_trainable_parameters(model) != metadata.parameter_count:
