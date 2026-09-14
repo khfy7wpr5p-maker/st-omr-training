@@ -1,9 +1,10 @@
 """Tiny 2D Transformer research prototype for Polyphonic Representation V2.
 
-TR-POLY-08 intentionally implements only a bounded teacher-forced forward path.
-It preserves the full patch-row x patch-column visual memory and cross-attends
-from the V2 token decoder to that memory. It contains no dataset loader,
-optimizer, checkpoint persistence, benchmark claim, or production wiring.
+TR-POLY-08 introduced the bounded teacher-forced forward path. TR-POLY-09B1
+adds only a reusable decoder-from-visual-memory surface so free-running
+inference can encode an image once and autoregress over the unchanged model.
+The model parameters, state-dict layout, configuration fingerprint and frozen
+V2 target vocabulary remain unchanged.
 """
 
 from __future__ import annotations
@@ -11,7 +12,6 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 import json
-import math
 from typing import Final
 
 import torch
@@ -41,7 +41,7 @@ _MAX_SEED: Final[int] = 2**63 - 1
 
 
 class Poly2DTransformerError(TrainingRuntimeError):
-    """Raised when the bounded TR-POLY-08 model surface fails closed."""
+    """Raised when the bounded TR-POLY-08/09B1 model surface fails closed."""
 
 
 def _plain_int(value: object) -> bool:
@@ -198,13 +198,26 @@ class TinyPoly2DTransformer(nn.Module):
         if decoder_input_ids.dtype != torch.long or decoder_input_ids.ndim != 2:
             raise Poly2DTransformerError("decoder_input_ids must be rank-2 torch.long")
         if decoder_input_ids.shape[0] != batch_size:
-            raise Poly2DTransformerError("decoder batch does not match image batch")
+            raise Poly2DTransformerError("decoder batch does not match visual-memory batch")
         length = decoder_input_ids.shape[1]
         if not 1 <= length <= self.config.max_target_tokens:
             raise Poly2DTransformerError("decoder sequence length is outside the TR-POLY-08 bound")
         if bool((decoder_input_ids < 0).any()) or bool((decoder_input_ids >= VOCABULARY_SIZE).any()):
             raise Poly2DTransformerError("decoder token id is outside the frozen V2 vocabulary")
         return decoder_input_ids
+
+    def _validate_memory(self, memory: object) -> torch.Tensor:
+        if not isinstance(memory, torch.Tensor):
+            raise Poly2DTransformerError("visual memory must be a torch tensor")
+        if memory.dtype != torch.float32 or memory.ndim != 3:
+            raise Poly2DTransformerError("visual memory must be float32 [batch,patches,model_dim]")
+        expected_tail = (self.config.visual_token_count, self.config.model_dim)
+        if tuple(memory.shape[1:]) != expected_tail:
+            raise Poly2DTransformerError("visual memory shape differs from the frozen 2D grid")
+        if memory.shape[0] < 1 or memory.shape[0] > 32:
+            raise Poly2DTransformerError("visual-memory batch size is outside the TR-POLY-08 bound")
+        assert_finite_tensor("TR-POLY-09B1 visual memory", memory)
+        return memory
 
     def _two_dimensional_positions(self, *, device: torch.device) -> torch.Tensor:
         rows = torch.arange(self.config.patch_rows, device=device, dtype=torch.long)
@@ -246,10 +259,17 @@ class TinyPoly2DTransformer(nn.Module):
             diagonal=1,
         )
 
-    def forward(self, images: torch.Tensor, decoder_input_ids: torch.Tensor) -> torch.Tensor:
-        checked_images = self._validate_images(images)
-        checked_ids = self._validate_decoder_ids(decoder_input_ids, checked_images.shape[0])
-        memory = self.encode_images(checked_images)
+    def decode_from_memory(
+        self,
+        memory: torch.Tensor,
+        decoder_input_ids: torch.Tensor,
+    ) -> torch.Tensor:
+        """Decode a prefix against an already-computed full 2D visual memory."""
+
+        checked_memory = self._validate_memory(memory)
+        checked_ids = self._validate_decoder_ids(decoder_input_ids, checked_memory.shape[0])
+        if checked_ids.device != checked_memory.device:
+            raise Poly2DTransformerError("decoder ids and visual memory must share one device")
 
         length = checked_ids.shape[1]
         target_positions = torch.arange(length, device=checked_ids.device, dtype=torch.long)
@@ -257,16 +277,22 @@ class TinyPoly2DTransformer(nn.Module):
         target_padding_mask = checked_ids.eq(PAD_TOKEN_ID)
         decoded = self.decoder(
             target,
-            memory,
+            checked_memory,
             tgt_mask=self.causal_mask(length, device=checked_ids.device),
             tgt_key_padding_mask=target_padding_mask,
         )
         logits = self.output_projection(decoded)
-        assert_finite_tensor("TR-POLY-08 logits", logits)
+        assert_finite_tensor("TR-POLY-09B1 logits", logits)
         expected = (checked_ids.shape[0], length, VOCABULARY_SIZE)
         if tuple(logits.shape) != expected:
             raise Poly2DTransformerError("decoder logits have unexpected shape")
         return logits
+
+    def forward(self, images: torch.Tensor, decoder_input_ids: torch.Tensor) -> torch.Tensor:
+        checked_images = self._validate_images(images)
+        checked_ids = self._validate_decoder_ids(decoder_input_ids, checked_images.shape[0])
+        memory = self.encode_images(checked_images)
+        return self.decode_from_memory(memory, checked_ids)
 
 
 def poly_2d_config_fingerprint(config: Poly2DTransformerConfig = FROZEN_POLY_2D_CONFIG) -> str:
