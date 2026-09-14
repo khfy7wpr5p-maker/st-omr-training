@@ -78,6 +78,16 @@ def _finite_number(value: object, name: str) -> float:
     return numeric
 
 
+def _require_sha256(name: str, value: object) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise PolyV2MetricError(f"{name} must be lowercase SHA-256 text")
+    return value
+
+
 def _levenshtein(left: tuple[object, ...], right: tuple[object, ...]) -> int:
     if len(left) < len(right):
         left, right = right, left
@@ -120,6 +130,7 @@ class MetricObservation:
 class PolyV2SampleMetricReport:
     sample_id: str
     benchmark_identity_sha256: str
+    candidate_identity_sha256: str
     inference_evidence_sha256: str
     reference_representation_sha256: str
     prediction_representation_sha256: str | None
@@ -134,24 +145,13 @@ class PolyV2SampleMetricReport:
         for name in (
             "sample_id",
             "benchmark_identity_sha256",
+            "candidate_identity_sha256",
             "inference_evidence_sha256",
             "reference_representation_sha256",
         ):
-            value = getattr(self, name)
-            if (
-                not isinstance(value, str)
-                or len(value) != 64
-                or any(character not in "0123456789abcdef" for character in value)
-            ):
-                raise PolyV2MetricError(f"{name} must be lowercase SHA-256 text")
+            _require_sha256(name, getattr(self, name))
         if self.prediction_representation_sha256 is not None:
-            value = self.prediction_representation_sha256
-            if (
-                not isinstance(value, str)
-                or len(value) != 64
-                or any(character not in "0123456789abcdef" for character in value)
-            ):
-                raise PolyV2MetricError("prediction_representation_sha256 must be SHA-256 when present")
+            _require_sha256("prediction_representation_sha256", self.prediction_representation_sha256)
         if not isinstance(self.voice_stratum, str) or not self.voice_stratum:
             raise PolyV2MetricError("voice_stratum must be non-empty text")
         if not isinstance(self.robustness_bucket, str) or not self.robustness_bucket:
@@ -527,6 +527,7 @@ def evaluate_poly_v2_validation_sample(
     report = PolyV2SampleMetricReport(
         sample_id=descriptor.sample_id,
         benchmark_identity_sha256=benchmark.canonical_sha256(),
+        candidate_identity_sha256=prediction.identity.fingerprint(),
         inference_evidence_sha256=prediction.evidence_fingerprint(),
         reference_representation_sha256=reference.canonical_sha256(),
         prediction_representation_sha256=prediction.prediction_sha256,
