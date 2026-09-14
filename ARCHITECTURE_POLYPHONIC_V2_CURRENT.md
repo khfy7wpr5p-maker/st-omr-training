@@ -2,346 +2,247 @@
 
 Updated: 2026-09-14
 
-This document is the detailed current-state companion to `ARCHITECTURE_CURRENT.md`. It separates implemented capability from measured quality and preserves the dependency order through the first common Polyphonic V2 benchmark.
+This document separates implemented capability from measured quality and preserves the dependency order toward a defensible Polyphonic V2 benchmark.
 
-## 1. Current baseline and active package
+## Current chain
 
-Protected-main baseline used to start the active package:
+Protected `main` baseline:
 
-`2bb0ac23e11fb953bb3ada4aaef6369073b7e1f1`
-
-Current chain:
+`58c27b5403301fe478c9b6c8351682c8f8bf1624`
 
 ```text
 TR-POLY-02 evaluation taxonomy / benchmark identity       ✅
 TR-POLY-03 external dataset + license registry            ✅
 TR-POLY-04 deterministic external benchmark harness       ✅
 TR-POLY-05 Polyphonic Representation V2                   ✅
-TR-POLY-06 V2 parser / tokenizer / lossless roundtrip     ✅
+TR-POLY-06 V2 parser/tokenizer/lossless roundtrip         ✅
 TR-POLY-07 research model registry                         ✅
-TR-POLY-08 tiny 2D Transformer prototype                  ✅
-TR-POLY-08A bounded training + provenance                  ✅
-TR-POLY-08B exact checkpoint persistence/reload            ✅
-TR-POLY-08C exact Stage 6 V1→V2 dataset execution         ✅
-TR-POLY-09A native explicit Polyphonic V2 materialization ✅
-TR-POLY-09B1 free-running greedy inference                ✅ IMPLEMENTED / MERGE GATE
-TR-POLY-09B2 deterministic metric/adaptor layer            🔄 NEXT
-TR-POLY-09B3 common VALIDATION benchmark                   🔒
+TR-POLY-08/08A/08B model + training + checkpoint          ✅ RESEARCH
+TR-POLY-08C exact Stage 6 V1→V2 execution                 ✅
+TR-POLY-09A native explicit V2 materialization            ✅
+TR-POLY-09B1 free-running greedy inference                ✅ MERGED
+TR-POLY-09B2 deterministic metric/adaptor layer           ✅ IMPLEMENTED / MERGE GATE
+TR-POLY-09B3 common VALIDATION aggregation                🔄 NEXT
+TR-POLY-09B-complete metric admission                     🔒 MusicXML validity + TEDn pending
+P09C evidence-driven refinement                           🔒
+P09D final candidate freeze                               🔒
+Stage 9 sealed TEST decision                              🔒
+Stage 10 ScoreMosaic shadow integration                   🔒
 ```
 
-## 2. What is implemented versus what is proven
+## Capability now implemented
 
-### Implemented
-
-- explicit structured Polyphonic V2 target representation;
-- exact onset/duration/staff/voice fields;
-- deterministic canonical V2 JSON;
-- lossless V2 tokenizer/detokenizer;
-- 2D visual Transformer encoder preserving row × column patch memory;
-- teacher-forced TRAIN/VALIDATION execution;
-- deterministic training/checkpoint provenance;
-- exact checkpoint persistence and reload verification;
-- Stage 6 single-voice V1→V2 execution bridge;
-- native explicit Polyphonic V2 dataset/materialization path;
-- voice 2 / 3 / 4+ dataset-coverage gates;
-- family leakage and sealed-TEST protections;
-- BOS-only deterministic greedy free-running inference;
-- one-time image encoding with autoregressive decoder-memory reuse;
-- strict V2 semantic validation after EOS;
-- explicit invalid/abstain states for malformed output, generated PAD/BOS and decode-limit exhaustion;
-- exact inference/checkpoint identity binding.
-
-### Not yet proven
-
-- useful Polyphonic V2 recognition accuracy;
-- superiority over V1 or specialist/hybrid candidates;
-- reliable 2/3/4+ voice separation;
-- relation quality for ties, beams, accidentals or cross-staff notation;
-- scanned/phone robustness;
-- sealed TEST performance;
-- ScoreMosaic shadow readiness;
-- production authority.
-
-Implementation of inference closes a measurement prerequisite; it is not itself model-quality evidence.
-
-## 3. TR-POLY-09B1 closes the teacher-forcing gap
-
-Before B1, the 2D model could be scored only while receiving the true preceding target tokens. That is not valid end-to-end OMR evidence.
-
-B1 freezes the first honest prediction path:
+The research path now contains all of the following surfaces:
 
 ```text
-verified image tensor
+explicit canonical V2 target + image
         ↓
-full 2D visual memory
+hash-bound TRAIN/VALIDATION materialization
         ↓
-BOS only
+2D Transformer training/checkpoint path
         ↓
-argmax next token
+verified checkpoint
         ↓
-append prediction and repeat
+BOS-only free-running greedy prediction
         ↓
-EOS / generated-control failure / max-step stop
+strict V2 parse OR explicit invalid/abstain
         ↓
-strict V2 parser
-        ↓
-canonical prediction OR explicit invalid/abstain
+versioned deterministic metric adapter
 ```
 
-The image is encoded once; `decode_from_memory()` reuses the same full row × column memory for every autoregressive step.
+B1 means the candidate is measurable without teacher forcing. B2 means those free-running outputs can be compared to canonical V2 references on a substantial, versioned portion of the frozen TR-POLY-02 metric vocabulary.
 
-### First-search policy
+Neither package proves that the recognizer is accurate.
 
-The initial common baseline is greedy by design:
+## B2 metric coverage
 
-- deterministic argmax;
-- lowest token id wins a numerical tie under the pinned runtime behavior;
-- no beam search;
-- no sampling;
-- no grammar-based logit masking;
-- no semantic repair;
-- no fabricated EOS;
-- generated PAD or a second BOS is recorded as model failure;
-- strict parser failure is recorded as semantic-invalid output.
+### Available numeric metrics
 
-This keeps model quality separate from search/repair quality. A later constrained or beam decoder must use a separately fingerprinted profile and be compared as its own candidate.
+Serialization:
 
-## 4. Candidate identity freeze now available
+- `parse_success`
 
-Every B1 result binds:
+Sequence:
 
-- exact model-state SHA-256;
-- model-profile SHA-256;
-- inference-profile SHA-256;
-- max decode-step budget;
-- tokenizer fingerprint;
-- representation/tokenizer versions;
-- pinned PyTorch runtime.
+- `ter`
+- `normalized_edit_distance`
+- `exact_sequence_accuracy`
 
-Verified-checkpoint inference additionally binds:
+Musical semantics:
 
-- checkpoint SHA-256;
-- metadata file SHA-256;
-- receipt SHA-256;
-- metadata fingerprint;
-- dataset manifest;
-- preprocessing fingerprint;
-- trainer profile;
-- training provenance;
-- model-registry record fingerprint;
-- repository SHA.
+- `pitch_accuracy`
+- `duration_accuracy`
+- `onset_accuracy`
+- `voice_accuracy`
+- `staff_accuracy`
 
-This provides the model/checkpoint portion of P09B-0. The benchmark identity, metric-set identity and candidate adapter identity must still be frozen by B2/B3.
+Relations:
 
-## 5. Next critical gap: deterministic metric/adaptor support
+- `notehead_stem_f1`
+- `beam_relation_f1`
+- `tie_relation_f1`
+- `accidental_note_f1`
+- `note_staff_f1`
 
-The next missing component is not another model architecture. It is a common scoring bridge that turns free-running prediction/reference pairs into the already-frozen TR-POLY-02 evaluation surface.
+### Frozen metrics still unsupported
 
-B2 should provide versioned, deterministic adapters for the metrics that can be computed from Polyphonic V2 without inventing unavailable information.
+`musicxml_validity`
 
-### Priority metric surface
+Reason: no admitted deterministic V2 → MusicXML export/validation adapter is bound to this benchmark path yet.
 
-#### Serialization / validity
+`tedn`
 
-- parse success;
-- canonical V2 validity;
-- MusicXML validity only where an admitted deterministic export adapter exists.
+Reason: TR-POLY-02 reserves TEDn, but the exact algorithm/version/license implementation has not yet been admitted. B2 does not approximate TEDn under the frozen metric name.
 
-#### Sequence
+Every sample report contains both unavailable metric IDs with explicit unsupported reasons and no numeric value.
 
-- token error rate;
-- normalized edit distance;
-- exact sequence accuracy.
+## Why incomplete metrics do not block diagnostic benchmarking
 
-#### Musical semantic
+B3 can still produce useful VALIDATION evidence for the implemented metric families. This is enough to diagnose whether the dominant problem is sequence generation, pitch, rhythm/onset, voice separation, staff assignment or relation recovery.
 
-- pitch accuracy;
-- duration accuracy;
-- onset accuracy;
-- voice accuracy;
-- staff accuracy.
-
-#### Relations
-
-Where both reference and prediction expose the relation deterministically:
-
-- beam relation F1;
-- tie relation F1;
-- accidental-note F1;
-- note-staff F1;
-- notehead-stem F1 only if the representation/adaptor can define it without hidden visual labels.
-
-#### Structural
-
-TEDn remains reserved by TR-POLY-02 but must not be fabricated. It may enter only after the exact implementation/algorithm and license boundary is reviewed and versioned.
-
-## 6. Common benchmark readiness checklist
-
-TR-POLY-09B3 comparative execution stays closed until:
-
-- B1 free-running inference is green on protected main;
-- native V2 TRAIN/VALIDATION materialization remains hash-verifiable;
-- compared checkpoint identities are frozen;
-- the benchmark dataset/split identity is frozen;
-- candidate adapters are versioned;
-- metric implementations are deterministic and versioned;
-- unsupported metrics are explicitly marked unsupported;
-- TEST remains sealed.
-
-## 7. Required benchmark strata
-
-The first common VALIDATION report must not collapse all polyphony into one number.
-
-At minimum report separately:
-
-- `1_voice`;
-- `2_voice`;
-- `3_voice`;
-- `4_plus_voice`.
-
-Where admitted data exists, robustness buckets should also remain separate:
-
-- clean;
-- scan;
-- phone;
-- blur;
-- perspective;
-- low contrast.
-
-Aggregate metrics may be added, but never as the only reported evidence.
-
-## 8. Recommended package order
-
-### P09B-1 — Free-running inference
-
-Status: implemented in the active package; merge requires exact-head green CI.
-
-Exit condition:
-
-- a verified checkpoint consumes one admitted image;
-- no gold target prefix is supplied;
-- output becomes either canonical V2 or explicit invalid/abstain evidence;
-- model state does not mutate;
-- all relevant model/checkpoint/runtime identities are bound.
-
-### P09B-2 — Metric implementation and candidate adapters
-
-Status: next.
-
-Exit condition:
-
-- two compatible prediction/reference pairs can be scored by one versioned metric surface;
-- candidate-specific interpretation is prohibited;
-- unsupported fields remain unsupported;
-- benchmark identity is included in the evidence binding;
-- TEST remains unopened.
-
-### P09B-3 — Common VALIDATION benchmark
-
-Status: blocked until B2.
-
-Exit condition:
-
-- compared candidates use the same exact benchmark/split identity;
-- per-voice-stratum reports exist;
-- parse/sequence/semantic/relation evidence is separated;
-- no TEST artifact is opened.
-
-### P09C — Evidence-driven refinement
-
-Use only TRAIN/VALIDATION evidence to determine the dominant failure family:
-
-- visual resolution / patching;
-- sequence search;
-- representation length;
-- data imbalance;
-- voice separation;
-- staff assignment;
-- rhythm/onset modeling;
-- relation modeling;
-- robustness/domain coverage.
-
-Only a demonstrated failure should justify expanding model, data or search complexity.
-
-### P09D — Candidate freeze before sealed TEST
-
-Freeze the complete recipe:
-
-- model architecture;
-- checkpoint;
-- preprocessing;
-- decoding algorithm;
-- resource bounds;
-- metric versions;
-- benchmark adapter;
-- abstention policy.
-
-After this freeze, sealed TEST cannot become a tuning loop.
-
-### Stage 9 — Sealed held-out decision
-
-Run the already-frozen candidate once on held-out TEST evidence. Valid outcomes include accept, reject and insufficient evidence. A poor result does not authorize repeated TEST-driven tuning.
-
-### Stage 10 — Separate ScoreMosaic shadow gate
-
-A successful Stage 9 candidate still has no automatic production authority. Integration must separately verify artifact provenance, resource bounds, deterministic validator compatibility, failure/abstain behavior and regression safety.
-
-## 9. Specialist/hybrid relationship
-
-The Stage 7-D specialist lane remains historical and reusable evidence.
-
-Potential later architecture:
+However, B3 must distinguish:
 
 ```text
-2D Polyphonic V2 recognizer
+partial common VALIDATION evidence     ✅ permitted
+TR-POLY-02-complete result             🔒 unavailable
+winner / promotion claim               🔒 unavailable
+sealed TEST opening                     🔒 unavailable
+```
+
+The partial benchmark must never be described as the complete frozen benchmark.
+
+## B2 alignment and scoring policy
+
+Sequence metrics use deterministic unit-cost Levenshtein over V2 token surfaces after BOS.
+
+Semantic and relation metrics use a versioned unit-cost event alignment inside corresponding part/measure positions. Arbitrary event and notehead IDs are excluded from the alignment signature.
+
+Reference-oriented semantic correctness measures:
+
+- pitch surface `(step, alter, octave)`;
+- exact rational duration;
+- exact rational onset;
+- logical voice;
+- event staff.
+
+Relations are exact multiset identities within aligned events:
+
+- pitch ↔ stem direction;
+- beam level/state;
+- pitch ↔ tie state;
+- pitch ↔ displayed accidental;
+- pitch ↔ effective staff, including cross-staff override.
+
+Invalid/abstain free-running predictions remain benchmark evidence. They receive `parse_success=0`, their real generated token sequence contributes sequence edits, and semantic/relation metrics receive zero credit rather than being excluded.
+
+## Identity and comparability
+
+A B2 report binds:
+
+- sample SHA-256;
+- BenchmarkIdentity SHA-256;
+- B1 inference evidence SHA-256;
+- reference V2 SHA-256;
+- prediction V2 SHA-256 when valid;
+- voice stratum;
+- robustness bucket;
+- metric-adapter version;
+- event-alignment version;
+- relation-metric version;
+- ordered metric availability/value surface.
+
+Changing the benchmark identity changes report identity even for identical prediction/reference content.
+
+## B3 next architecture
+
+B3 should be an aggregation/execution layer, not a new model package.
+
+```text
+same frozen BenchmarkIdentity
         +
-local specialists / deterministic geometry
+VALIDATION BenchmarkSampleDescriptor set
+        +
+B1 inference results
+        +
+B2 sample metric reports
         ↓
-versioned fusion candidate
-        ↓
-same common benchmark contract
+deterministic aggregate report
+        ├─ 1_voice
+        ├─ 2_voice
+        ├─ 3_voice
+        ├─ 4_plus_voice
+        └─ robustness buckets
 ```
 
-Hybrid fusion should wait until the standalone free-running 2D candidate has a measurable baseline. Otherwise attribution of improvement/regression is impossible.
+Required B3 behavior:
 
-## 10. Data strategy after benchmark evidence
+- VALIDATION only;
+- exact benchmark identity equality across all samples/candidates;
+- no dropping invalid/abstain outputs;
+- metric coverage counts alongside means;
+- explicit unsupported metric propagation;
+- deterministic canonical report fingerprint;
+- no winner/promotion field while the required metric set is incomplete;
+- TEST bytes never opened.
 
-Do not default to “more data” or “larger model”. Use measured strata:
+## After B3
 
-```text
-VALIDATION error strata
-        ↓
-dominant failure family
-        ↓
-rights/provenance/split check
-        ↓
-targeted TRAIN/VALIDATION data or bounded model/search change
-        ↓
-new deterministic artifact identity
-        ↓
-retrain and re-evaluate
-```
+Use B3 evidence to select only demonstrated failure families for P09C.
 
 Examples:
 
-- weak 4+ voice result → increase admitted high-polyphony evidence;
-- weak cross-staff relation → add cross-staff-specific targets;
-- strong clean / weak scan → improve admitted scan-domain coverage first;
-- good token sequence / weak relations → improve relation modeling rather than visual capacity.
+```text
+high parse failure          -> decoder/search/sequence grammar diagnosis
+high TER, good parse        -> sequence model/search diagnosis
+weak pitch only             -> visual/pitch representation diagnosis
+weak onset/duration         -> rhythmic representation/training diagnosis
+weak voice                  -> polyphonic separation/data diagnosis
+weak note_staff_f1          -> staff/cross-staff diagnosis
+strong clean / weak scan    -> domain-coverage diagnosis
+```
 
-## 11. Do not do next
+Do not enlarge the model or expand data broadly without this evidence.
 
-Until the common VALIDATION path is operational, do not prioritize:
+## Metric-completion packages
 
-- opening sealed TEST;
-- ScoreMosaic/production integration;
-- a larger Transformer by default;
-- broad hyperparameter sweeps;
-- beam/repair decoding before greedy evidence is frozen;
-- automatic learning from teacher corrections;
-- external data without rights/install-pin admission;
-- presenting teacher-forced loss or implementation success as OMR accuracy.
+Before a final complete comparison claim, independently admit:
 
-## 12. Immediate next action
+1. deterministic Polyphonic V2 → MusicXML export + independent MusicXML validation for `musicxml_validity`;
+2. exact TEDn implementation with version, algorithm semantics, dependency/license review and deterministic regression evidence.
 
-Finish the TR-POLY-09B1 exact-head CI/merge gate. Then implement **TR-POLY-09B2 deterministic metric/adaptor support** and proceed directly to **TR-POLY-09B3 common VALIDATION benchmarking** under the frozen TR-POLY-02 identity. TEST remains sealed throughout B1–B3.
+These should remain separable from model tuning so metric implementation cannot silently change candidate behavior.
+
+## Final dependency order
+
+```text
+B2 exact-head CI + merge
+        ↓
+B3 partial common VALIDATION aggregation
+        ↓
+MusicXML validity + TEDn metric admission
+        ↓
+TR-POLY-02-complete comparable evidence
+        ↓
+P09C evidence-driven refinement on TRAIN/VALIDATION
+        ↓
+P09D candidate + evaluation recipe freeze
+        ↓
+Stage 9 one-shot sealed TEST decision
+        ↓
+Stage 10 independent ScoreMosaic shadow gate
+```
+
+## Safety invariants
+
+- TEST remains sealed until Stage 9.
+- TRAIN is the only parameter-updating split.
+- VALIDATION evaluation is read-only.
+- Unsupported metrics remain unsupported; no proxy inherits a frozen metric ID.
+- Invalid/abstain outputs stay in denominators.
+- External data requires rights/license/install-pin admission.
+- Teacher corrections and ScoreMosaic uploads are not automatic training data.
+- Benchmark success never grants automatic production authority.
+
+## Immediate next action
+
+Finish TR-POLY-09B2 exact-head CI/merge, then implement TR-POLY-09B3 deterministic VALIDATION aggregation/reporting by voice stratum and robustness bucket. Keep complete-winner and sealed-TEST gates closed until the missing required metrics are independently admitted.
