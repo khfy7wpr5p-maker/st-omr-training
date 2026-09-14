@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from PIL import Image, ImageDraw
+from PIL import Image
 
 from st_omr_training.dataset_manifest import DatasetSplit
 from st_omr_training.poly_2d_quality_checkpoint import (
@@ -114,13 +114,18 @@ def _score() -> PolyScore:
 
 
 def _png(seed: int) -> bytes:
+    """Create deterministic grayscale score-like bytes without ImageDraw primitives."""
+
     image = Image.new("L", (128, 48), 255)
-    draw = ImageDraw.Draw(image)
     for row in range(5):
         y = 12 + row * 4
-        draw.line((5, y, 123, y), fill=90)
-    x = 12 + (seed % 80)
-    draw.ellipse((x, 20, x + 6, 26), fill=seed % 40)
+        for x in range(5, 124):
+            image.putpixel((x, y), 90)
+    note_x = 12 + (seed % 80)
+    shade = int(seed % 40)
+    for y in range(20, 27):
+        for x in range(note_x, min(note_x + 7, image.width)):
+            image.putpixel((x, y), shade)
     stream = BytesIO()
     image.save(stream, format="PNG")
     return stream.getvalue()
