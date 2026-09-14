@@ -6,10 +6,9 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 ## Current repository phase
 
-- protected `main`: `58c27b5403301fe478c9b6c8351682c8f8bf1624`
-- latest merged package: PR #155 — TR-POLY-09B1 bounded free-running V2 inference
-- active package: TR-POLY-09B2 deterministic V2 metric/adaptor support
-- next package: TR-POLY-09B3 common VALIDATION aggregation/reporting
+- protected `main`: `79c2631682ebdb3b2be30c146a191e3ef8183ad0`
+- latest merged package: PR #156 — TR-POLY-09B2 deterministic V2 metric/adaptor layer
+- active package: TR-POLY-09B3 common VALIDATION aggregation/reporting
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
 
@@ -21,28 +20,26 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 | 7-A/B/C | Baseline model/training evidence | ✅ Historical baseline |
 | 7-D | Specialist architecture/evidence | ✅ Historical evidence |
 | 8-0/1/2 | Real-data rights/intake/run contracts | ✅ Preserved |
-| 8-3 | Real pilot execution | ⏸ Not current priority |
 | TR-POLY-02 | Evaluation taxonomy + benchmark identity | ✅ Closed / frozen |
 | TR-POLY-03/04 | External-data registry + benchmark harness | ✅ Closed |
 | TR-POLY-05/06 | V2 representation + tokenizer/roundtrip | ✅ Closed / frozen |
 | TR-POLY-07/08/08A/08B | Registry + 2D model + trainer + checkpoint | ✅ Research implementation |
 | TR-POLY-08C | Stage 6 V1→V2 execution | ✅ Single-voice evidence only |
 | TR-POLY-09A | Native explicit V2 dataset/materialization | ✅ Merged |
-| TR-POLY-09B1 | Free-running greedy inference | ✅ Merged / CI green |
-| TR-POLY-09B2 | Deterministic V2 metric/adaptor layer | ✅ Implemented / merge gate pending |
-| TR-POLY-09B3 | Common VALIDATION aggregation/report | 🔄 Next |
+| TR-POLY-09B1 | Free-running greedy inference | ✅ Merged |
+| TR-POLY-09B2 | Deterministic V2 metric/adaptor layer | ✅ Merged / CI green |
+| TR-POLY-09B3 | Common VALIDATION aggregation/report | ✅ Implemented in active package / merge gate pending |
+| Real B3 execution | Run exact checkpoint across admitted VALIDATION artifacts | 🔄 After B3 merge |
 | Missing metric admission | 5 frozen metrics remain unsupported | 🔒 Separate packages required |
-| P09C | Evidence-driven refinement | 🔒 After VALIDATION evidence |
+| P09C | Evidence-driven refinement | 🔒 After real VALIDATION evidence |
 | Stage 9 | Final sealed TEST decision | 🔒 TEST sealed |
 | Stage 10 | ScoreMosaic shadow/integration | 🔒 Not started |
 
-## B1 completed
+## B1–B2 completed
 
-PR #155 passed exact-head CI and merged at `58c27b5403301fe478c9b6c8351682c8f8bf1624`. The 2D candidate can now produce strict free-running V2 prediction evidence without gold-prefix teacher forcing.
+B1 closed the teacher-forcing gap and produces strict free-running V2 prediction evidence from BOS alone. B2 maps each VALIDATION prediction/reference pair to the frozen TR-POLY-02 metric vocabulary.
 
-## B2 metric coverage
-
-### Numeric and admitted in B2 — 11
+B2 provides 11 numeric metrics:
 
 ```text
 parse_success
@@ -58,46 +55,63 @@ accidental_note_f1
 note_staff_f1
 ```
 
-### Explicitly unsupported — 5
+Five metrics remain explicitly unsupported:
 
 ```text
 musicxml_validity
-  v2_musicxml_export_adapter_not_admitted
-
 tedn
-  tedn_implementation_not_admitted
-
 notehead_stem_f1
-  explicit_notehead_stem_relation_not_represented_in_v2
-
 beam_relation_f1
-  explicit_cross_event_beam_relation_not_represented_in_v2
-
 tie_relation_f1
-  explicit_cross_event_tie_relation_not_represented_in_v2
 ```
 
-B2 does not reinterpret event-level stem direction, beam state, or tie START/STOP state as the stronger explicit relation metrics.
+No proxy value is permitted under those frozen metric IDs.
 
-## B2 safety behavior
+## B3 implemented behavior
 
-- VALIDATION descriptors only;
-- TRAIN/TEST descriptors rejected;
-- invalid/abstain predictions remain in reports;
-- actual generated tokens determine sequence error;
-- available semantic/relation metrics receive zero credit for invalid output;
-- unsupported metrics remain non-numeric;
-- deterministic report fingerprint binds benchmark identity and B1 inference evidence;
-- full TR-POLY-02 result gate refuses admission while any metric is unsupported.
+TR-POLY-09B3 aggregates only checkpoint-bound B2 VALIDATION reports that share exactly one benchmark identity and one candidate identity.
 
-## Current interpretation
+The aggregation policy is `sample-macro-mean-v1`.
 
-B2 and B3 can diagnose sequence, pitch, duration, onset, voice, staff, accidental association and staff association quality. They cannot yet support a complete frozen-benchmark winner/promotion claim.
+B3 produces:
+
+- one overall VALIDATION slice;
+- separate `1_voice`, `2_voice`, `3_voice`, `4_plus_voice` slices when present;
+- explicit `missing_voice_strata` when coverage is incomplete;
+- separate observed robustness-bucket slices;
+- parse-success counts/rates;
+- mean/min/max for each available metric;
+- explicit unsupported metric coverage/reasons;
+- deterministic report fingerprint bound to exact sample-report fingerprints.
+
+Invalid/abstain outputs remain in the denominator because B2 keeps them as scored sample reports.
+
+## B3 fail-closed gates
+
+B3 rejects:
+
+- TRAIN or TEST evidence;
+- unbound checkpoint evidence;
+- mixed benchmark identities;
+- mixed candidate/checkpoint identities;
+- duplicate sample IDs;
+- unexpected strata/buckets;
+- mixed metric availability inside one aggregate.
+
+`common_comparison_ready` remains false while any required metric is unsupported or any required voice stratum is missing. Candidate comparison validates comparability only; it does not rank or select a winner.
+
+## What a green B3 merge means
+
+A green merge means the repository has deterministic infrastructure to summarize real VALIDATION evidence correctly. It does **not** mean the real checkpoint has already been run across the external VALIDATION artifacts or that accuracy numbers already exist.
+
+The actual measurement run still requires the frozen checkpoint and admitted native V2 VALIDATION image/target artifacts outside ordinary Git content.
 
 ## Next gate
 
-1. exact-head CI and merge for B2;
-2. B3 aggregation by 1/2/3/4+ voice strata and robustness bucket;
-3. preserve unsupported coverage and invalid outputs explicitly;
-4. independently admit the five missing metric surfaces before a complete TR-POLY-02 winner claim;
-5. keep TEST sealed throughout.
+1. merge B3 only after exact-head CI is green;
+2. freeze exact VALIDATION manifest/build + checkpoint identities;
+3. run B1 inference across every admitted VALIDATION sample;
+4. produce B2 per-sample reports;
+5. aggregate through B3 and inspect 1/2/3/4+ voice and robustness results;
+6. choose P09C refinement from measured failure strata only;
+7. keep TEST sealed throughout.
