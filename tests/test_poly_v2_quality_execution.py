@@ -57,7 +57,7 @@ _SMALL_MODEL = Poly2DTransformerConfig(
     decoder_layers=1,
     attention_heads=4,
     feedforward_dim=64,
-    max_target_tokens=512,
+    max_target_tokens=2048,
 )
 
 
