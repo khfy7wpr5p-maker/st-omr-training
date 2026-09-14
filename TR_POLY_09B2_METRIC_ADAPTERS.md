@@ -6,11 +6,9 @@ Status: implementation package; common benchmark execution and sealed TEST remai
 
 TR-POLY-09B1 established free-running Polyphonic V2 predictions without gold target prefixes. TR-POLY-09B2 adds the deterministic scoring bridge from one VALIDATION reference/prediction pair into the frozen TR-POLY-02 metric vocabulary.
 
-This package deliberately distinguishes **implemented metrics** from **declared-but-not-yet-admitted metrics**. It does not fabricate numeric values for metric surfaces that have no accepted implementation.
+The package distinguishes **exactly representable metrics** from metric names whose required relation/export structure is not present yet. It never fills an unsupported metric with a proxy number.
 
-## Admitted input boundary
-
-The metric adapter consumes exactly:
+## Input boundary
 
 ```text
 canonical PolyScore reference
@@ -24,13 +22,13 @@ VALIDATION BenchmarkSampleDescriptor
 versioned PolyV2SampleMetricReport
 ```
 
-TRAIN and TEST descriptors are rejected. The package opens no dataset bytes itself and authorizes no TEST access.
+TRAIN and TEST descriptors are rejected. B2 opens no dataset bytes itself and authorizes no TEST access.
 
 ## Metric status
 
-### Implemented
+### Available numeric metrics
 
-Serialization / prediction validity:
+Prediction validity:
 
 - `parse_success`
 
@@ -48,80 +46,64 @@ Musical semantic:
 - `voice_accuracy`
 - `staff_accuracy`
 
-Relations:
+Relations explicitly represented by V2 notehead data:
 
-- `notehead_stem_f1`
-- `beam_relation_f1`
-- `tie_relation_f1`
 - `accidental_note_f1`
 - `note_staff_f1`
 
 ### Explicitly unsupported in B2
 
-- `musicxml_validity` — no admitted deterministic Polyphonic V2 → MusicXML export/validation adapter is yet bound to this benchmark surface;
-- `tedn` — TR-POLY-02 reserves the metric name, but no exact TEDn algorithm/version/license implementation has yet been admitted in this repository.
+- `musicxml_validity` — no admitted deterministic Polyphonic V2 → MusicXML benchmark export/validation adapter;
+- `tedn` — no exact reviewed TEDn implementation/version/license surface admitted;
+- `notehead_stem_f1` — V2 stores event-level stem direction, not an explicit notehead↔stem relation object;
+- `beam_relation_f1` — V2 stores per-event beam marks, not an explicit cross-event beam relation identity;
+- `tie_relation_f1` — V2 stores START/STOP tie state on noteheads, not an explicit cross-event tie relation identity.
 
-Unsupported metrics remain present in the report with `availability=unsupported`, no numeric value and an explicit reason. Therefore the report cannot be promoted to a complete TR-POLY-02 metric result while either surface remains unsupported.
+Those states remain useful semantics, but treating them as the stronger frozen relation-F1 metrics would silently redefine TR-POLY-02. B2 refuses that shortcut.
+
+Every unsupported metric remains in the ordered report with `availability=unsupported`, no numeric value, and an explicit reason.
 
 ## Sequence policy
 
-Sequence comparison operates on the frozen V2 token IDs excluding the initial BOS. Unit-cost Levenshtein distance is deterministic.
-
-Definitions:
+Sequence comparison uses frozen V2 token IDs after BOS and deterministic unit-cost Levenshtein distance.
 
 ```text
 TER = edits / reference-token-count
 NED = edits / max(reference-token-count, prediction-token-count)
-exact_sequence_accuracy = 1 iff complete token-id tuples are equal, otherwise 0
+exact_sequence_accuracy = 1 iff complete token-id tuples are equal
 ```
 
-Free-running invalid/abstain predictions remain in the evaluation population. They are not dropped from reports.
+Invalid/abstain free-running outputs remain in the evaluation population.
 
-## Event alignment
+## Event alignment and semantic metrics
 
-Semantic and relation metrics use a versioned unit-cost deterministic event alignment inside corresponding part/measure positions.
+Semantic fields use a versioned deterministic event alignment inside corresponding part/measure positions. Arbitrary event/atom IDs do not drive matching.
 
-The alignment signature excludes arbitrary event/atom IDs and uses musical content such as:
+Reference-oriented numeric semantics are:
 
-- event kind;
-- onset and duration;
-- logical voice and staff;
-- visible note type;
-- pitch surface;
-- dots/stem;
-- beam/tuplet/grace metadata;
-- tie, accidental and cross-staff information.
+- sorted pitch spelling surface `(step, alter, octave)`;
+- exact rational duration;
+- exact rational onset;
+- logical voice;
+- event staff.
 
-Substitution is preferred on deterministic dynamic-programming ties before deletion/insertion.
+Missing predicted reference events receive zero correctness.
 
-## Semantic metrics
-
-Semantic accuracies are reference-oriented. A missing predicted event therefore contributes zero correctness for the corresponding reference event.
-
-Pitch is compared as the sorted event notehead spelling surface `(step, alter, octave)` rather than by arbitrary note IDs.
-
-Invalid/unparseable free-running outputs receive:
+For invalid/unparseable free-running output:
 
 - `parse_success = 0`;
-- sequence edit metrics from the actual generated token sequence;
-- semantic metrics = 0;
-- relation metrics = 0.
+- sequence metrics use the actual generated token sequence;
+- implemented semantic metrics = 0;
+- implemented relation metrics = 0;
+- unsupported metrics remain unsupported rather than becoming zero.
 
-This prevents invalid outputs from disappearing from aggregate benchmark evidence.
+## Exact relation metrics
 
-## Relation metrics
+`accidental_note_f1` compares explicit `(pitch, display_accidental)` associations.
 
-Relations are represented as deterministic multisets inside aligned events and scored by standard F1 over exact relation identities.
+`note_staff_f1` compares explicit `(pitch, effective_staff)` associations, including `staff_override` for cross-staff placement.
 
-Examples:
-
-- notehead ↔ stem direction;
-- beam level/state;
-- pitch ↔ tie state;
-- pitch ↔ visible accidental intent;
-- pitch ↔ effective staff, including `staff_override`.
-
-An empty reference and empty prediction relation set yields F1 = 1.0. Extra or missing relations are penalized through false positives/false negatives.
+They are scored with deterministic multiset F1 inside aligned events. An empty reference and empty prediction relation set yields F1 = 1.0; extra or missing relations contribute false positives/false negatives.
 
 ## Evidence identity
 
@@ -130,75 +112,61 @@ Every sample report binds:
 - sample SHA-256;
 - benchmark identity SHA-256;
 - B1 inference evidence SHA-256;
-- reference representation SHA-256;
-- prediction representation SHA-256 when parse-valid;
+- reference V2 SHA-256;
+- prediction V2 SHA-256 when parse-valid;
 - voice stratum;
 - robustness bucket;
-- metric adapter version;
+- metric-adapter version;
 - event-alignment version;
 - relation-metric version;
-- complete ordered metric availability/value surface.
+- every frozen metric ID with its availability/value/reason state.
 
-Changing the benchmark identity changes the report fingerprint even when prediction/reference content is unchanged.
+Changing benchmark identity changes report identity even when musical content is unchanged.
 
-## Full-contract admission gate
+## Full-contract gate
 
-`require_complete_required_metrics()` is deliberately fail-closed.
+`require_complete_required_metrics()` fails closed until every frozen TR-POLY-02 metric is numerically admitted.
 
-It can succeed only when every frozen TR-POLY-02 metric is numerically available and then passes `validate_required_metric_result(...)`.
-
-With B2 alone, it remains closed because `musicxml_validity` and `tedn` are unsupported.
-
-This distinction is important:
+Current state:
 
 ```text
 B2 partial/common metric evidence    ✅ available
-TR-POLY-02-complete metric record    🔒 not yet available
-benchmark winner claim               🔒 prohibited
+11 exact numeric metrics             ✅ available
+5 frozen metrics                     ⚠️ explicit UNSUPPORTED
+TR-POLY-02-complete metric record    🔒 unavailable
+winner / promotion claim             🔒 prohibited
 ```
 
 ## Regression coverage
 
-Tests cover:
+Tests verify:
 
-- exact prediction → perfect implemented metrics;
-- explicit unsupported MusicXML/TEDn surfaces;
-- full-contract gate refusal while unsupported metrics remain;
-- field-specific pitch/onset/voice errors;
-- relation-specific stem/beam/tie/accidental/staff errors;
-- invalid free-running output retained with zero semantic/relation credit;
-- deterministic report fingerprint;
-- benchmark-identity binding;
-- TRAIN and TEST descriptor rejection.
+- exact prediction → perfect exactly representable metrics;
+- all five unsupported surfaces are explicit and non-numeric;
+- stem/beam/tie states do not become proxy relation scores;
+- field-specific pitch/onset/voice errors remain visible;
+- explicit accidental/staff relation errors are scored;
+- invalid output remains in available metrics rather than being excluded;
+- deterministic report identity and benchmark binding;
+- TRAIN/TEST descriptor rejection;
+- full-contract admission refusal while unsupported metrics remain.
 
 ## Safety / non-claims
 
 TR-POLY-09B2 does not:
 
 - open TEST;
-- train or mutate any model;
-- select or promote a checkpoint;
-- implement or approximate TEDn;
+- train or mutate a model;
+- select/promote a checkpoint;
+- approximate TEDn under the TEDn metric ID;
 - fabricate MusicXML validity;
-- claim a benchmark winner;
+- reinterpret stem/beam/tie state as an explicit relation metric;
+- claim a complete benchmark winner;
 - modify ScoreMosaic;
 - grant production authority.
 
-## Exit condition
-
-The package may merge only after exact-head CI is green.
-
-A green merge means that free-running V2 evidence can be scored deterministically on the currently admitted subset of the frozen TR-POLY-02 metric surface. It does not mean the metric contract is complete or that the recognizer is accurate.
-
 ## Next gate
 
-TR-POLY-09B3 should add a common VALIDATION execution/report harness that:
+After exact-head CI and merge, TR-POLY-09B3 should aggregate B2 VALIDATION sample reports by 1/2/3/4+ voice strata and robustness bucket, preserve invalid/abstain samples, expose metric coverage, and refuse any complete winner/promotion field while frozen metrics remain unsupported.
 
-- consumes one exact BenchmarkIdentity;
-- aggregates B2 sample reports by 1/2/3/4+ voice strata and robustness bucket;
-- preserves invalid/abstain samples in denominators;
-- exposes metric coverage/unsupported counts;
-- refuses a complete winner/promotion decision while required metrics remain unsupported;
-- keeps TEST sealed.
-
-MusicXML validity and TEDn admission may be implemented as separate, independently reviewed packages before any final TR-POLY-02-complete comparison claim.
+MusicXML validity, notehead-stem relation, beam relation, tie relation and TEDn can be admitted later only through separate exact/versioned evidence surfaces.
