@@ -2,7 +2,7 @@
 
 Updated: 2026-09-14
 
-This document separates implemented capability from measured quality and preserves the dependency order toward a defensible Polyphonic V2 benchmark.
+This document separates implemented capability from measured quality and preserves the dependency order toward a defensible Polyphonic V2 model.
 
 ## Current chain
 
@@ -17,13 +17,18 @@ TR-POLY-04 deterministic external benchmark harness       ✅
 TR-POLY-05 Polyphonic Representation V2                   ✅
 TR-POLY-06 V2 parser/tokenizer/lossless roundtrip         ✅
 TR-POLY-07 research model registry                         ✅
-TR-POLY-08/08A/08B model + training + checkpoint          ✅ RESEARCH
+TR-POLY-08 tiny 2D Transformer                            ✅ RESEARCH
+TR-POLY-08A bounded trainer                               ✅ SMOKE ONLY (≤2 steps)
+TR-POLY-08B exact checkpoint persistence/reload            ✅
 TR-POLY-08C exact Stage 6 V1→V2 execution                 ✅
 TR-POLY-09A native explicit V2 materialization            ✅
 TR-POLY-09B1 free-running greedy inference                ✅ MERGED
 TR-POLY-09B2 deterministic metric/adaptor layer           ✅ MERGED
 TR-POLY-09B3 deterministic VALIDATION aggregation         ✅ IMPLEMENTED / MERGE GATE
-real checkpoint × VALIDATION execution                    🔄 NEXT
+smoke-checkpoint B1→B2→B3 sanity baseline                 🔄 OPTIONAL
+quality-training regime                                   🔒 REQUIRED
+first quality-trained candidate                           🔒
+quality VALIDATION benchmark                              🔒
 P09C evidence-driven refinement                           🔒
 missing metric admission                                  🔒 5 surfaces
 P09D final candidate freeze                               🔒
@@ -31,7 +36,7 @@ Stage 9 sealed TEST decision                              🔒
 Stage 10 ScoreMosaic shadow integration                   🔒
 ```
 
-## End-to-end measurement architecture
+## Measurement architecture
 
 ```text
 native V2 VALIDATION image + canonical target
@@ -50,7 +55,7 @@ B3 deterministic candidate aggregation
         └─ robustness buckets
 ```
 
-B1 removes teacher forcing. B2 provides honest per-sample metric evidence. B3 makes those sample reports comparable and inspectable without hiding failure cases.
+B1 removes teacher forcing. B2 provides per-sample metric evidence. B3 makes those reports deterministic and inspectable without hiding failure cases.
 
 ## B3 aggregation contract
 
@@ -64,19 +69,11 @@ B3 accepts only B2 reports that are:
 
 It rejects mixed benchmark identities, mixed candidate identities, duplicate sample IDs, unbound checkpoints and unexpected strata/buckets.
 
-### Frozen first aggregation policy
-
-`sample-macro-mean-v1`
-
-Every available metric is averaged equally over samples. B3 records mean/min/max plus coverage counts. It does not silently weight longer scores or larger families more heavily.
-
-A later pooled/micro policy, if needed, must receive its own version and evidence identity.
+The first aggregation policy is `sample-macro-mean-v1`. Every available metric is averaged equally over samples and reports mean/min/max plus coverage counts. A later pooled/micro policy must be separately versioned.
 
 ## Failure visibility
 
-Free-running invalid/abstain outputs remain in the B3 population because B2 already assigns them explicit sample reports.
-
-Therefore:
+Free-running invalid/abstain outputs remain in the B3 population because B2 emits explicit sample reports for them.
 
 ```text
 parse-invalid sample
@@ -84,22 +81,20 @@ parse-invalid sample
         = visible failed sample in aggregate evidence
 ```
 
-This prevents survivorship bias in parse success and available semantic metrics.
+This prevents survivorship bias.
 
-## Voice strata
+## Voice and robustness strata
 
-Required voice coverage remains:
+Required voice coverage:
 
 - `1_voice`
 - `2_voice`
 - `3_voice`
 - `4_plus_voice`
 
-B3 creates slices for observed strata and records any missing required strata explicitly. Missing voice coverage keeps the common-comparison gate closed.
+Missing required voice strata are explicit and keep the common-comparison gate closed.
 
-## Robustness buckets
-
-Observed buckets are kept separate:
+Observed robustness buckets remain separate:
 
 - `clean`
 - `scan`
@@ -107,8 +102,6 @@ Observed buckets are kept separate:
 - `blur`
 - `perspective`
 - `low_contrast`
-
-A global average may be reported but cannot replace the per-stratum evidence.
 
 ## Current metric coverage
 
@@ -136,50 +129,76 @@ A global average may be reported but cannot replace the per-stratum evidence.
 
 B3 propagates these as unsupported with explicit reasons and no numeric proxy.
 
+## Critical training-readiness boundary
+
+The current Polyphonic 2D trainer is intentionally limited by `MAX_POLY_2D_SMOKE_STEPS = 2`. This means the training/checkpoint chain is an infrastructure proof, not a converged training program.
+
+The existing smoke checkpoint can still be valuable for one purpose: verifying that the complete image → inference → metric → aggregation path works end to end.
+
+It cannot support claims such as:
+
+- expected architecture accuracy;
+- meaningful voice-separation quality;
+- production readiness;
+- comparison against mature OMR systems.
+
+Before model-quality measurement, a separately versioned quality-training regime must be implemented with:
+
+- TRAIN-only parameter updates;
+- meaningful bounded step/epoch budget;
+- deterministic batch/order policy;
+- checkpoint cadence and exact checkpoint selection;
+- read-only VALIDATION selection/evaluation;
+- early-stop or fixed-budget policy defined before execution;
+- resume/restart provenance;
+- no TEST access;
+- exact training-recipe fingerprint.
+
+Only after that regime produces a frozen candidate checkpoint should B1→B2→B3 numbers be interpreted as model-quality evidence.
+
 ## Common comparison gate
 
-B3 exposes comparability validation but no winner selection.
+B3 validates comparability but does not rank candidates.
 
-A candidate report becomes `common_comparison_ready` only when:
+A report becomes `common_comparison_ready` only when:
 
-1. the candidate is checkpoint-bound;
+1. candidate evidence is checkpoint-bound;
 2. all required voice strata are represented;
 3. every frozen TR-POLY-02 metric is numerically admitted.
 
-Two or more candidate reports may then be considered comparable only when they also share the exact benchmark identity and exact VALIDATION sample IDs.
+Multiple candidates additionally require identical benchmark identity and exact VALIDATION sample IDs.
 
-Today this gate remains closed because five metrics are unsupported. Partial diagnostic VALIDATION evidence is still permitted and is sufficient to guide P09C refinement.
+Today this gate remains closed because five metrics are unsupported. Partial diagnostic VALIDATION evidence remains useful for P09C once a quality-trained candidate exists.
 
-## Real execution after B3 merge
-
-B3 infrastructure alone does not produce real model quality numbers. The next execution package/run must bind the actual external artifacts:
+## Recommended execution order
 
 ```text
-exact native V2 VALIDATION manifest/build
-        +
-exact verified checkpoint
+B3 exact-head CI + merge
         ↓
-for each VALIDATION sample:
-    image → B1 → B2 report
+optional current smoke checkpoint sanity run
         ↓
-all sample reports → B3 aggregate
+quality-training contract + implementation
         ↓
-measured failure strata
+train first native-V2 candidate on TRAIN
+        ↓
+freeze exact checkpoint + recipe identity
+        ↓
+quality VALIDATION B1→B2→B3
+        ↓
+P09C evidence-driven refinement
+        ↓
+missing metric admission / complete comparison surface
+        ↓
+P09D candidate + evaluation recipe freeze
+        ↓
+Stage 9 one-shot sealed TEST decision
+        ↓
+Stage 10 independent ScoreMosaic shadow gate
 ```
-
-The resulting report should answer:
-
-- Does the model parse reliably?
-- How large is token error?
-- Are pitches correct?
-- Are durations/onsets correct?
-- Does voice separation collapse as polyphony increases?
-- Are notes assigned to the correct staff?
-- Are scan/phone/blur domains weaker than clean data?
 
 ## P09C decision policy
 
-Use measured evidence rather than model-size intuition:
+Use measured quality evidence rather than model-size intuition:
 
 ```text
 high parse failure       → decoder/search diagnosis
@@ -203,31 +222,12 @@ Before a complete TR-POLY-02 winner/promotion claim, separately implement and re
 4. explicit cross-event tie relation representation/adapter;
 5. exact TEDn algorithm/dependency/license/version surface.
 
-These packages should not modify model weights merely to complete the reporting surface.
-
-## Final order
-
-```text
-B3 exact-head CI + merge
-        ↓
-real B1→B2→B3 VALIDATION execution
-        ↓
-P09C evidence-driven TRAIN/VALIDATION refinement
-        ↓
-missing metric admission / complete comparison surface
-        ↓
-P09D candidate + evaluation recipe freeze
-        ↓
-Stage 9 one-shot sealed TEST decision
-        ↓
-Stage 10 independent ScoreMosaic shadow gate
-```
-
 ## Safety invariants
 
 - TEST remains sealed until Stage 9.
 - TRAIN is the only parameter-updating split.
 - VALIDATION is read-only evidence.
+- Smoke checkpoint evidence cannot be relabeled as quality-trained evidence.
 - Unsupported metrics cannot receive proxy values under frozen IDs.
 - Invalid/abstain outputs remain visible in denominators.
 - Different benchmark/candidate identities cannot be mixed.
@@ -237,4 +237,4 @@ Stage 10 independent ScoreMosaic shadow gate
 
 ## Immediate next action
 
-Finish TR-POLY-09B3 exact-head CI/merge. Then execute the exact checkpoint over the admitted native V2 VALIDATION artifacts and aggregate the resulting B1/B2 evidence through B3. Use those measured strata—not assumptions—to choose P09C refinement. TEST remains sealed.
+Finish TR-POLY-09B3 exact-head CI/merge. Then establish the quality-training contract and execution path before treating VALIDATION metrics as model-quality evidence. A smoke-checkpoint B1→B2→B3 run is optional and may be used only as a pipeline sanity baseline. TEST remains sealed.
