@@ -6,12 +6,13 @@ This file is the current stage-status source for the repository. `ARCHITECTURE.m
 
 ## Current repository phase
 
-- protected branch: `main`
-- reviewed main head: `6a6bf1e1faf0149ebd097a310536076b77feac65`
-- latest merged package: PR #153 — TR-POLY-09A native Polyphonic V2 dataset materialization
+- protected-main baseline for this package: `2bb0ac23e11fb953bb3ada4aaef6369073b7e1f1`
+- latest previously merged technical package: PR #153 — TR-POLY-09A native Polyphonic V2 dataset materialization
+- PR #154 architecture refresh: merged
+- active package: TR-POLY-09B1 bounded free-running greedy inference
 - current top-level lane: Polyphonic V2 candidate measurement readiness
-- next comparative gate: TR-POLY-09B common benchmark
-- immediate missing capability before valid comparison: free-running Polyphonic V2 inference / semantic decoding
+- next implementation after TR-POLY-09B1: TR-POLY-09B2 deterministic metric/adaptor support
+- next comparative execution: TR-POLY-09B3 common VALIDATION benchmark
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
 
@@ -35,13 +36,14 @@ This file is the current stage-status source for the repository. `ARCHITECTURE.m
 | TR-POLY-08B | Exact checkpoint persistence/reload | ✅ Implemented |
 | TR-POLY-08C | Exact Stage 6 V1→V2 artifact execution | ✅ Closed / single-voice evidence only |
 | TR-POLY-09A | Native explicit Polyphonic V2 dataset/materialization | ✅ Merged on protected main |
-| Polyphonic V2 inference | Free-running greedy decode + semantic validation | 🔄 Next required capability |
-| TR-POLY-09B | Common comparable VALIDATION benchmark | 🔒 Next gate |
+| TR-POLY-09B1 | Free-running greedy decode + strict V2 semantic validation | ✅ Implemented in active package / merge gate pending |
+| TR-POLY-09B2 | Deterministic common metric implementations/adapters | 🔄 Next after B1 merge |
+| TR-POLY-09B3 | Common comparable VALIDATION benchmark | 🔒 After B2 |
 | Polyphonic refinement | Evidence-driven TRAIN/VALIDATION refinement | 🔒 After benchmark |
 | Stage 9 sealed TEST | Final held-out candidate decision | 🔒 TEST sealed |
 | Stage 10 | Separate ScoreMosaic shadow/integration gate | 🔒 Not started |
 
-## Latest completed architecture chain
+## Latest architecture chain
 
 ```text
 TR-POLY-02 evaluation contract
@@ -65,48 +67,51 @@ TR-POLY-08B checkpoint/reload
 TR-POLY-08C exact Stage 6 V1→V2 execution
         ↓
 TR-POLY-09A native Polyphonic V2 materialization
+        ↓
+TR-POLY-09B1 free-running greedy inference + strict semantic validation
 ```
 
-## TR-POLY-09A accepted scope
+## TR-POLY-09B1 scope
 
-The merged native V2 path admits explicit canonical Polyphonic V2 TRAIN/VALIDATION targets and grayscale PNG artifacts through hash-bound manifests/build identities into the existing 2D training/checkpoint chain.
-
-The contract includes explicit polyphonic coverage gates for voice 2 and corpus-level voice 3 / voice 4+ cases, structural chord-vs-independent-voice distinction, exact onset/duration/staff/voice preservation, lossless tokenizer roundtrip, family leakage protection, semantic truncation rejection and sealed-TEST non-access.
-
-It does not claim recognition accuracy, benchmark superiority, production readiness or ScoreMosaic authority.
-
-## Current blocker before TR-POLY-09B
-
-The Polyphonic V2 model has teacher-forced training/forward execution but no current free-running Polyphonic V2 inference contract.
-
-A common benchmark must score predictions generated from image input without gold target prefixes. Therefore the next implementation should add bounded deterministic greedy decoding and strict V2 semantic validation before any comparative benchmark result is considered valid.
-
-Minimum exit criteria:
+The package closes the teacher-forcing gap required before end-to-end OMR comparison.
 
 ```text
-admitted image + exact checkpoint
+one admitted image
         ↓
-free-running greedy token generation
+2D visual memory computed once
         ↓
-EOS / bounded termination
+BOS-only prefix
         ↓
-V2 detokenize + strict parse
+deterministic greedy token generation
         ↓
-canonical prediction OR explicit invalid/abstain
+EOS / invalid-control / max-step termination
         ↓
-provenance-bound VALIDATION evidence
+strict V2 reconstruction
+        ↓
+canonical prediction OR explicit invalid/abstain evidence
 ```
 
-## Recommended next order
+The model does not receive a gold target prefix. Generated PAD or a second BOS fails closed rather than being silently masked. Decode-limit exhaustion does not fabricate EOS. EOS is accepted only if strict V2 detokenization/parser validation succeeds.
 
-1. Freeze exact candidate/checkpoint/tokenizer/dataset/benchmark identities.
-2. Implement bounded Polyphonic V2 free-running greedy inference.
-3. Complete/admit deterministic benchmark metric implementations and adapters required by TR-POLY-02.
-4. Run common VALIDATION benchmark on identical benchmark identities with separate 1/2/3/4+ voice strata.
-5. Perform validation-only error decomposition and make only evidence-supported model/data changes.
-6. Freeze final candidate, preprocessing, decoder, metrics and abstention policy.
-7. Open sealed TEST once for the final Stage 9 decision.
-8. If accepted, enter a separate ScoreMosaic shadow/integration gate; do not grant automatic production authority.
+The inference path preserves model state and binds exact model/tokenizer/runtime identity. When called through the verified checkpoint wrapper it additionally binds checkpoint, metadata, receipt, dataset-manifest, preprocessing, trainer, provenance, registry and repository identities.
+
+This is measurement infrastructure, not quality evidence. No accuracy or benchmark claim is made by implementing inference.
+
+## Next required capability
+
+TR-POLY-09B2 should connect free-running predictions and references to the frozen TR-POLY-02 evaluation contract.
+
+Priority order:
+
+1. serialization/parse result mapping;
+2. token sequence metrics;
+3. pitch/duration/onset/voice/staff semantic metrics;
+4. relation metrics where the representation supplies both prediction and reference relations;
+5. structural metric only after the exact algorithm/license surface is versioned and admitted.
+
+Unavailable metrics must remain explicitly unsupported; they must not be guessed or synthesized.
+
+After B2 is green, TR-POLY-09B3 may run the first common VALIDATION benchmark with separate 1/2/3/4+ voice strata.
 
 ## Safety boundaries
 
@@ -122,4 +127,4 @@ provenance-bound VALIDATION evidence
 
 ## Next gate
 
-Implement the bounded Polyphonic V2 free-running inference/semantic-decoding contract, then enter TR-POLY-09B common VALIDATION benchmarking under the frozen TR-POLY-02 benchmark identity.
+Merge TR-POLY-09B1 only after exact-head CI is green. Then implement TR-POLY-09B2 metric/adaptor support and proceed to the TR-POLY-09B3 common VALIDATION benchmark. TEST remains sealed.
