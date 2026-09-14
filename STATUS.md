@@ -2,17 +2,14 @@
 
 Updated: 2026-09-14
 
-This file is the current stage-status source for the repository. `ARCHITECTURE.md` keeps the long-form historical architecture; `ARCHITECTURE_CURRENT.md` and `ARCHITECTURE_POLYPHONIC_V2_CURRENT.md` describe the active lane.
+This is the current stage-status source. `ARCHITECTURE.md` preserves historical detail; `ARCHITECTURE_CURRENT.md` and `ARCHITECTURE_POLYPHONIC_V2_CURRENT.md` describe the active lane.
 
 ## Current repository phase
 
-- protected-main baseline for this package: `2bb0ac23e11fb953bb3ada4aaef6369073b7e1f1`
-- latest previously merged technical package: PR #153 — TR-POLY-09A native Polyphonic V2 dataset materialization
-- PR #154 architecture refresh: merged
-- active package: TR-POLY-09B1 bounded free-running greedy inference
-- current top-level lane: Polyphonic V2 candidate measurement readiness
-- next implementation after TR-POLY-09B1: TR-POLY-09B2 deterministic metric/adaptor support
-- next comparative execution: TR-POLY-09B3 common VALIDATION benchmark
+- protected `main`: `58c27b5403301fe478c9b6c8351682c8f8bf1624`
+- latest merged package: PR #155 — TR-POLY-09B1 bounded free-running V2 inference
+- active package: TR-POLY-09B2 deterministic V2 metric/adaptor support
+- next execution package: TR-POLY-09B3 common VALIDATION aggregation/reporting
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
 
@@ -22,109 +19,92 @@ This file is the current stage-status source for the repository. `ARCHITECTURE.m
 |---|---|---|
 | 0–6 | Deterministic symbolic → rendered → validated synthetic dataset pipeline | ✅ Closed / preserved |
 | 7-A/B/C | Baseline tokenizer/model/trainer + bounded baseline evidence | ✅ Closed / historical baseline |
-| 7-D specialist lane | Staff/structure/local specialist architecture and evidence | ✅ Historical evidence / not current top-level lane |
+| 7-D specialist lane | Staff/structure/local specialist evidence | ✅ Historical evidence |
 | 8-0/1/2 | Real-data rights, intake and paired-run contracts | ✅ Closed / preserved |
-| 8-3 real-data execution | Real pilot execution path | ⏸ Not current priority |
-| TR-POLY-02 | Polyphonic evaluation taxonomy + benchmark identity | ✅ Closed |
+| 8-3 | Real pilot execution | ⏸ Not current priority |
+| TR-POLY-02 | Evaluation taxonomy + benchmark identity | ✅ Closed / frozen contract |
 | TR-POLY-03 | External dataset/license registry | ✅ Closed |
 | TR-POLY-04 | Deterministic external benchmark harness | ✅ Closed |
 | TR-POLY-05 | Polyphonic Representation V2 | ✅ Closed / frozen |
 | TR-POLY-06 | V2 parser/tokenizer/lossless roundtrip | ✅ Closed |
 | TR-POLY-07 | Research model registry | ✅ Closed |
-| TR-POLY-08 | Tiny 2D Transformer architecture | ✅ Implemented / research |
-| TR-POLY-08A | Bounded training + provenance | ✅ Implemented |
-| TR-POLY-08B | Exact checkpoint persistence/reload | ✅ Implemented |
-| TR-POLY-08C | Exact Stage 6 V1→V2 artifact execution | ✅ Closed / single-voice evidence only |
-| TR-POLY-09A | Native explicit Polyphonic V2 dataset/materialization | ✅ Merged on protected main |
-| TR-POLY-09B1 | Free-running greedy decode + strict V2 semantic validation | ✅ Implemented in active package / merge gate pending |
-| TR-POLY-09B2 | Deterministic common metric implementations/adapters | 🔄 Next after B1 merge |
-| TR-POLY-09B3 | Common comparable VALIDATION benchmark | 🔒 After B2 |
-| Polyphonic refinement | Evidence-driven TRAIN/VALIDATION refinement | 🔒 After benchmark |
-| Stage 9 sealed TEST | Final held-out candidate decision | 🔒 TEST sealed |
-| Stage 10 | Separate ScoreMosaic shadow/integration gate | 🔒 Not started |
+| TR-POLY-08/08A/08B | 2D Transformer + bounded training + checkpoint contract | ✅ Implemented / research |
+| TR-POLY-08C | Exact Stage 6 V1→V2 execution | ✅ Closed / single-voice evidence only |
+| TR-POLY-09A | Native explicit V2 dataset/materialization | ✅ Merged |
+| TR-POLY-09B1 | Free-running greedy inference + strict semantic validation | ✅ Merged / CI green |
+| TR-POLY-09B2 | Deterministic V2 metric/adaptor support | ✅ Implemented in active package / merge gate pending |
+| TR-POLY-09B3 | Common VALIDATION aggregation/report | 🔄 Next after B2 merge |
+| Full TR-POLY-02 metric completeness | Includes MusicXML validity + TEDn | 🔒 Blocked until exact adapters admitted |
+| P09C | Evidence-driven TRAIN/VALIDATION refinement | 🔒 After benchmark evidence |
+| Stage 9 | Final sealed TEST decision | 🔒 TEST sealed |
+| Stage 10 | ScoreMosaic shadow/integration | 🔒 Not started |
 
-## Latest architecture chain
+## B1 completed
 
-```text
-TR-POLY-02 evaluation contract
-        ↓
-TR-POLY-03 rights/license registry
-        ↓
-TR-POLY-04 external benchmark harness
-        ↓
-TR-POLY-05 structured Polyphonic V2
-        ↓
-TR-POLY-06 parser/tokenizer/roundtrip
-        ↓
-TR-POLY-07 model registry
-        ↓
-TR-POLY-08 2D Transformer
-        ↓
-TR-POLY-08A bounded training/provenance
-        ↓
-TR-POLY-08B checkpoint/reload
-        ↓
-TR-POLY-08C exact Stage 6 V1→V2 execution
-        ↓
-TR-POLY-09A native Polyphonic V2 materialization
-        ↓
-TR-POLY-09B1 free-running greedy inference + strict semantic validation
-```
+PR #155 passed exact-head CI and merged at:
 
-## TR-POLY-09B1 scope
+`58c27b5403301fe478c9b6c8351682c8f8bf1624`
 
-The package closes the teacher-forcing gap required before end-to-end OMR comparison.
+The current candidate can now generate V2 tokens from BOS alone without gold-prefix teacher forcing, strictly parse EOS-complete output, expose invalid/abstain states and bind inference to exact model/checkpoint/provenance identity.
+
+## B2 implemented metric surface
+
+B2 currently implements deterministic numeric evidence for:
 
 ```text
-one admitted image
-        ↓
-2D visual memory computed once
-        ↓
-BOS-only prefix
-        ↓
-deterministic greedy token generation
-        ↓
-EOS / invalid-control / max-step termination
-        ↓
-strict V2 reconstruction
-        ↓
-canonical prediction OR explicit invalid/abstain evidence
+parse_success
+ter
+normalized_edit_distance
+exact_sequence_accuracy
+pitch_accuracy
+duration_accuracy
+onset_accuracy
+voice_accuracy
+staff_accuracy
+notehead_stem_f1
+beam_relation_f1
+tie_relation_f1
+accidental_note_f1
+note_staff_f1
 ```
 
-The model does not receive a gold target prefix. Generated PAD or a second BOS fails closed rather than being silently masked. Decode-limit exhaustion does not fabricate EOS. EOS is accepted only if strict V2 detokenization/parser validation succeeds.
+Every report also carries all frozen TR-POLY-02 metric IDs. The two not yet safely implemented are retained as explicit unsupported observations:
 
-The inference path preserves model state and binds exact model/tokenizer/runtime identity. When called through the verified checkpoint wrapper it additionally binds checkpoint, metadata, receipt, dataset-manifest, preprocessing, trainer, provenance, registry and repository identities.
+```text
+musicxml_validity  -> v2_musicxml_export_adapter_not_admitted
+tedn               -> tedn_implementation_not_admitted
+```
 
-This is measurement infrastructure, not quality evidence. No accuracy or benchmark claim is made by implementing inference.
+No zero, one, proxy, or placeholder value is substituted for either missing metric.
 
-## Next required capability
+## B2 scoring behavior
 
-TR-POLY-09B2 should connect free-running predictions and references to the frozen TR-POLY-02 evaluation contract.
+- only VALIDATION descriptors are accepted;
+- TEST descriptors are rejected;
+- invalid/abstain B1 predictions are retained rather than filtered out;
+- invalid output receives parse success 0 and zero semantic/relation credit while sequence metrics use the actual generated tokens;
+- sequence edit distance is deterministic unit-cost Levenshtein;
+- semantic fields use versioned deterministic event alignment;
+- relation metrics use exact multiset F1 inside aligned events;
+- report identity binds benchmark identity and inference evidence;
+- a full required-metric record fails closed while any metric is unsupported.
 
-Priority order:
+## Current interpretation boundary
 
-1. serialization/parse result mapping;
-2. token sequence metrics;
-3. pitch/duration/onset/voice/staff semantic metrics;
-4. relation metrics where the representation supplies both prediction and reference relations;
-5. structural metric only after the exact algorithm/license surface is versioned and admitted.
+A B2/B3 report may answer questions such as:
 
-Unavailable metrics must remain explicitly unsupported; they must not be guessed or synthesized.
+- does the candidate parse successfully?;
+- how large is token edit error?;
+- are pitch, duration, onset, voice and staff correct?;
+- which relation families fail?;
+- which voice stratum is weakest?;
 
-After B2 is green, TR-POLY-09B3 may run the first common VALIDATION benchmark with separate 1/2/3/4+ voice strata.
-
-## Safety boundaries
-
-- No automatic TEST access before the final Stage 9 gate.
-- TRAIN is the only split allowed to update parameters.
-- VALIDATION may guide bounded development but must not mutate model state during evaluation.
-- External data must pass rights/license/install-pin admission.
-- ScoreMosaic uploads and teacher corrections are not automatic training data.
-- Large datasets/checkpoints stay outside ordinary Git content.
-- Candidate artifacts remain exact hash/provenance bound.
-- Deterministic musical validators retain veto authority.
-- Historical specialist evidence is preserved and must not be silently rewritten as current benchmark evidence.
+It may **not** yet claim a complete TR-POLY-02 benchmark winner because MusicXML validity and TEDn are not admitted.
 
 ## Next gate
 
-Merge TR-POLY-09B1 only after exact-head CI is green. Then implement TR-POLY-09B2 metric/adaptor support and proceed to the TR-POLY-09B3 common VALIDATION benchmark. TEST remains sealed.
+1. exact-head CI and merge for TR-POLY-09B2;
+2. implement TR-POLY-09B3 deterministic VALIDATION aggregation/reporting by voice stratum and robustness bucket;
+3. preserve unsupported metric coverage explicitly;
+4. separately admit MusicXML validity and TEDn before any complete winner/promotion claim;
+5. keep TEST sealed throughout.
