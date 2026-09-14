@@ -9,6 +9,7 @@ This file records the active architecture lane. `ARCHITECTURE.md` remains the lo
 - protected `main`: `79c2631682ebdb3b2be30c146a191e3ef8183ad0`
 - latest merged package: PR #156 — TR-POLY-09B2 deterministic V2 metric/adaptor layer
 - active package: TR-POLY-09B3 deterministic VALIDATION aggregation/reporting
+- current Poly2D trainer: bounded smoke harness, maximum 2 update steps
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
 
@@ -19,9 +20,9 @@ Polyphonic Representation V2                         ✅ FROZEN
         ↓
 V2 parser / tokenizer / lossless roundtrip          ✅
         ↓
-Tiny 2D Transformer + bounded trainer               ✅ RESEARCH
+Tiny 2D Transformer                                 ✅ RESEARCH
         ↓
-Exact checkpoint persistence/reload                  ✅
+Bounded ≤2-step smoke trainer + checkpoint          ✅ INFRASTRUCTURE
         ↓
 Native explicit Polyphonic V2 TRAIN/VALIDATION      ✅ TR-POLY-09A
         ↓
@@ -33,7 +34,13 @@ Deterministic per-sample metric/adaptor surface      ✅ TR-POLY-09B2
         ↓
 Deterministic VALIDATION aggregation                 ✅ IMPLEMENTED — TR-POLY-09B3
         ↓
-Real checkpoint × VALIDATION execution               🔄 NEXT EXECUTION GATE
+Smoke checkpoint VALIDATION sanity run               🔄 OPTIONAL NEXT EXECUTION
+        ↓
+Versioned quality-training regime                    🔒 REQUIRED FOR QUALITY CLAIMS
+        ↓
+First quality-trained checkpoint                     🔒
+        ↓
+Real quality VALIDATION B1→B2→B3                    🔒
         ↓
 Evidence-driven P09C refinement                      🔒
         ↓
@@ -46,7 +53,7 @@ Separate ScoreMosaic shadow/integration              🔒
 
 ## What B3 adds
 
-B3 does not create new model predictions. It consumes B2 sample reports and creates one deterministic candidate-level VALIDATION report.
+B3 consumes B2 sample reports and creates one deterministic candidate-level VALIDATION report.
 
 ```text
 checkpoint-bound B2 sample reports
@@ -65,13 +72,28 @@ sample-macro aggregation
         └─ unsupported-metric coverage
 ```
 
-### Frozen aggregation policy
-
-`sample-macro-mean-v1`
-
-For each available metric B3 records sample count, mean, minimum and maximum. It does not introduce hidden weighting by token count, score length, family size or note count.
+The first aggregation policy is frozen as `sample-macro-mean-v1`. For each available metric B3 records sample count, mean, minimum and maximum. It does not introduce hidden weighting by token count, score length, family size or note count.
 
 Invalid/abstain outputs remain in the population because B2 emits them as scored sample reports rather than dropping them.
+
+## Training-readiness boundary
+
+The current `Poly2DTrainingConfig` caps training at two smoke steps. Therefore existing checkpoint support demonstrates:
+
+- deterministic parameter updates;
+- TRAIN/VALIDATION split enforcement;
+- checkpoint persistence and reload;
+- provenance binding;
+- inference and metric compatibility.
+
+It does **not** demonstrate a converged or quality-trained OMR candidate.
+
+Accordingly, B3 has two distinct uses:
+
+1. **sanity baseline now** — run the current smoke checkpoint through B1→B2→B3 to validate the end-to-end measurement path;
+2. **quality benchmark later** — first implement a separately versioned TRAIN-only multi-step/epoch training regime, train/freeze a candidate, then run the same B1→B2→B3 path on VALIDATION.
+
+Smoke-checkpoint numbers must never be presented as the architecture's expected quality ceiling.
 
 ## Identity and leakage protections
 
@@ -89,7 +111,7 @@ The final B3 fingerprint binds exact sorted sample IDs and exact B2 sample-repor
 
 ## Voice and robustness reporting
 
-The required voice strata remain:
+Required voice strata:
 
 ```text
 1_voice
@@ -98,9 +120,9 @@ The required voice strata remain:
 4_plus_voice
 ```
 
-Missing strata are not silently ignored; they are recorded in `missing_voice_strata` and keep the common-comparison gate closed.
+Missing strata are recorded in `missing_voice_strata` and keep the common-comparison gate closed.
 
-Observed robustness buckets are reported separately from the frozen set:
+Observed robustness buckets are reported separately:
 
 ```text
 clean
@@ -113,9 +135,7 @@ low_contrast
 
 ## Metric coverage boundary
 
-B2/B3 currently expose 11 numeric frozen metrics and five explicit unsupported metrics.
-
-Available:
+Available numeric metrics:
 
 ```text
 parse_success
@@ -131,7 +151,7 @@ accidental_note_f1
 note_staff_f1
 ```
 
-Unsupported:
+Explicitly unsupported:
 
 ```text
 musicxml_validity
@@ -141,49 +161,47 @@ beam_relation_f1
 tie_relation_f1
 ```
 
-B3 preserves unsupported status and reasons. Unsupported metrics are never averaged as zero and never receive proxy values.
+Unsupported metrics are never averaged as zero and never receive proxy values.
 
 ## Comparison boundary
 
-B3 can validate whether multiple candidate reports are comparable, but it does not rank candidates.
+B3 can validate comparability but does not rank candidates. A complete common-comparison gate requires checkpoint-bound evidence, all required voice strata, all frozen TR-POLY-02 metrics numerically admitted, and identical benchmark/sample identities across candidates.
 
-A complete common-comparison gate requires:
+Because five metrics remain unsupported, complete winner/promotion claims remain closed.
 
-- checkpoint-bound candidate evidence;
-- all required voice strata;
-- all frozen TR-POLY-02 metrics numerically admitted;
-- identical benchmark identity and exact VALIDATION sample set across candidates.
-
-Because five metrics remain unsupported, complete winner/promotion claims remain closed even after B3 infrastructure is green.
-
-## Real measurement after B3
-
-The next meaningful work is execution, not another model redesign:
+## Recommended development order
 
 ```text
-freeze checkpoint + VALIDATION manifest/build
+B3 exact-head CI + merge
         ↓
-run B1 on every VALIDATION image
+optional smoke B1→B2→B3 sanity baseline
         ↓
-produce one B2 report per sample
+versioned quality-training regime (TRAIN only)
         ↓
-aggregate through B3
+train + freeze first quality candidate
         ↓
-inspect measured failure strata
+quality VALIDATION B1→B2→B3
         ↓
-choose P09C refinement only from evidence
+P09C evidence-driven refinement
+        ↓
+missing metric admission / complete comparison surface
+        ↓
+P09D candidate + evaluation recipe freeze
+        ↓
+Stage 9 one-shot sealed TEST decision
+        ↓
+Stage 10 independent ScoreMosaic shadow gate
 ```
-
-This is where real pitch, duration, onset, voice, staff and robustness numbers will appear.
 
 ## Safety invariants
 
 - TEST remains sealed until Stage 9.
 - TRAIN alone may update parameters.
 - VALIDATION evaluation is read-only.
-- Invalid/abstain outputs must remain in denominators.
-- Unsupported metrics must not receive proxy numbers under frozen metric IDs.
-- Different benchmark/candidate identities must never be mixed in one aggregate.
+- Invalid/abstain outputs remain in denominators.
+- Unsupported metrics cannot receive proxies under frozen IDs.
+- Different benchmark/candidate identities cannot be mixed.
+- Smoke evidence cannot be relabeled as quality-trained evidence.
 - External data still requires rights/license/install-pin admission.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
 - Candidate artifacts and reports remain hash/provenance bound.
@@ -191,4 +209,4 @@ This is where real pitch, duration, onset, voice, staff and robustness numbers w
 
 ## Next gate
 
-Merge TR-POLY-09B3 only after exact-head CI is green. Then execute the frozen checkpoint against the admitted native V2 VALIDATION artifacts, produce B1→B2→B3 evidence, and use those measured strata to choose P09C. Do not open TEST or claim a complete benchmark winner while any frozen metric remains unsupported.
+Merge TR-POLY-09B3 only after exact-head CI is green. Then either run the current checkpoint strictly as a sanity baseline or proceed directly to a separately versioned quality-training regime. A model-quality VALIDATION claim requires the latter. TEST remains sealed.
