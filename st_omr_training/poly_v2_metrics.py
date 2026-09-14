@@ -1,10 +1,9 @@
 """Deterministic metric/adaptor layer for free-running Polyphonic V2 evidence.
 
 TR-POLY-09B2 maps one VALIDATION reference plus one TR-POLY-09B1 prediction to
-the frozen TR-POLY-02 metric vocabulary. Metrics that do not yet have an
-admitted implementation remain explicitly UNSUPPORTED; this module never
-fabricates TEDn or MusicXML validity values just to satisfy the required-metric
-shape.
+the frozen TR-POLY-02 metric vocabulary. Metrics without an exact admitted
+implementation remain explicitly UNSUPPORTED. No proxy inherits a frozen metric
+identifier merely because related state exists in the V2 representation.
 """
 
 from __future__ import annotations
@@ -38,8 +37,14 @@ from .polyphonic_serialization import BOS_TOKEN_ID, tokenize_polyphonic_score
 POLY_V2_METRIC_ADAPTER_VERSION: Final[str] = "st-omr-poly-v2-metric-adapter-v1"
 POLY_V2_EVENT_ALIGNMENT_VERSION: Final[str] = "st-omr-poly-v2-event-alignment-v1"
 POLY_V2_RELATION_METRIC_VERSION: Final[str] = "st-omr-poly-v2-relation-metrics-v1"
-UNSUPPORTED_MUSICXML_REASON: Final[str] = "v2_musicxml_export_adapter_not_admitted"
-UNSUPPORTED_TEDN_REASON: Final[str] = "tedn_implementation_not_admitted"
+
+UNSUPPORTED_METRIC_REASONS: Final[dict[str, str]] = {
+    "musicxml_validity": "v2_musicxml_export_adapter_not_admitted",
+    "tedn": "tedn_implementation_not_admitted",
+    "notehead_stem_f1": "explicit_notehead_stem_relation_not_represented_in_v2",
+    "beam_relation_f1": "explicit_cross_event_beam_relation_not_represented_in_v2",
+    "tie_relation_f1": "explicit_cross_event_tie_relation_not_represented_in_v2",
+}
 
 
 class PolyV2MetricError(ValueError):
@@ -74,8 +79,6 @@ def _finite_number(value: object, name: str) -> float:
 
 
 def _levenshtein(left: tuple[object, ...], right: tuple[object, ...]) -> int:
-    """Deterministic unit-cost Levenshtein distance with O(min(m,n)) memory."""
-
     if len(left) < len(right):
         left, right = right, left
     previous = list(range(len(right) + 1))
@@ -141,11 +144,14 @@ class PolyV2SampleMetricReport:
                 or any(character not in "0123456789abcdef" for character in value)
             ):
                 raise PolyV2MetricError(f"{name} must be lowercase SHA-256 text")
-        if self.prediction_representation_sha256 is not None and (
-            len(self.prediction_representation_sha256) != 64
-            or any(character not in "0123456789abcdef" for character in self.prediction_representation_sha256)
-        ):
-            raise PolyV2MetricError("prediction_representation_sha256 must be SHA-256 when present")
+        if self.prediction_representation_sha256 is not None:
+            value = self.prediction_representation_sha256
+            if (
+                not isinstance(value, str)
+                or len(value) != 64
+                or any(character not in "0123456789abcdef" for character in value)
+            ):
+                raise PolyV2MetricError("prediction_representation_sha256 must be SHA-256 when present")
         if not isinstance(self.voice_stratum, str) or not self.voice_stratum:
             raise PolyV2MetricError("voice_stratum must be non-empty text")
         if not isinstance(self.robustness_bucket, str) or not self.robustness_bucket:
@@ -154,9 +160,7 @@ class PolyV2SampleMetricReport:
             not isinstance(item, MetricObservation) for item in self.observations
         ):
             raise PolyV2MetricError("observations must be an immutable MetricObservation tuple")
-        expected = required_metric_ids()
-        actual = tuple(item.metric_id for item in self.observations)
-        if actual != expected:
+        if tuple(item.metric_id for item in self.observations) != required_metric_ids():
             raise PolyV2MetricError("observations must contain every frozen metric exactly once in contract order")
         if self.adapter_version != POLY_V2_METRIC_ADAPTER_VERSION:
             raise PolyV2MetricError("metric adapter version mismatch")
@@ -206,7 +210,9 @@ class PolyV2SampleMetricReport:
     def fingerprint(self) -> str:
         payload = asdict(self)
         for item in payload["observations"]:
-            item["availability"] = item["availability"].value if isinstance(item["availability"], MetricAvailability) else item["availability"]
+            availability = item["availability"]
+            if isinstance(availability, MetricAvailability):
+                item["availability"] = availability.value
         return sha256(_canonical_json_bytes(payload)).hexdigest()
 
 
@@ -253,8 +259,6 @@ def _align_events(
     reference: tuple[PolyEvent, ...],
     predicted: tuple[PolyEvent, ...],
 ) -> tuple[tuple[PolyEvent | None, PolyEvent | None], ...]:
-    """Unit-cost sequence alignment; substitution wins deterministic ties."""
-
     rows = len(reference) + 1
     cols = len(predicted) + 1
     cost = [[0] * cols for _ in range(rows)]
@@ -309,7 +313,9 @@ def _score_event_alignment(
         ref_part = reference.parts[part_index] if part_index < len(reference.parts) else None
         pred_part = predicted.parts[part_index] if part_index < len(predicted.parts) else None
         if ref_part is None:
-            for measure in pred_part.measures:  # type: ignore[union-attr]
+            if pred_part is None:
+                raise PolyV2MetricError("internal part alignment failure")
+            for measure in pred_part.measures:
                 aligned.extend((None, event) for event in measure.events)
             continue
         if pred_part is None:
@@ -325,7 +331,9 @@ def _score_event_alignment(
                 pred_part.measures[measure_index] if measure_index < len(pred_part.measures) else None
             )
             if ref_measure is None:
-                aligned.extend((None, event) for event in pred_measure.events)  # type: ignore[union-attr]
+                if pred_measure is None:
+                    raise PolyV2MetricError("internal measure alignment failure")
+                aligned.extend((None, event) for event in pred_measure.events)
             elif pred_measure is None:
                 aligned.extend((event, None) for event in ref_measure.events)
             else:
@@ -333,12 +341,8 @@ def _score_event_alignment(
     return tuple(aligned)
 
 
-def _reference_event_count(score: PolyScore) -> int:
+def _event_count(score: PolyScore) -> int:
     return sum(len(measure.events) for part in score.parts for measure in part.measures)
-
-
-def _predicted_event_count(score: PolyScore) -> int:
-    return _reference_event_count(score)
 
 
 def _ratio_or_vacuous(correct: int, reference_count: int, predicted_count: int) -> float:
@@ -349,12 +353,9 @@ def _ratio_or_vacuous(correct: int, reference_count: int, predicted_count: int) 
 
 def _semantic_metrics(reference: PolyScore, predicted: PolyScore) -> dict[str, float]:
     aligned = _score_event_alignment(reference, predicted)
-    ref_events = _reference_event_count(reference)
-    pred_events = _predicted_event_count(predicted)
-    onset_correct = 0
-    duration_correct = 0
-    voice_correct = 0
-    staff_correct = 0
+    ref_events = _event_count(reference)
+    pred_events = _event_count(predicted)
+    onset_correct = duration_correct = voice_correct = staff_correct = 0
     pitch_correct = 0
     ref_pitched = 0
     pred_pitched = sum(
@@ -404,24 +405,6 @@ def _f1(true_positive: int, false_positive: int, false_negative: int) -> float:
     return 1.0 if denominator == 0 else (2.0 * true_positive) / denominator
 
 
-def _notehead_stem_items(event: PolyEvent) -> tuple[tuple[object, ...], ...]:
-    if event.kind is EventKind.REST or event.stem is None:
-        return ()
-    return tuple((_pitch_identity(note), event.stem.value) for note in event.noteheads)
-
-
-def _beam_items(event: PolyEvent) -> tuple[tuple[object, ...], ...]:
-    return tuple((mark.level, mark.state.value) for mark in event.beams)
-
-
-def _tie_items(event: PolyEvent) -> tuple[tuple[object, ...], ...]:
-    return tuple(
-        (_pitch_identity(note), tie.value)
-        for note in event.noteheads
-        for tie in note.ties
-    )
-
-
 def _accidental_items(event: PolyEvent) -> tuple[tuple[object, ...], ...]:
     return tuple(
         (_pitch_identity(note), note.pitch.display_accidental.value)
@@ -437,12 +420,9 @@ def _note_staff_items(event: PolyEvent) -> tuple[tuple[object, ...], ...]:
     )
 
 
-def _relation_metrics(reference: PolyScore, predicted: PolyScore) -> dict[str, float]:
+def _explicit_relation_metrics(reference: PolyScore, predicted: PolyScore) -> dict[str, float]:
     aligned = _score_event_alignment(reference, predicted)
     extractors = {
-        "notehead_stem_f1": _notehead_stem_items,
-        "beam_relation_f1": _beam_items,
-        "tie_relation_f1": _tie_items,
         "accidental_note_f1": _accidental_items,
         "note_staff_f1": _note_staff_items,
     }
@@ -456,8 +436,8 @@ def _relation_metrics(reference: PolyScore, predicted: PolyScore) -> dict[str, f
             totals[metric_id][1] += fp
             totals[metric_id][2] += fn
     return {
-        metric_id: _f1(true_positive, false_positive, false_negative)
-        for metric_id, (true_positive, false_positive, false_negative) in totals.items()
+        metric_id: _f1(tp, fp, fn)
+        for metric_id, (tp, fp, fn) in totals.items()
     }
 
 
@@ -514,7 +494,7 @@ def evaluate_poly_v2_validation_sample(
         if prediction.prediction is None:
             raise PolyV2MetricError("semantic-valid B1 result is missing its PolyScore")
         semantic_values = _semantic_metrics(reference, prediction.prediction)
-        relation_values = _relation_metrics(reference, prediction.prediction)
+        relation_values = _explicit_relation_metrics(reference, prediction.prediction)
     else:
         semantic_values = {
             "pitch_accuracy": 0.0,
@@ -524,9 +504,6 @@ def evaluate_poly_v2_validation_sample(
             "staff_accuracy": 0.0,
         }
         relation_values = {
-            "notehead_stem_f1": 0.0,
-            "beam_relation_f1": 0.0,
-            "tie_relation_f1": 0.0,
             "accidental_note_f1": 0.0,
             "note_staff_f1": 0.0,
         }
@@ -539,10 +516,8 @@ def evaluate_poly_v2_validation_sample(
     }
     observations: list[MetricObservation] = []
     for metric_id in required_metric_ids():
-        if metric_id == "musicxml_validity":
-            observations.append(_unsupported(metric_id, UNSUPPORTED_MUSICXML_REASON))
-        elif metric_id == "tedn":
-            observations.append(_unsupported(metric_id, UNSUPPORTED_TEDN_REASON))
+        if metric_id in UNSUPPORTED_METRIC_REASONS:
+            observations.append(_unsupported(metric_id, UNSUPPORTED_METRIC_REASONS[metric_id]))
         else:
             try:
                 observations.append(_available(metric_id, available_values[metric_id]))
@@ -560,8 +535,6 @@ def evaluate_poly_v2_validation_sample(
         observations=tuple(observations),
     )
 
-    # Available metrics must already satisfy the per-metric numeric domains of
-    # TR-POLY-02 even though a full required-result cannot be admitted yet.
     for item in report.observations:
         if item.availability is not MetricAvailability.AVAILABLE:
             continue
