@@ -6,9 +6,9 @@ This file records the active architecture lane. `ARCHITECTURE.md` remains the lo
 
 ## Current baseline
 
-- protected `main`: `58c27b5403301fe478c9b6c8351682c8f8bf1624`
-- latest merged package: PR #155 — TR-POLY-09B1 bounded free-running V2 inference
-- active package: TR-POLY-09B2 deterministic V2 metric/adaptor support
+- protected `main`: `79c2631682ebdb3b2be30c146a191e3ef8183ad0`
+- latest merged package: PR #156 — TR-POLY-09B2 deterministic V2 metric/adaptor layer
+- active package: TR-POLY-09B3 deterministic VALIDATION aggregation/reporting
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
 
@@ -29,28 +29,93 @@ BOS-only free-running greedy inference               ✅ TR-POLY-09B1
         ↓
 Strict V2 parse / explicit invalid-abstain evidence ✅ TR-POLY-09B1
         ↓
-Deterministic metric/adaptor surface                 ✅ IMPLEMENTED — TR-POLY-09B2
+Deterministic per-sample metric/adaptor surface      ✅ TR-POLY-09B2
         ↓
-Common VALIDATION aggregation/execution              🔄 NEXT — TR-POLY-09B3
+Deterministic VALIDATION aggregation                 ✅ IMPLEMENTED — TR-POLY-09B3
         ↓
-Exact missing-metric admission                       🔒
+Real checkpoint × VALIDATION execution               🔄 NEXT EXECUTION GATE
         ↓
-Evidence-driven refinement                           🔒
+Evidence-driven P09C refinement                      🔒
+        ↓
+Exact missing-metric admission                       🔒 5 surfaces
         ↓
 Candidate freeze + sealed TEST decision              🔒 TEST SEALED
         ↓
 Separate ScoreMosaic shadow/integration              🔒
 ```
 
-## B1 completed
+## What B3 adds
 
-TR-POLY-09B1 closed the teacher-forcing gap. A verified image/checkpoint can now produce tokens from BOS alone, reuse one 2D visual memory during decoding, and terminate as canonical V2 or explicit invalid/abstain evidence. PR #155 passed exact-head CI and merged at `58c27b5403301fe478c9b6c8351682c8f8bf1624`.
+B3 does not create new model predictions. It consumes B2 sample reports and creates one deterministic candidate-level VALIDATION report.
 
-## B2 exact metric surface
+```text
+checkpoint-bound B2 sample reports
+        ↓
+exact benchmark identity equality
+        ↓
+exact candidate identity equality
+        ↓
+duplicate/split/version checks
+        ↓
+sample-macro aggregation
+        ├─ overall
+        ├─ 1 / 2 / 3 / 4+ voice
+        ├─ robustness buckets
+        ├─ parse-success coverage
+        └─ unsupported-metric coverage
+```
 
-B2 maps one canonical V2 reference and one B1 free-running prediction into every frozen TR-POLY-02 metric ID without inventing missing evidence.
+### Frozen aggregation policy
 
-### 11 available numeric metrics
+`sample-macro-mean-v1`
+
+For each available metric B3 records sample count, mean, minimum and maximum. It does not introduce hidden weighting by token count, score length, family size or note count.
+
+Invalid/abstain outputs remain in the population because B2 emits them as scored sample reports rather than dropping them.
+
+## Identity and leakage protections
+
+B3 requires every sample report to be:
+
+- `split=validation`;
+- checkpoint-bound;
+- from the same exact BenchmarkIdentity;
+- from the same exact candidate identity;
+- produced by the frozen B2 adapter/alignment/relation versions.
+
+Mixed candidates, mixed benchmarks, duplicate samples, TRAIN/TEST evidence and unexpected strata are rejected.
+
+The final B3 fingerprint binds exact sorted sample IDs and exact B2 sample-report fingerprints, so input ordering cannot alter evidence identity.
+
+## Voice and robustness reporting
+
+The required voice strata remain:
+
+```text
+1_voice
+2_voice
+3_voice
+4_plus_voice
+```
+
+Missing strata are not silently ignored; they are recorded in `missing_voice_strata` and keep the common-comparison gate closed.
+
+Observed robustness buckets are reported separately from the frozen set:
+
+```text
+clean
+scan
+phone
+blur
+perspective
+low_contrast
+```
+
+## Metric coverage boundary
+
+B2/B3 currently expose 11 numeric frozen metrics and five explicit unsupported metrics.
+
+Available:
 
 ```text
 parse_success
@@ -66,75 +131,64 @@ accidental_note_f1
 note_staff_f1
 ```
 
-### 5 explicit unsupported metrics
+Unsupported:
 
 ```text
-musicxml_validity  -> V2→MusicXML benchmark adapter not admitted
-tedn               -> exact TEDn implementation not admitted
-notehead_stem_f1   -> explicit notehead↔stem relation not represented in V2
-beam_relation_f1   -> explicit cross-event beam relation not represented in V2
-tie_relation_f1    -> explicit cross-event tie relation not represented in V2
+musicxml_validity
+tedn
+notehead_stem_f1
+beam_relation_f1
+tie_relation_f1
 ```
 
-V2 does contain stem direction, beam marks and tie START/STOP state, but B2 does **not** silently redefine those states as the stronger frozen relation metrics.
+B3 preserves unsupported status and reasons. Unsupported metrics are never averaged as zero and never receive proxy values.
 
-## Scoring behavior
+## Comparison boundary
 
-- only VALIDATION descriptors are admitted;
-- TRAIN and TEST descriptors are rejected;
-- invalid/abstain B1 outputs remain in evaluation;
-- invalid output receives parse success 0, sequence error from its actual generated tokens, and zero credit on available semantic/relation metrics;
-- unsupported metrics remain unsupported rather than becoming zero;
-- sequence edit distance is deterministic unit-cost Levenshtein;
-- semantic fields use versioned deterministic event alignment;
-- `accidental_note_f1` and `note_staff_f1` use exact relation identities represented in V2;
-- report identity binds benchmark, inference evidence, reference/prediction identity, voice stratum, robustness bucket and adapter versions.
+B3 can validate whether multiple candidate reports are comparable, but it does not rank candidates.
 
-## Benchmark interpretation boundary
+A complete common-comparison gate requires:
 
-B2/B3 may provide useful partial common VALIDATION evidence, but a full TR-POLY-02 result is still closed.
+- checkpoint-bound candidate evidence;
+- all required voice strata;
+- all frozen TR-POLY-02 metrics numerically admitted;
+- identical benchmark identity and exact VALIDATION sample set across candidates.
+
+Because five metrics remain unsupported, complete winner/promotion claims remain closed even after B3 infrastructure is green.
+
+## Real measurement after B3
+
+The next meaningful work is execution, not another model redesign:
 
 ```text
-partial diagnostic benchmark evidence   ✅ permitted
-11 numeric frozen metrics                ✅ available
-5 explicit unsupported metrics           ⚠️ visible
-complete TR-POLY-02 metric record         🔒 unavailable
-winner / promotion claim                  🔒 prohibited
-sealed TEST                               🔒 closed
+freeze checkpoint + VALIDATION manifest/build
+        ↓
+run B1 on every VALIDATION image
+        ↓
+produce one B2 report per sample
+        ↓
+aggregate through B3
+        ↓
+inspect measured failure strata
+        ↓
+choose P09C refinement only from evidence
 ```
 
-## Recommended order
-
-```text
-TR-POLY-09B2 exact-head CI + merge
-        ↓
-TR-POLY-09B3 deterministic VALIDATION aggregation
-        ↓
-independent admission of missing metric surfaces
-        ↓
-TR-POLY-02-complete comparable evidence
-        ↓
-P09C evidence-driven TRAIN/VALIDATION refinement
-        ↓
-P09D candidate/evaluation recipe freeze
-        ↓
-Stage 9 one-shot sealed TEST decision
-        ↓
-Stage 10 separate ScoreMosaic shadow gate
-```
+This is where real pitch, duration, onset, voice, staff and robustness numbers will appear.
 
 ## Safety invariants
 
 - TEST remains sealed until Stage 9.
 - TRAIN alone may update parameters.
 - VALIDATION evaluation is read-only.
-- Invalid/abstain outputs must not be removed from denominators.
-- Unsupported metrics must not receive proxy or placeholder numbers under frozen metric IDs.
+- Invalid/abstain outputs must remain in denominators.
+- Unsupported metrics must not receive proxy numbers under frozen metric IDs.
+- Different benchmark/candidate identities must never be mixed in one aggregate.
 - External data still requires rights/license/install-pin admission.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
-- Candidate artifacts and metric reports remain hash/provenance bound.
+- Candidate artifacts and reports remain hash/provenance bound.
 - Deterministic musical validators retain veto authority.
 
 ## Next gate
 
-Merge TR-POLY-09B2 only after exact-head CI is green. Then implement TR-POLY-09B3 common VALIDATION aggregation/reporting by voice stratum and robustness bucket. Do not open TEST or declare a complete benchmark winner while any frozen metric remains unsupported.
+Merge TR-POLY-09B3 only after exact-head CI is green. Then execute the frozen checkpoint against the admitted native V2 VALIDATION artifacts, produce B1→B2→B3 evidence, and use those measured strata to choose P09C. Do not open TEST or claim a complete benchmark winner while any frozen metric remains unsupported.
