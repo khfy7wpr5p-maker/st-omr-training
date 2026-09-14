@@ -17,8 +17,7 @@ from st_omr_training.poly_v2_metrics import (
     MetricAvailability,
     POLY_V2_METRIC_ADAPTER_VERSION,
     PolyV2MetricError,
-    UNSUPPORTED_MUSICXML_REASON,
-    UNSUPPORTED_TEDN_REASON,
+    UNSUPPORTED_METRIC_REASONS,
     evaluate_poly_v2_validation_sample,
 )
 from st_omr_training.polyphonic_representation import (
@@ -168,7 +167,7 @@ def _descriptor(*, split: str = "validation") -> BenchmarkSampleDescriptor:
 
 
 class PolyV2MetricAdapterTests(unittest.TestCase):
-    def test_exact_prediction_scores_all_implemented_metrics_perfectly(self) -> None:
+    def test_exact_prediction_scores_all_exactly_representable_metrics_perfectly(self) -> None:
         score = _score()
         report = evaluate_poly_v2_validation_sample(
             reference=score,
@@ -176,7 +175,6 @@ class PolyV2MetricAdapterTests(unittest.TestCase):
             benchmark=_benchmark(),
             descriptor=_descriptor(),
         )
-
         self.assertEqual(report.adapter_version, POLY_V2_METRIC_ADAPTER_VERSION)
         self.assertEqual(report.metric("parse_success").value, 1.0)
         self.assertEqual(report.metric("ter").value, 0.0)
@@ -188,15 +186,12 @@ class PolyV2MetricAdapterTests(unittest.TestCase):
             "onset_accuracy",
             "voice_accuracy",
             "staff_accuracy",
-            "notehead_stem_f1",
-            "beam_relation_f1",
-            "tie_relation_f1",
             "accidental_note_f1",
             "note_staff_f1",
         ):
             self.assertEqual(report.metric(metric_id).value, 1.0, metric_id)
 
-    def test_musicxml_and_tedn_are_explicitly_unsupported_not_fabricated(self) -> None:
+    def test_unadmitted_or_unrepresentable_metrics_are_explicitly_unsupported(self) -> None:
         score = _score()
         report = evaluate_poly_v2_validation_sample(
             reference=score,
@@ -204,16 +199,20 @@ class PolyV2MetricAdapterTests(unittest.TestCase):
             benchmark=_benchmark(),
             descriptor=_descriptor(),
         )
-        musicxml = report.metric("musicxml_validity")
-        tedn = report.metric("tedn")
-        self.assertEqual(musicxml.availability, MetricAvailability.UNSUPPORTED)
-        self.assertIsNone(musicxml.value)
-        self.assertEqual(musicxml.unsupported_reason, UNSUPPORTED_MUSICXML_REASON)
-        self.assertEqual(tedn.availability, MetricAvailability.UNSUPPORTED)
-        self.assertIsNone(tedn.value)
-        self.assertEqual(tedn.unsupported_reason, UNSUPPORTED_TEDN_REASON)
+        expected = (
+            "musicxml_validity",
+            "tedn",
+            "notehead_stem_f1",
+            "beam_relation_f1",
+            "tie_relation_f1",
+        )
+        self.assertEqual(report.unsupported_metric_ids, expected)
+        for metric_id in expected:
+            observation = report.metric(metric_id)
+            self.assertEqual(observation.availability, MetricAvailability.UNSUPPORTED)
+            self.assertIsNone(observation.value)
+            self.assertEqual(observation.unsupported_reason, UNSUPPORTED_METRIC_REASONS[metric_id])
         self.assertFalse(report.full_contract_ready)
-        self.assertEqual(report.unsupported_metric_ids, ("musicxml_validity", "tedn"))
         with self.assertRaisesRegex(PolyV2MetricError, "unsupported metrics"):
             report.require_complete_required_metrics()
 
@@ -234,12 +233,9 @@ class PolyV2MetricAdapterTests(unittest.TestCase):
         self.assertGreater(report.metric("ter").value, 0.0)
         self.assertEqual(report.metric("exact_sequence_accuracy").value, 0.0)
 
-    def test_relation_metrics_use_event_alignment_and_relation_content(self) -> None:
+    def test_explicit_accidental_and_staff_relations_are_scored(self) -> None:
         reference = _score()
         prediction_score = _score(
-            stem=StemDirection.DOWN,
-            beam_state=BeamState.END,
-            ties=(),
             accidental=DisplayAccidentalV2.NONE,
             staff_override=1,
         )
@@ -249,13 +245,27 @@ class PolyV2MetricAdapterTests(unittest.TestCase):
             benchmark=_benchmark(),
             descriptor=_descriptor(),
         )
-        self.assertEqual(report.metric("notehead_stem_f1").value, 0.0)
-        self.assertEqual(report.metric("beam_relation_f1").value, 0.0)
-        self.assertEqual(report.metric("tie_relation_f1").value, 0.0)
         self.assertEqual(report.metric("accidental_note_f1").value, 0.0)
         self.assertEqual(report.metric("note_staff_f1").value, 0.0)
 
-    def test_invalid_free_running_output_is_not_excluded_from_metrics(self) -> None:
+    def test_stem_beam_and_tie_state_do_not_create_proxy_relation_metrics(self) -> None:
+        reference = _score()
+        prediction_score = _score(
+            stem=StemDirection.DOWN,
+            beam_state=BeamState.END,
+            ties=(),
+        )
+        report = evaluate_poly_v2_validation_sample(
+            reference=reference,
+            prediction=_valid_result(prediction_score),
+            benchmark=_benchmark(),
+            descriptor=_descriptor(),
+        )
+        for metric_id in ("notehead_stem_f1", "beam_relation_f1", "tie_relation_f1"):
+            self.assertEqual(report.metric(metric_id).availability, MetricAvailability.UNSUPPORTED)
+            self.assertIsNone(report.metric(metric_id).value)
+
+    def test_invalid_free_running_output_is_not_excluded_from_available_metrics(self) -> None:
         reference = _score()
         report = evaluate_poly_v2_validation_sample(
             reference=reference,
@@ -271,13 +281,12 @@ class PolyV2MetricAdapterTests(unittest.TestCase):
             "onset_accuracy",
             "voice_accuracy",
             "staff_accuracy",
-            "notehead_stem_f1",
-            "beam_relation_f1",
-            "tie_relation_f1",
             "accidental_note_f1",
             "note_staff_f1",
         ):
             self.assertEqual(report.metric(metric_id).value, 0.0, metric_id)
+        for metric_id in ("notehead_stem_f1", "beam_relation_f1", "tie_relation_f1"):
+            self.assertEqual(report.metric(metric_id).availability, MetricAvailability.UNSUPPORTED)
 
     def test_report_identity_is_deterministic_and_benchmark_bound(self) -> None:
         score = _score()
