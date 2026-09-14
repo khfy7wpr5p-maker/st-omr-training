@@ -23,7 +23,7 @@ TR-POLY-09A native explicit V2 materialization            ✅
 TR-POLY-09B1 free-running greedy inference                ✅ MERGED
 TR-POLY-09B2 deterministic metric/adaptor layer           ✅ IMPLEMENTED / MERGE GATE
 TR-POLY-09B3 common VALIDATION aggregation                🔄 NEXT
-TR-POLY-09B-complete metric admission                     🔒 MusicXML validity + TEDn pending
+missing metric admission                                  🔒 5 surfaces
 P09C evidence-driven refinement                           🔒
 P09D final candidate freeze                               🔒
 Stage 9 sealed TEST decision                              🔒
@@ -31,8 +31,6 @@ Stage 10 ScoreMosaic shadow integration                   🔒
 ```
 
 ## Capability now implemented
-
-The research path now contains all of the following surfaces:
 
 ```text
 explicit canonical V2 target + image
@@ -50,94 +48,50 @@ strict V2 parse OR explicit invalid/abstain
 versioned deterministic metric adapter
 ```
 
-B1 means the candidate is measurable without teacher forcing. B2 means those free-running outputs can be compared to canonical V2 references on a substantial, versioned portion of the frozen TR-POLY-02 metric vocabulary.
+B1 makes the candidate measurable without teacher forcing. B2 scores the exact metric semantics that can be supported from the currently frozen V2 representation without inventing relation/export structure.
 
-Neither package proves that the recognizer is accurate.
+## B2 exact metric coverage
 
-## B2 metric coverage
-
-### Available numeric metrics
-
-Serialization:
+### Available numeric metrics — 11
 
 - `parse_success`
-
-Sequence:
-
 - `ter`
 - `normalized_edit_distance`
 - `exact_sequence_accuracy`
-
-Musical semantics:
-
 - `pitch_accuracy`
 - `duration_accuracy`
 - `onset_accuracy`
 - `voice_accuracy`
 - `staff_accuracy`
-
-Relations:
-
-- `notehead_stem_f1`
-- `beam_relation_f1`
-- `tie_relation_f1`
 - `accidental_note_f1`
 - `note_staff_f1`
 
-### Frozen metrics still unsupported
+### Unsupported frozen metrics — 5
 
-`musicxml_validity`
+- `musicxml_validity`: deterministic V2→MusicXML benchmark adapter not admitted;
+- `tedn`: exact reviewed TEDn implementation not admitted;
+- `notehead_stem_f1`: event-level stem direction is not an explicit notehead↔stem relation object;
+- `beam_relation_f1`: event beam states do not provide an explicit cross-event beam relation identity;
+- `tie_relation_f1`: notehead START/STOP states do not provide an explicit cross-event tie relation identity.
 
-Reason: no admitted deterministic V2 → MusicXML export/validation adapter is bound to this benchmark path yet.
-
-`tedn`
-
-Reason: TR-POLY-02 reserves TEDn, but the exact algorithm/version/license implementation has not yet been admitted. B2 does not approximate TEDn under the frozen metric name.
-
-Every sample report contains both unavailable metric IDs with explicit unsupported reasons and no numeric value.
-
-## Why incomplete metrics do not block diagnostic benchmarking
-
-B3 can still produce useful VALIDATION evidence for the implemented metric families. This is enough to diagnose whether the dominant problem is sequence generation, pitch, rhythm/onset, voice separation, staff assignment or relation recovery.
-
-However, B3 must distinguish:
-
-```text
-partial common VALIDATION evidence     ✅ permitted
-TR-POLY-02-complete result             🔒 unavailable
-winner / promotion claim               🔒 unavailable
-sealed TEST opening                     🔒 unavailable
-```
-
-The partial benchmark must never be described as the complete frozen benchmark.
+This is a deliberate fail-closed boundary. Related notation state is not promoted into a stronger frozen metric by approximation.
 
 ## B2 alignment and scoring policy
 
-Sequence metrics use deterministic unit-cost Levenshtein over V2 token surfaces after BOS.
+Sequence metrics use deterministic unit-cost Levenshtein over token surfaces after BOS.
 
-Semantic and relation metrics use a versioned unit-cost event alignment inside corresponding part/measure positions. Arbitrary event and notehead IDs are excluded from the alignment signature.
+Semantic fields use deterministic event alignment inside corresponding part/measure positions. Arbitrary IDs do not drive matching. Numeric semantic evidence covers pitch spelling, exact rational duration/onset, logical voice and event staff.
 
-Reference-oriented semantic correctness measures:
+Exact relation metrics are limited to semantics explicitly represented on noteheads:
 
-- pitch surface `(step, alter, octave)`;
-- exact rational duration;
-- exact rational onset;
-- logical voice;
-- event staff.
-
-Relations are exact multiset identities within aligned events:
-
-- pitch ↔ stem direction;
-- beam level/state;
-- pitch ↔ tie state;
 - pitch ↔ displayed accidental;
-- pitch ↔ effective staff, including cross-staff override.
+- pitch ↔ effective staff including `staff_override`.
 
-Invalid/abstain free-running predictions remain benchmark evidence. They receive `parse_success=0`, their real generated token sequence contributes sequence edits, and semantic/relation metrics receive zero credit rather than being excluded.
+Invalid/abstain free-running predictions stay in the report. They receive `parse_success=0`, sequence errors from actual generated tokens, zero on available semantic/relation metrics, while unsupported metrics remain unsupported.
 
 ## Identity and comparability
 
-A B2 report binds:
+Each B2 sample report binds:
 
 - sample SHA-256;
 - BenchmarkIdentity SHA-256;
@@ -146,84 +100,103 @@ A B2 report binds:
 - prediction V2 SHA-256 when valid;
 - voice stratum;
 - robustness bucket;
-- metric-adapter version;
-- event-alignment version;
-- relation-metric version;
-- ordered metric availability/value surface.
+- metric/adaptor/alignment versions;
+- ordered availability/value/reason state for every frozen metric ID.
 
-Changing the benchmark identity changes report identity even for identical prediction/reference content.
+## What B3 may and may not do
 
-## B3 next architecture
+B3 can aggregate VALIDATION reports by:
 
-B3 should be an aggregation/execution layer, not a new model package.
+- `1_voice`;
+- `2_voice`;
+- `3_voice`;
+- `4_plus_voice`;
+- robustness bucket where admitted.
+
+It can produce useful partial common evidence for sequence, semantic, accidental and staff-association quality.
+
+It must not claim a complete winner while five frozen metrics remain unsupported.
 
 ```text
-same frozen BenchmarkIdentity
+partial common VALIDATION evidence     ✅ permitted
+11 numeric frozen metrics               ✅ available
+5 explicit unsupported metrics          ⚠️ visible
+TR-POLY-02-complete metric record        🔒 unavailable
+winner / promotion claim                 🔒 unavailable
+sealed TEST                               🔒 closed
+```
+
+## B3 required architecture
+
+```text
+same exact BenchmarkIdentity
         +
-VALIDATION BenchmarkSampleDescriptor set
+VALIDATION descriptors
         +
-B1 inference results
+B1 inference evidence
         +
-B2 sample metric reports
+B2 sample reports
         ↓
 deterministic aggregate report
-        ├─ 1_voice
-        ├─ 2_voice
-        ├─ 3_voice
-        ├─ 4_plus_voice
-        └─ robustness buckets
+        ├─ global partial metrics
+        ├─ 1/2/3/4+ voice strata
+        ├─ robustness buckets
+        ├─ invalid/abstain counts
+        └─ available/unsupported metric coverage
 ```
 
-Required B3 behavior:
+Required behavior:
 
 - VALIDATION only;
-- exact benchmark identity equality across all samples/candidates;
-- no dropping invalid/abstain outputs;
-- metric coverage counts alongside means;
-- explicit unsupported metric propagation;
-- deterministic canonical report fingerprint;
-- no winner/promotion field while the required metric set is incomplete;
-- TEST bytes never opened.
+- benchmark identity equality enforced;
+- duplicate sample identities rejected;
+- invalid/abstain results retained;
+- available metric means computed only from reports where that metric is numerically available, while coverage count is explicit;
+- unsupported metrics propagated, never averaged as zero;
+- canonical aggregate fingerprint;
+- no winner/promotion field while metric coverage is incomplete;
+- no TEST access.
 
-## After B3
+## Missing-metric admission
 
-Use B3 evidence to select only demonstrated failure families for P09C.
+Before a final complete TR-POLY-02 comparison, independently implement and review:
 
-Examples:
+1. deterministic V2→MusicXML export plus independent validation;
+2. exact notehead-stem relation representation/adapter if the metric remains required;
+3. explicit cross-event beam relation representation/adapter;
+4. explicit cross-event tie relation representation/adapter;
+5. exact TEDn algorithm/dependency/license/version surface.
+
+These packages should not modify candidate model weights or search behavior.
+
+## Evidence-driven refinement after B3
+
+Use measured VALIDATION strata to choose P09C work:
 
 ```text
-high parse failure          -> decoder/search/sequence grammar diagnosis
-high TER, good parse        -> sequence model/search diagnosis
-weak pitch only             -> visual/pitch representation diagnosis
-weak onset/duration         -> rhythmic representation/training diagnosis
-weak voice                  -> polyphonic separation/data diagnosis
-weak note_staff_f1          -> staff/cross-staff diagnosis
-strong clean / weak scan    -> domain-coverage diagnosis
+high parse failure       -> decoder/search diagnosis
+high TER, valid parses   -> sequence modeling/search diagnosis
+weak pitch               -> visual/pitch evidence diagnosis
+weak onset/duration      -> rhythm representation/training diagnosis
+weak voice               -> polyphonic separation/data diagnosis
+weak note_staff_f1       -> staff/cross-staff diagnosis
+strong clean, weak scan  -> domain coverage diagnosis
 ```
 
-Do not enlarge the model or expand data broadly without this evidence.
+Do not enlarge the model or broadly add data without such evidence.
 
-## Metric-completion packages
-
-Before a final complete comparison claim, independently admit:
-
-1. deterministic Polyphonic V2 → MusicXML export + independent MusicXML validation for `musicxml_validity`;
-2. exact TEDn implementation with version, algorithm semantics, dependency/license review and deterministic regression evidence.
-
-These should remain separable from model tuning so metric implementation cannot silently change candidate behavior.
-
-## Final dependency order
+## Final order
 
 ```text
 B2 exact-head CI + merge
         ↓
 B3 partial common VALIDATION aggregation
         ↓
-MusicXML validity + TEDn metric admission
+exact admission of five missing metric surfaces
         ↓
 TR-POLY-02-complete comparable evidence
         ↓
-P09C evidence-driven refinement on TRAIN/VALIDATION
+P09C evidence-driven TRAIN/VALIDATION refinement
         ↓
 P09D candidate + evaluation recipe freeze
         ↓
@@ -236,13 +209,13 @@ Stage 10 independent ScoreMosaic shadow gate
 
 - TEST remains sealed until Stage 9.
 - TRAIN is the only parameter-updating split.
-- VALIDATION evaluation is read-only.
-- Unsupported metrics remain unsupported; no proxy inherits a frozen metric ID.
-- Invalid/abstain outputs stay in denominators.
+- VALIDATION is read-only evidence.
+- Unsupported frozen metrics cannot receive proxies under the same metric ID.
+- Invalid/abstain outputs stay visible.
 - External data requires rights/license/install-pin admission.
 - Teacher corrections and ScoreMosaic uploads are not automatic training data.
 - Benchmark success never grants automatic production authority.
 
 ## Immediate next action
 
-Finish TR-POLY-09B2 exact-head CI/merge, then implement TR-POLY-09B3 deterministic VALIDATION aggregation/reporting by voice stratum and robustness bucket. Keep complete-winner and sealed-TEST gates closed until the missing required metrics are independently admitted.
+Finish TR-POLY-09B2 exact-head CI/merge, then implement TR-POLY-09B3 deterministic VALIDATION aggregation/reporting with explicit metric coverage. Keep missing-metric, winner, and sealed-TEST gates closed until their independent evidence requirements are satisfied.
