@@ -2,155 +2,158 @@
 
 Updated: 2026-09-14
 
-This document is the detailed current-state companion to `ARCHITECTURE_CURRENT.md`. It describes what is already implemented on protected `main`, what is still missing, and the recommended dependency order for the next architecture packages.
+This document is the detailed current-state companion to `ARCHITECTURE_CURRENT.md`. It separates implemented capability from measured quality and preserves the dependency order through the first common Polyphonic V2 benchmark.
 
-## 1. Current protected-main baseline
+## 1. Current baseline and active package
 
-Reviewed `main` head:
+Protected-main baseline used to start the active package:
 
-`6a6bf1e1faf0149ebd097a310536076b77feac65`
+`2bb0ac23e11fb953bb3ada4aaef6369073b7e1f1`
 
-Latest merged package:
-
-PR #153 — `TR-POLY-09A: native Polyphonic V2 dataset materialization`
-
-The current Polyphonic V2 chain on main is:
+Current chain:
 
 ```text
-TR-POLY-02 evaluation taxonomy / benchmark identity      ✅
-TR-POLY-03 external dataset + license registry           ✅
-TR-POLY-04 deterministic external benchmark harness      ✅
-TR-POLY-05 Polyphonic Representation V2                  ✅
-TR-POLY-06 V2 parser / tokenizer / lossless roundtrip    ✅
-TR-POLY-07 research model registry                        ✅
-TR-POLY-08 tiny 2D Transformer prototype                 ✅
-TR-POLY-08A bounded training + provenance                ✅
-TR-POLY-08B exact checkpoint persistence/reload           ✅
-TR-POLY-08C exact Stage 6 V1→V2 dataset execution        ✅
-TR-POLY-09A native explicit Polyphonic V2 materialization✅
-TR-POLY-09B common benchmark                              🔒 NEXT
+TR-POLY-02 evaluation taxonomy / benchmark identity       ✅
+TR-POLY-03 external dataset + license registry            ✅
+TR-POLY-04 deterministic external benchmark harness       ✅
+TR-POLY-05 Polyphonic Representation V2                   ✅
+TR-POLY-06 V2 parser / tokenizer / lossless roundtrip     ✅
+TR-POLY-07 research model registry                         ✅
+TR-POLY-08 tiny 2D Transformer prototype                  ✅
+TR-POLY-08A bounded training + provenance                  ✅
+TR-POLY-08B exact checkpoint persistence/reload            ✅
+TR-POLY-08C exact Stage 6 V1→V2 dataset execution         ✅
+TR-POLY-09A native explicit Polyphonic V2 materialization ✅
+TR-POLY-09B1 free-running greedy inference                ✅ IMPLEMENTED / MERGE GATE
+TR-POLY-09B2 deterministic metric/adaptor layer            🔄 NEXT
+TR-POLY-09B3 common VALIDATION benchmark                   🔒
 ```
 
 ## 2. What is implemented versus what is proven
 
 ### Implemented
 
-- explicit structured polyphonic target representation;
+- explicit structured Polyphonic V2 target representation;
 - exact onset/duration/staff/voice fields;
 - deterministic canonical V2 JSON;
 - lossless V2 tokenizer/detokenizer;
 - 2D visual Transformer encoder preserving row × column patch memory;
-- autoregressive decoder architecture under teacher forcing;
-- TRAIN-only optimizer path;
-- read-only VALIDATION path;
-- deterministic provenance fingerprints;
-- exact checkpoint hash/reload verification;
-- Stage 6 single-voice V1→V2 execution path;
+- teacher-forced TRAIN/VALIDATION execution;
+- deterministic training/checkpoint provenance;
+- exact checkpoint persistence and reload verification;
+- Stage 6 single-voice V1→V2 execution bridge;
 - native explicit Polyphonic V2 dataset/materialization path;
-- voice 2 / 3 / 4+ coverage gates at the dataset contract level;
-- family leakage and sealed-TEST protections.
+- voice 2 / 3 / 4+ dataset-coverage gates;
+- family leakage and sealed-TEST protections;
+- BOS-only deterministic greedy free-running inference;
+- one-time image encoding with autoregressive decoder-memory reuse;
+- strict V2 semantic validation after EOS;
+- explicit invalid/abstain states for malformed output, generated PAD/BOS and decode-limit exhaustion;
+- exact inference/checkpoint identity binding.
 
 ### Not yet proven
 
-- free-running Polyphonic V2 recognition quality;
-- greedy or beam inference correctness on real benchmark samples;
-- common benchmark superiority versus V1 baseline or specialist/hybrid candidates;
-- robust relation recovery for ties, beams, accidentals and cross-staff cases;
-- production-quality scanned/phone-photo performance;
+- useful Polyphonic V2 recognition accuracy;
+- superiority over V1 or specialist/hybrid candidates;
+- reliable 2/3/4+ voice separation;
+- relation quality for ties, beams, accidentals or cross-staff notation;
+- scanned/phone robustness;
+- sealed TEST performance;
 - ScoreMosaic shadow readiness;
 - production authority.
 
-## 3. Critical architecture gap before comparison
+Implementation of inference closes a measurement prerequisite; it is not itself model-quality evidence.
 
-The current 2D model exposes a teacher-forced training/forward surface, but there is no corresponding Polyphonic V2 free-running inference contract yet.
+## 3. TR-POLY-09B1 closes the teacher-forcing gap
 
-That matters because a valid OMR benchmark must score outputs produced from the image without feeding the gold target prefix. Teacher-forced token loss or teacher-forced logits are useful training diagnostics, not end-to-end recognition evidence.
+Before B1, the 2D model could be scored only while receiving the true preceding target tokens. That is not valid end-to-end OMR evidence.
 
-The first missing runtime component is therefore:
+B1 freezes the first honest prediction path:
 
 ```text
 verified image tensor
         ↓
-2D Transformer visual memory
+full 2D visual memory
         ↓
-BOS-only decoder start
+BOS only
         ↓
-autoregressive next-token loop
+argmax next token
         ↓
-EOS / max-step termination
+append prediction and repeat
         ↓
-V2 detokenize + strict parser
+EOS / generated-control failure / max-step stop
         ↓
-semantic-valid V2 output OR explicit invalid/abstain result
+strict V2 parser
+        ↓
+canonical prediction OR explicit invalid/abstain
 ```
 
-## 4. Required inference contract
+The image is encoded once; `decode_from_memory()` reuses the same full row × column memory for every autoregressive step.
 
-The initial inference surface should be deliberately narrow.
+### First-search policy
 
-### First admitted decoder
+The initial common baseline is greedy by design:
 
-Use deterministic greedy decoding first.
+- deterministic argmax;
+- lowest token id wins a numerical tie under the pinned runtime behavior;
+- no beam search;
+- no sampling;
+- no grammar-based logit masking;
+- no semantic repair;
+- no fabricated EOS;
+- generated PAD or a second BOS is recorded as model failure;
+- strict parser failure is recorded as semantic-invalid output.
 
-Requirements:
+This keeps model quality separate from search/repair quality. A later constrained or beam decoder must use a separately fingerprinted profile and be compared as its own candidate.
 
-- one exact model/checkpoint identity;
-- one exact tokenizer fingerprint;
-- BOS required at start;
-- EOS terminates the sequence;
-- PAD is never generated as meaningful content;
-- maximum decode-step bound;
-- exact vocabulary bounds;
-- finite logits only;
-- deterministic same-input/same-checkpoint/same-runtime result;
-- strict V2 detokenization and canonical parser validation;
-- no silent insertion of missing onset/duration/voice/staff values;
-- invalid semantic output becomes explicit failure/abstention evidence;
-- no TEST access.
+## 4. Candidate identity freeze now available
 
-### Why beam search should wait
+Every B1 result binds:
 
-Beam search can improve sequence metrics but changes the search algorithm itself. If introduced before a greedy baseline is frozen, model quality and search quality become confounded.
+- exact model-state SHA-256;
+- model-profile SHA-256;
+- inference-profile SHA-256;
+- max decode-step budget;
+- tokenizer fingerprint;
+- representation/tokenizer versions;
+- pinned PyTorch runtime.
 
-Recommended sequence:
+Verified-checkpoint inference additionally binds:
 
-1. freeze greedy decode evidence;
-2. run common VALIDATION benchmark;
-3. only then evaluate beam/constrained search as a separately fingerprinted candidate if needed.
+- checkpoint SHA-256;
+- metadata file SHA-256;
+- receipt SHA-256;
+- metadata fingerprint;
+- dataset manifest;
+- preprocessing fingerprint;
+- trainer profile;
+- training provenance;
+- model-registry record fingerprint;
+- repository SHA.
 
-## 5. Benchmark readiness checklist
+This provides the model/checkpoint portion of P09B-0. The benchmark identity, metric-set identity and candidate adapter identity must still be frozen by B2/B3.
 
-TR-POLY-09B should not start comparative scoring until all of the following are true:
+## 5. Next critical gap: deterministic metric/adaptor support
 
-- native V2 TRAIN/VALIDATION materialization is hash-verifiable;
-- candidate checkpoint can be reloaded exactly;
-- free-running V2 inference exists;
-- benchmark identity is fixed;
-- compared candidates use the same dataset/split identity where comparison is claimed;
-- metric implementations are versioned and deterministic;
-- unavailable metrics are marked unsupported rather than fabricated;
-- TEST remains sealed.
+The next missing component is not another model architecture. It is a common scoring bridge that turns free-running prediction/reference pairs into the already-frozen TR-POLY-02 evaluation surface.
 
-## 6. Common benchmark surface
+B2 should provide versioned, deterministic adapters for the metrics that can be computed from Polyphonic V2 without inventing unavailable information.
 
-The benchmark should preserve the TR-POLY-02 hierarchy.
+### Priority metric surface
 
-### Serialization
+#### Serialization / validity
 
 - parse success;
-- MusicXML validity where a deterministic export adapter exists.
+- canonical V2 validity;
+- MusicXML validity only where an admitted deterministic export adapter exists.
 
-### Sequence
+#### Sequence
 
 - token error rate;
 - normalized edit distance;
 - exact sequence accuracy.
 
-### Structural
-
-- TEDn or another explicitly versioned structural distance only after implementation and license review.
-
-### Musical semantic
+#### Musical semantic
 
 - pitch accuracy;
 - duration accuracy;
@@ -158,68 +161,95 @@ The benchmark should preserve the TR-POLY-02 hierarchy.
 - voice accuracy;
 - staff accuracy.
 
-### Relations
+#### Relations
 
-- notehead-stem F1;
+Where both reference and prediction expose the relation deterministically:
+
 - beam relation F1;
 - tie relation F1;
 - accidental-note F1;
-- note-staff F1.
+- note-staff F1;
+- notehead-stem F1 only if the representation/adaptor can define it without hidden visual labels.
 
-### Required strata
+#### Structural
+
+TEDn remains reserved by TR-POLY-02 but must not be fabricated. It may enter only after the exact implementation/algorithm and license boundary is reviewed and versioned.
+
+## 6. Common benchmark readiness checklist
+
+TR-POLY-09B3 comparative execution stays closed until:
+
+- B1 free-running inference is green on protected main;
+- native V2 TRAIN/VALIDATION materialization remains hash-verifiable;
+- compared checkpoint identities are frozen;
+- the benchmark dataset/split identity is frozen;
+- candidate adapters are versioned;
+- metric implementations are deterministic and versioned;
+- unsupported metrics are explicitly marked unsupported;
+- TEST remains sealed.
+
+## 7. Required benchmark strata
+
+The first common VALIDATION report must not collapse all polyphony into one number.
 
 At minimum report separately:
 
-- 1 voice;
-- 2 voices;
-- 3 voices;
-- 4+ voices.
+- `1_voice`;
+- `2_voice`;
+- `3_voice`;
+- `4_plus_voice`.
 
-Where data exists, also keep robustness buckets such as clean, scan, phone, blur, perspective and low contrast distinct. Do not collapse all results into one aggregate number only.
+Where admitted data exists, robustness buckets should also remain separate:
 
-## 7. Recommended next package order
+- clean;
+- scan;
+- phone;
+- blur;
+- perspective;
+- low contrast.
 
-These labels express the recommended dependency order; they are not claims that the packages already exist.
+Aggregate metrics may be added, but never as the only reported evidence.
 
-### P09B-0 — Candidate freeze
+## 8. Recommended package order
 
-Freeze:
+### P09B-1 — Free-running inference
 
-- repository SHA;
-- candidate registry row;
-- checkpoint SHA;
-- model profile;
-- trainer profile;
-- tokenizer fingerprint;
-- representation version;
-- preprocessing fingerprint;
-- native V2 dataset manifest/build identity;
-- benchmark identity;
-- runtime fingerprint.
+Status: implemented in the active package; merge requires exact-head green CI.
 
-No comparison should proceed if those identities drift mid-run.
+Exit condition:
 
-### P09B-1 — Polyphonic V2 inference
+- a verified checkpoint consumes one admitted image;
+- no gold target prefix is supplied;
+- output becomes either canonical V2 or explicit invalid/abstain evidence;
+- model state does not mutate;
+- all relevant model/checkpoint/runtime identities are bound.
 
-Implement deterministic free-running greedy decode and strict semantic validation.
+### P09B-2 — Metric implementation and candidate adapters
 
-Exit condition: a reloaded checkpoint can consume an admitted image and produce either a canonical parseable V2 prediction or an explicit failure/abstain result with deterministic provenance.
+Status: next.
 
-### P09B-2 — Metric implementation/adapters
+Exit condition:
 
-Complete any still-missing deterministic metric code and candidate adapters required by TR-POLY-02.
-
-Exit condition: two compatible prediction/reference pairs can be scored through the same versioned metric surface without candidate-specific interpretation.
+- two compatible prediction/reference pairs can be scored by one versioned metric surface;
+- candidate-specific interpretation is prohibited;
+- unsupported fields remain unsupported;
+- benchmark identity is included in the evidence binding;
+- TEST remains unopened.
 
 ### P09B-3 — Common VALIDATION benchmark
 
-Run comparable candidates against the same frozen VALIDATION benchmark identity.
+Status: blocked until B2.
 
-Exit condition: per-stratum reports exist for sequence, semantic, structural and relation metrics; no TEST bytes are opened.
+Exit condition:
+
+- compared candidates use the same exact benchmark/split identity;
+- per-voice-stratum reports exist;
+- parse/sequence/semantic/relation evidence is separated;
+- no TEST artifact is opened.
 
 ### P09C — Evidence-driven refinement
 
-Use only TRAIN/VALIDATION evidence to determine whether the dominant failure is:
+Use only TRAIN/VALIDATION evidence to determine the dominant failure family:
 
 - visual resolution / patching;
 - sequence search;
@@ -229,49 +259,38 @@ Use only TRAIN/VALIDATION evidence to determine whether the dominant failure is:
 - staff assignment;
 - rhythm/onset modeling;
 - relation modeling;
-- missing robustness coverage.
+- robustness/domain coverage.
 
-Only the demonstrated failure mode should justify architecture expansion.
+Only a demonstrated failure should justify expanding model, data or search complexity.
 
 ### P09D — Candidate freeze before sealed TEST
 
-Freeze the complete evaluation recipe:
+Freeze the complete recipe:
 
 - model architecture;
 - checkpoint;
 - preprocessing;
 - decoding algorithm;
-- thresholds;
+- resource bounds;
 - metric versions;
 - benchmark adapter;
 - abstention policy.
 
-After this freeze, sealed TEST must not become a tuning loop.
+After this freeze, sealed TEST cannot become a tuning loop.
 
 ### Stage 9 — Sealed held-out decision
 
-Use the held-out TEST only for the final candidate decision under the already-frozen recipe.
-
-Possible outcomes should include acceptance, rejection or insufficient-evidence/abstain. A poor TEST result must not trigger repeated tuning against TEST.
+Run the already-frozen candidate once on held-out TEST evidence. Valid outcomes include accept, reject and insufficient evidence. A poor result does not authorize repeated TEST-driven tuning.
 
 ### Stage 10 — Separate ScoreMosaic shadow gate
 
-Even a successful sealed benchmark does not directly grant production authority.
+A successful Stage 9 candidate still has no automatic production authority. Integration must separately verify artifact provenance, resource bounds, deterministic validator compatibility, failure/abstain behavior and regression safety.
 
-A later integration gate should independently verify:
+## 9. Specialist/hybrid relationship
 
-- artifact provenance;
-- runtime resource bounds;
-- failure/abstain behavior;
-- deterministic validator compatibility;
-- no silent score mutation;
-- regression against accepted historical OMR surfaces.
+The Stage 7-D specialist lane remains historical and reusable evidence.
 
-## 8. Specialist/hybrid relationship
-
-The Stage 7-D specialist line is not discarded.
-
-Potential future architecture:
+Potential later architecture:
 
 ```text
 2D Polyphonic V2 recognizer
@@ -283,47 +302,46 @@ versioned fusion candidate
 same common benchmark contract
 ```
 
-However, hybrid fusion should be added only after the standalone 2D model has a measurable benchmark baseline. Otherwise it becomes impossible to determine which component caused an improvement or regression.
+Hybrid fusion should wait until the standalone free-running 2D candidate has a measurable baseline. Otherwise attribution of improvement/regression is impossible.
 
-## 9. Data strategy after TR-POLY-09A
+## 10. Data strategy after benchmark evidence
 
-The immediate priority is not simply “more data”. Data expansion should follow benchmark error evidence.
-
-Preferred decision logic:
+Do not default to “more data” or “larger model”. Use measured strata:
 
 ```text
-benchmark error strata
+VALIDATION error strata
         ↓
-identify dominant under-covered failure family
+dominant failure family
         ↓
-check rights / provenance / split safety
+rights/provenance/split check
         ↓
-add explicit TRAIN/VALIDATION data for that family
+targeted TRAIN/VALIDATION data or bounded model/search change
         ↓
-rebuild deterministic manifest identity
+new deterministic artifact identity
         ↓
-retrain / re-evaluate
+retrain and re-evaluate
 ```
 
 Examples:
 
-- weak 4+ voice score → increase explicit high-polyphony examples;
-- weak cross-staff relation → add cross-staff-specific admitted data;
-- strong clean / weak scan → improve admitted scan-domain coverage rather than enlarging the model first;
-- good localization / poor relation scores → improve relation-target modeling before adding visual capacity.
+- weak 4+ voice result → increase admitted high-polyphony evidence;
+- weak cross-staff relation → add cross-staff-specific targets;
+- strong clean / weak scan → improve admitted scan-domain coverage first;
+- good token sequence / weak relations → improve relation modeling rather than visual capacity.
 
-## 10. Do not do next
+## 11. Do not do next
 
-Until the common benchmark path is operational, do not prioritize:
+Until the common VALIDATION path is operational, do not prioritize:
 
 - opening sealed TEST;
-- production/ScoreMosaic integration;
+- ScoreMosaic/production integration;
 - a larger Transformer by default;
 - broad hyperparameter sweeps;
+- beam/repair decoding before greedy evidence is frozen;
 - automatic learning from teacher corrections;
-- mixing external datasets without rights/install-pin admission;
-- treating teacher-forced loss as end-to-end OMR accuracy.
+- external data without rights/install-pin admission;
+- presenting teacher-forced loss or implementation success as OMR accuracy.
 
-## 11. Immediate next action
+## 12. Immediate next action
 
-Implement P09B-1: the bounded free-running Polyphonic V2 greedy inference + strict semantic validation surface. Once that path is green and provenance-bound, proceed directly to the frozen common VALIDATION benchmark under TR-POLY-02.
+Finish the TR-POLY-09B1 exact-head CI/merge gate. Then implement **TR-POLY-09B2 deterministic metric/adaptor support** and proceed directly to **TR-POLY-09B3 common VALIDATION benchmarking** under the frozen TR-POLY-02 identity. TEST remains sealed throughout B1–B3.
