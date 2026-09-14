@@ -1,278 +1,170 @@
 # ST-OMR Training — Current Architecture Overlay
 
-This file records the current active lane without replacing the repository's long-form closed-stage history in `ARCHITECTURE.md`.
+Updated: 2026-09-14
+
+This file records the current active lane. `ARCHITECTURE.md` remains the long-form historical architecture record. The detailed Polyphonic V2 roadmap is in `ARCHITECTURE_POLYPHONIC_V2_CURRENT.md`.
+
+## Current repository head
+
+- protected branch: `main`
+- current main head reviewed for this overlay: `6a6bf1e1faf0149ebd097a310536076b77feac65`
+- latest merged package: PR #153 — `TR-POLY-09A: native Polyphonic V2 dataset materialization`
+- latest architecture gate completed on main: native explicit Polyphonic Representation V2 TRAIN/VALIDATION materialization into the existing bounded 2D Transformer training/checkpoint chain
+- sealed TEST: remains closed
+- ScoreMosaic / production authority: not granted
 
 ## Active pipeline
 
 ```text
-Canonical ST Music
+Canonical / explicit notation targets
         ↓
-Deterministic MusicXML writer + independent validators
+Deterministic symbolic validation + rendering
         ↓
-Pinned Verovio renderer
+Hash-bound image/target artifacts
         ↓
-Controlled degradation
+Polyphonic Representation V2                    ✅ FROZEN
         ↓
-Stage 5/6 validated synthetic persistence
+V2 parser + tokenizer + lossless roundtrip       ✅ CLOSED
         ↓
-Stage 7-D0..D9 specialist decomposition history      ✅ CLOSED
+Research model registry                           ✅ CLOSED
         ↓
-Stage 7-D10 local ROI derivatives                    ✅ CLOSED
+Tiny 2D Transformer architecture                  ✅ IMPLEMENTED / RESEARCH
         ↓
-Stage 7-D11 barline + meter refiners                  ✅ CLOSED / technical baseline
+Bounded TRAIN-only trainer + VALIDATION read-only ✅ IMPLEMENTED
         ↓
-Stage 7-D12 NoteHead/Rest/Accidental GT gate          ✅ CLOSED / TEST SEALED
+Exact checkpoint persistence/reload               ✅ IMPLEMENTED
         ↓
-Stage 7-D13-R1 first symbol-specialist training       ⛔ NOT ACCEPTED / BASELINE EVIDENCE
+Exact Stage 6 V1→V2 execution bridge              ✅ CLOSED / single-voice evidence only
         ↓
-Stage 7-D13-R2 specialist refinement                  🔄 ACTIVE ARCHITECTURE
+Native explicit Polyphonic V2 dataset path        ✅ CLOSED — TR-POLY-09A
         ↓
-Rhythm / StaffPosition / Chord specialists            🔒
+Free-running V2 inference / semantic decoding     🔄 NEXT REQUIRED CAPABILITY
         ↓
-Deterministic fusion + musical validators              🔒
+TR-POLY-09B common benchmark execution            🔒 NEXT COMPARATIVE GATE
         ↓
-Stage 9 sealed benchmark/candidate gate                🔒 TEST SEALED
+Polyphonic error-strata diagnosis/refinement       🔒
+        ↓
+Frozen candidate + sealed TEST decision            🔒 TEST SEALED
+        ↓
+Separate ScoreMosaic shadow/integration gate       🔒
 ```
 
-## Current decision
+## What TR-POLY-09A actually established
 
-D13-R1 is retained as experimental evidence, not accepted as the final NoteHead/Rest/Accidental stage.
+TR-POLY-09A added a separate native Polyphonic V2 dataset boundary without relabeling the frozen V1 corpus.
 
-The available run evidence is enough to reject a blind rerun of the same profile:
-
-- **NoteHead:** strong learning; visual architecture is provisionally kept. The main refinement question is optimizer/checkpoint stability because the minimum-validation-loss epoch and the strongest F1 epoch were not always identical.
-- **Rest:** failed materially. The observed ten-epoch run ended with zero center F1, zero bbox F1 and zero macro F1. Rest therefore requires root-cause analysis before another full optimizer run.
-- **Accidental:** meaningful learning was visible before interruption, but macro-class performance lagged localization. It is refined before being split automatically.
-
-D13-R2 is governed by `STAGE7D13_R2_REFINEMENT_PLAN.md`.
-
-## R2 architecture principle
-
-The specialist system follows one rule:
-
-> Ask learned models the smallest visual question that is useful; use deterministic composition and musical validation for structure that does not need to be learned.
-
-The target graph is therefore allowed to differ by symbol family rather than forcing every specialist into one identical detector shape.
+The admitted path is:
 
 ```text
-Score / accepted measure geometry
+explicit canonical V2 target + grayscale PNG
         ↓
-learned local observations
-        ├─ NoteHead detection + open|filled
-        ├─ Rest presence/localization → Rest type classification
-        └─ Accidental presence/localization → optional type classification
+native V2 manifest/build SHA-256 identity
         ↓
-deterministic association/composition
+TRAIN/VALIDATION artifact hash verification
         ↓
-musical validation
+lossless V2 JSON/token roundtrip
+        ↓
+deterministic image preprocessing
+        ↓
+Poly2DTrainingBatch
+        ↓
+TR-POLY-08A bounded trainer
+        ↓
+TR-POLY-08B checkpoint/reload
 ```
 
-## D13-R2 approved sequence
+The native dataset contract requires explicit polyphonic evidence including voice 2 and corpus-level coverage of voice 3, voice 4+, note/rest/chord, simultaneous independent voices, and chord-vs-independent-voice same-onset cases. Missing voice/onset/duration/staff information is not inferred.
+
+TR-POLY-09A does **not** establish benchmark success, quality improvement, production readiness, ScoreMosaic readiness, or a winner over existing baselines.
+
+## Current architectural gap
+
+The 2D Transformer currently has a teacher-forced forward/training surface. The repository does not yet expose a Polyphonic V2 free-running inference path equivalent to the V1 constrained greedy decode surface.
+
+That gap must be closed before a common benchmark can measure real recognition output. A benchmark that scores only teacher-forced logits would not be a valid end-to-end OMR comparison.
+
+The next capability therefore is a bounded V2 inference contract with:
+
+- deterministic greedy decoding first;
+- exact BOS/EOS/PAD handling;
+- maximum decode-step/resource bounds;
+- fail-closed invalid-token/state handling;
+- canonical V2 parse/detokenize validation;
+- explicit semantic-invalid / abstain outcome rather than silent repair;
+- no TEST access;
+- no hidden beam-search advantage in the first common baseline comparison.
+
+Beam or more advanced search may be evaluated later as a separately fingerprinted experiment after the greedy baseline is frozen.
+
+## Recommended development order
+
+The following is the current recommended architecture order. The sub-gate names below are roadmap labels, not claims that packages already exist.
 
 ```text
-R2-0  Freeze D13-R1 evidence
-        ↓
-R2-1  Rest root-cause audit
-        ↓
-R2-2  Rest architecture decision
-        ↓
-R2-3  Specialist-specific ROI / visual-scale decision
-        ↓
-R2-4  Short TRAIN-only diagnostic gate
-        ↓
-R2-5  Learning-rate scheduler A/B
-        ↓
-R2-6  Checkpoint-selection refinement
-        ↓
-R2-7  Accidental refinement
-        ↓
-R2-8  NoteHead optimizer/checkpoint refinement
-        ↓
-R2-9  Safe fast-resume contract
-        ↓
-R2-10 Product-oriented validation preparation
+P09B-0  Freeze benchmark candidate identities
+        - exact checkpoint / registry / tokenizer / dataset / runtime fingerprints
+        - no hyperparameter changes after benchmark start
+
+P09B-1  Implement bounded Polyphonic V2 inference
+        - free-running greedy decode
+        - semantic parse/roundtrip validation
+        - deterministic resource limits
+        - VALIDATION only
+
+P09B-2  Complete benchmark metric implementations/adapters
+        - TR-POLY-02 required metric families
+        - implement/admit missing structural metric code such as TEDn only after license/algorithm review
+        - no invented metrics for unsupported outputs
+
+P09B-3  Execute common VALIDATION benchmark
+        - identical benchmark identity/splits for compared candidates
+        - 1 / 2 / 3 / 4+ voice strata
+        - clean + robustness buckets where admitted
+        - compare sequence, structure, semantic and relation metrics
+
+P09C    Validation-only error decomposition and bounded refinement
+        - pitch / duration / onset / voice / staff
+        - chord grouping / tie / beam / accidental association
+        - focus model/data changes only where evidence shows a failure mode
+        - TRAIN/VALIDATION only; TEST remains sealed
+
+P09D    Freeze final candidate and evaluation recipe
+        - architecture + preprocessing + decoder + checkpoint + metric set fixed
+        - no further tuning from sealed-test outcomes
+
+Stage 9 sealed TEST candidate decision
+        - one-shot held-out evidence
+        - accept / reject / abstain on candidate promotion
+
+Stage 10 separate shadow integration
+        - no automatic production authority
+        - deterministic validators retain veto authority
 ```
 
-The first implementation package is **Rest Root-Cause Audit**. It is diagnostic/read-only with respect to model parameters. A second full Rest training run is blocked until the audit distinguishes data/label, representation/scale, decoder-threshold, localization and class-separation failure modes.
+## Why this order is preferred
 
-## Rest R2 candidate graph
+The repository already has a strong provenance/checkpoint/data-contract surface. The biggest immediate risk is not missing another model architecture; it is attempting comparison before real free-running Polyphonic V2 inference exists.
 
-The primary candidate, subject to R2-1 evidence, is:
+Therefore the next work should **not** be a larger Transformer, wider training sweep, ScoreMosaic integration, or TEST opening. First make the current candidate measurable end-to-end under the already-frozen representation and benchmark identity.
 
-```text
-accepted measure / local high-resolution ROI
-        ↓
-RestPresence + RestLocalization
-        ↓
-normalized Rest crop
-        ↓
-RestTypeClassifier
-half | quarter | eighth
-        ↓
-deterministic Rest validator
-```
+## Existing specialist lane
 
-This split is not automatic. If R2-1 finds incorrect labels or destructive scaling, that root cause is fixed before adding model complexity.
+The Stage 7-D specialist work, including D10/D11/D12/D13-era contracts, remains valid historical evidence and may later contribute to hybrid/fusion designs. It is no longer the current top-level active lane in this repository overlay.
 
-## NoteHead R2 policy
+Do not delete or rewrite that evidence. If a later hybrid architecture is compared against the Polyphonic V2 model, it must enter through the same frozen benchmark identity and metric surface.
 
-R1 demonstrated that the current detector can learn NoteHead strongly. Therefore the default R2 policy is:
+## Safety boundaries that remain unchanged
 
-```text
-current NoteHead detector         KEEP
-learning-rate behavior            REFINE / controlled A/B
-checkpoint selection              REFINE
-open|filled class stability       REVIEW
-visual architecture redesign      BLOCKED without new evidence
-```
-
-A high specialist F1 remains a specialist metric only; it is not end-to-end PDF-reading accuracy.
-
-## Accidental R2 policy
-
-Accidental is refined before it is split because R1 showed substantial learning.
-
-First candidate:
-
-```text
-current Accidental detector
-+ frozen scheduler candidate
-+ refined checkpoint ranking
-+ per-class metrics
-```
-
-If class-specific evidence remains weak, especially for the rare class, evaluate:
-
-```text
-AccidentalPresence/Localization
-        ↓
-normalized crop
-        ↓
-sharp | flat | natural classifier
-        ↓
-deterministic note-association validator
-```
-
-Glyph recognition and association to a note remain separate responsibilities.
-
-## Training-system refinements
-
-### Learning-rate scheduler
-
-R2 treats scheduler policy as part of the reproducible training contract. Candidate schedules are compared under a frozen A/B protocol. A scheduler is admitted only if it improves task stability/quality, not merely scalar validation loss.
-
-Any admitted scheduler must be checkpointed and independently verified together with model state, optimizer state, completed epoch, optimizer-step count, current LR and LR history.
-
-### Checkpoint selection
-
-R1 showed that minimum validation loss can disagree with the strongest F1 epoch. R2 therefore freezes a task-aware ranking rule before authoritative validation.
-
-Candidate order:
-
-1. specialist technical gates must pass;
-2. prefer higher macro-class F1;
-3. use center/bbox F1 as secondary quality evidence;
-4. use validation loss as tie-break/regularization evidence rather than the sole product proxy.
-
-The exact ranking formula must be fixed and tested before the result is known.
-
-### Short diagnostic gate
-
-R2 avoids another hours-long degenerate run. Before full training, a deterministic TRAIN-only diagnostic/dev partition may run a small fixed budget. A model that remains degenerate fails fast and cannot enter the authoritative full run.
-
-The authoritative validation split and sealed TEST must not become architecture-tuning loops.
-
-## Resume architecture
-
-R1 recovery was safe but expensive because restart repeated the complete derivative preflight. R2 should add a fail-closed fast-resume path for immutable artifacts.
-
-Fast resume may bypass the record-by-record scan only when a persisted preflight receipt remains bound to all of:
-
-```text
-derivative build id
-manifest SHA-256
-artifact-binding SHA-256
-preflight receipt SHA-256
-repository SHA
-runtime/dependency fingerprint
-training-profile fingerprint
-resume checkpoint SHA-256
-```
-
-Any mismatch falls back to the full preflight. TEST sealing, family isolation, exact optimizer-step accounting and checkpoint integrity are never weakened.
-
-## Ground-truth authority
-
-Synthetic ground truth remains split into deterministic authorities:
-
-- **symbolic GT:** canonical ST music / deterministic MusicXML;
-- **spatial GT:** pinned Verovio geometry replayed through the exact accepted image transform.
-
-R2 does not manufacture labels from model predictions. Real geometry later requires separately admitted, human-verified annotation. ScoreMosaic uploads and teacher corrections remain excluded from automatic training.
-
-## D13 development surface
-
-The accepted D13 derivative surface used by R1 remains evidence, not disposable scratch data:
-
-```text
-TRAIN records        9840
-VALIDATION records   1224
-TOTAL records       11064
-persisted images    11062
-persisted labels    11064
-TEST records            0
-```
-
-Target instances:
-
-```text
-TRAIN
-  NoteHeadSet     38334
-  RestSet         10602
-  AccidentalSet   22392
-
-VALIDATION
-  NoteHeadSet      5232
-  RestSet           969
-  AccidentalSet     3330
-```
-
-R2 may reuse this surface only after the root-cause audit confirms that the relevant labels/transforms are valid for the selected R2 representation. Any new ROI derivative receives a new deterministic identity and independent verification.
-
-## Meter status
-
-D11 Meter remains a technical baseline, not the product-quality endpoint. Meter V2 is intentionally outside D13-R2 implementation scope. After D13-R2 closes, Meter returns to product-quality review and may be decomposed into presence/digit/composer stages if the frozen product thresholds are not met.
-
-## Product-quality direction
-
-The user-visible question is not "is F1 high?" but "did the PDF become correct music?" Later evaluation therefore needs to connect specialist observations to:
-
-```text
-symbol detection correctness
-symbol class correctness
-staff-position / pitch correctness
-duration correctness
-accidental association correctness
-exact note-event correctness
-exact measure correctness
-critical errors per 10,000 symbols
-UNKNOWN / abstain behavior
-```
-
-No current specialist validation F1 is to be presented as end-to-end PDF-reading accuracy.
-
-## Safety boundary
-
-D13-R2 does **not** authorize:
-
-- sealed TEST access;
-- automatic ScoreMosaic/teacher-correction learning;
-- RhythmSet/PitchSet/ChordSet training;
-- Meter V2 implementation;
-- production integration;
-- deletion or rewriting of D13-R1 evidence;
-- architecture tuning from sealed-test outcomes.
+- TEST remains sealed until the final Stage 9 decision gate.
+- TRAIN alone may update model parameters.
+- VALIDATION is read-only evaluation/tuning evidence.
+- ScoreMosaic uploads and teacher corrections are not automatic training data.
+- External datasets require the existing rights/license/install-pin contract.
+- Large datasets and checkpoints remain outside ordinary Git content.
+- Every candidate artifact remains hash/provenance bound.
+- Deterministic musical validators retain veto authority over learned outputs.
+- No benchmark result may be presented as production accuracy unless its exact dataset/split/metric identity is stated.
 
 ## Next gate
 
-Implement **Rest Root-Cause Audit** as the first R2 package. Produce read-only diagnostic evidence for label correctness, target scale, decoder behavior, localization and class separation. Only after that evidence selects the failure mode may the next package freeze the Rest R2 architecture and authorize a bounded diagnostic optimizer run.
+Implement the **bounded Polyphonic V2 free-running inference/semantic-decoding contract**, then enter **TR-POLY-09B common benchmark execution** on VALIDATION under the frozen TR-POLY-02 identity. Do not open sealed TEST and do not redesign the model before this measurement surface exists.
