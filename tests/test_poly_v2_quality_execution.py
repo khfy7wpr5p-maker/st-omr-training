@@ -61,7 +61,21 @@ _SMALL_MODEL = Poly2DTransformerConfig(
 )
 
 
-def _score() -> PolyScore:
+def _atom(atom_id: str, step: str, octave: int) -> NoteAtom:
+    return NoteAtom(
+        atom_id=atom_id,
+        pitch=PitchSpelling(step=step, alter=0, octave=octave),
+    )
+
+
+def _score(tag: str) -> PolyScore:
+    """Build a compact target that satisfies the admitted native V2 coverage contract.
+
+    The tag participates only in stable event/atom identities so every fixture target
+    is byte-distinct across TRAIN and VALIDATION while preserving the same semantic
+    coverage surface.
+    """
+
     return PolyScore(
         parts=(
             PolyPart(
@@ -76,34 +90,46 @@ def _score() -> PolyScore:
                         clefs=(ClefAssignment(staff=1, sign="G", line=2),),
                         events=(
                             PolyEvent(
-                                event_id="e-v1",
-                                kind=EventKind.NOTE,
+                                event_id=f"{tag}-chord-v1",
+                                kind=EventKind.CHORD,
                                 onset=ExactRational(0, 1),
                                 duration=ExactRational(1, 4),
                                 voice=1,
                                 staff=1,
                                 note_type=NoteType.QUARTER,
                                 noteheads=(
-                                    NoteAtom(
-                                        atom_id="a-v1",
-                                        pitch=PitchSpelling(step="C", alter=0, octave=4),
-                                    ),
+                                    _atom(f"{tag}-c4", "C", 4),
+                                    _atom(f"{tag}-e4", "E", 4),
                                 ),
                             ),
                             PolyEvent(
-                                event_id="e-v2",
+                                event_id=f"{tag}-note-v2",
                                 kind=EventKind.NOTE,
                                 onset=ExactRational(0, 1),
                                 duration=ExactRational(1, 4),
                                 voice=2,
                                 staff=1,
                                 note_type=NoteType.QUARTER,
-                                noteheads=(
-                                    NoteAtom(
-                                        atom_id="a-v2",
-                                        pitch=PitchSpelling(step="E", alter=0, octave=4),
-                                    ),
-                                ),
+                                noteheads=(_atom(f"{tag}-g4", "G", 4),),
+                            ),
+                            PolyEvent(
+                                event_id=f"{tag}-rest-v3",
+                                kind=EventKind.REST,
+                                onset=ExactRational(0, 1),
+                                duration=ExactRational(1, 4),
+                                voice=3,
+                                staff=1,
+                                note_type=NoteType.QUARTER,
+                            ),
+                            PolyEvent(
+                                event_id=f"{tag}-note-v4",
+                                kind=EventKind.NOTE,
+                                onset=ExactRational(0, 1),
+                                duration=ExactRational(1, 4),
+                                voice=4,
+                                staff=1,
+                                note_type=NoteType.QUARTER,
+                                noteheads=(_atom(f"{tag}-b4", "B", 4),),
                             ),
                         ),
                     ),
@@ -168,14 +194,13 @@ def _sealed_test_sample() -> NativePolyV2Sample:
 
 
 def _build(train_count: int = 10, validation_count: int = 3):
-    target = serialize_polyphonic_score(_score()).encode("ascii")
     artifacts = []
     for index in range(train_count):
         artifacts.append(
             NativePolyV2ArtifactInput(
                 family_id=f"train-family-{index:02d}",
                 split=DatasetSplit.TRAIN,
-                target_json=target,
+                target_json=serialize_polyphonic_score(_score(f"train-{index:02d}")).encode("ascii"),
                 image_png=_png(index + 1),
             )
         )
@@ -184,7 +209,7 @@ def _build(train_count: int = 10, validation_count: int = 3):
             NativePolyV2ArtifactInput(
                 family_id=f"validation-family-{index:02d}",
                 split=DatasetSplit.VALIDATION,
-                target_json=target,
+                target_json=serialize_polyphonic_score(_score(f"validation-{index:02d}")).encode("ascii"),
                 image_png=_png(index + 101),
             )
         )
