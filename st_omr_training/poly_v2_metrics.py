@@ -129,8 +129,11 @@ class MetricObservation:
 @dataclass(frozen=True, slots=True)
 class PolyV2SampleMetricReport:
     sample_id: str
+    family_id: str
+    split: str
     benchmark_identity_sha256: str
     candidate_identity_sha256: str
+    checkpoint_bound: bool
     inference_evidence_sha256: str
     reference_representation_sha256: str
     prediction_representation_sha256: str | None
@@ -152,6 +155,12 @@ class PolyV2SampleMetricReport:
             _require_sha256(name, getattr(self, name))
         if self.prediction_representation_sha256 is not None:
             _require_sha256("prediction_representation_sha256", self.prediction_representation_sha256)
+        if not isinstance(self.family_id, str) or not self.family_id:
+            raise PolyV2MetricError("family_id must be non-empty text")
+        if self.split != "validation":
+            raise PolyV2MetricError("B2 sample report split must be validation")
+        if not isinstance(self.checkpoint_bound, bool):
+            raise PolyV2MetricError("checkpoint_bound must be bool")
         if not isinstance(self.voice_stratum, str) or not self.voice_stratum:
             raise PolyV2MetricError("voice_stratum must be non-empty text")
         if not isinstance(self.robustness_bucket, str) or not self.robustness_bucket:
@@ -526,8 +535,11 @@ def evaluate_poly_v2_validation_sample(
 
     report = PolyV2SampleMetricReport(
         sample_id=descriptor.sample_id,
+        family_id=descriptor.family_id,
+        split=descriptor.split,
         benchmark_identity_sha256=benchmark.canonical_sha256(),
         candidate_identity_sha256=prediction.identity.fingerprint(),
+        checkpoint_bound=prediction.identity.checkpoint_bound,
         inference_evidence_sha256=prediction.evidence_fingerprint(),
         reference_representation_sha256=reference.canonical_sha256(),
         prediction_representation_sha256=prediction.prediction_sha256,
