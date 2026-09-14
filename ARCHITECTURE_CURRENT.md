@@ -33,6 +33,8 @@ Deterministic metric/adaptor surface                 ✅ IMPLEMENTED — TR-POLY
         ↓
 Common VALIDATION aggregation/execution              🔄 NEXT — TR-POLY-09B3
         ↓
+Exact missing-metric admission                       🔒
+        ↓
 Evidence-driven refinement                           🔒
         ↓
 Candidate freeze + sealed TEST decision              🔒 TEST SEALED
@@ -40,82 +42,99 @@ Candidate freeze + sealed TEST decision              🔒 TEST SEALED
 Separate ScoreMosaic shadow/integration              🔒
 ```
 
-## TR-POLY-09B1 result
+## B1 completed
 
-B1 closed the teacher-forcing gap. A verified image/checkpoint can now produce a prediction from BOS alone, reuse one 2D visual memory across the autoregressive loop, and terminate as canonical V2 or explicit failure/abstention. No gold target prefix is supplied and model state must not mutate.
+TR-POLY-09B1 closed the teacher-forcing gap. A verified image/checkpoint can now produce tokens from BOS alone, reuse one 2D visual memory during decoding, and terminate as canonical V2 or explicit invalid/abstain evidence. PR #155 passed exact-head CI and merged at `58c27b5403301fe478c9b6c8351682c8f8bf1624`.
 
-PR #155 passed exact-head CI and merged to protected `main` at `58c27b5403301fe478c9b6c8351682c8f8bf1624`.
+## B2 exact metric surface
 
-## TR-POLY-09B2 architecture delta
+B2 maps one canonical V2 reference and one B1 free-running prediction into every frozen TR-POLY-02 metric ID without inventing missing evidence.
 
-B2 maps one canonical V2 reference and one B1 free-running prediction into the frozen TR-POLY-02 metric vocabulary.
+### 11 available numeric metrics
 
-Implemented numeric metrics:
+```text
+parse_success
+ter
+normalized_edit_distance
+exact_sequence_accuracy
+pitch_accuracy
+duration_accuracy
+onset_accuracy
+voice_accuracy
+staff_accuracy
+accidental_note_f1
+note_staff_f1
+```
 
-- `parse_success`;
-- `ter`, `normalized_edit_distance`, `exact_sequence_accuracy`;
-- `pitch_accuracy`, `duration_accuracy`, `onset_accuracy`, `voice_accuracy`, `staff_accuracy`;
-- `notehead_stem_f1`, `beam_relation_f1`, `tie_relation_f1`, `accidental_note_f1`, `note_staff_f1`.
+### 5 explicit unsupported metrics
 
-The adapter uses deterministic unit-cost sequence/event alignment, retains invalid/abstain predictions in evaluation, and binds every report to the benchmark identity, inference evidence, reference/prediction identity, voice stratum, robustness bucket and adapter versions.
+```text
+musicxml_validity  -> V2→MusicXML benchmark adapter not admitted
+tedn               -> exact TEDn implementation not admitted
+notehead_stem_f1   -> explicit notehead↔stem relation not represented in V2
+beam_relation_f1   -> explicit cross-event beam relation not represented in V2
+tie_relation_f1    -> explicit cross-event tie relation not represented in V2
+```
 
-### Explicitly unsupported metrics
+V2 does contain stem direction, beam marks and tie START/STOP state, but B2 does **not** silently redefine those states as the stronger frozen relation metrics.
 
-Two frozen TR-POLY-02 metrics remain deliberately non-numeric:
+## Scoring behavior
 
-- `musicxml_validity`: no admitted Polyphonic V2 → MusicXML benchmark export/validation adapter yet;
-- `tedn`: no exact reviewed TEDn implementation is admitted yet.
+- only VALIDATION descriptors are admitted;
+- TRAIN and TEST descriptors are rejected;
+- invalid/abstain B1 outputs remain in evaluation;
+- invalid output receives parse success 0, sequence error from its actual generated tokens, and zero credit on available semantic/relation metrics;
+- unsupported metrics remain unsupported rather than becoming zero;
+- sequence edit distance is deterministic unit-cost Levenshtein;
+- semantic fields use versioned deterministic event alignment;
+- `accidental_note_f1` and `note_staff_f1` use exact relation identities represented in V2;
+- report identity binds benchmark, inference evidence, reference/prediction identity, voice stratum, robustness bucket and adapter versions.
 
-They remain visible as `UNSUPPORTED` with explicit reasons. B2 therefore provides useful common metric evidence but **cannot produce a TR-POLY-02-complete metric record or winner claim**.
+## Benchmark interpretation boundary
 
-This fail-closed distinction is intentional. No surrogate TEDn or fabricated MusicXML validity score is permitted.
+B2/B3 may provide useful partial common VALIDATION evidence, but a full TR-POLY-02 result is still closed.
 
-## Current benchmark readiness
-
-After B2 is green on protected main, B3 may aggregate VALIDATION evidence by:
-
-- `1_voice`;
-- `2_voice`;
-- `3_voice`;
-- `4_plus_voice`;
-- robustness bucket where admitted.
-
-B3 must preserve invalid/abstain samples in denominators and expose metric coverage. A partial metric report may diagnose the model, but a complete winner/promotion decision remains closed until all required metric surfaces are admitted.
+```text
+partial diagnostic benchmark evidence   ✅ permitted
+11 numeric frozen metrics                ✅ available
+5 explicit unsupported metrics           ⚠️ visible
+complete TR-POLY-02 metric record         🔒 unavailable
+winner / promotion claim                  🔒 prohibited
+sealed TEST                               🔒 closed
+```
 
 ## Recommended order
 
 ```text
-TR-POLY-09B2 metric/adaptor package
-        ✅ implementation / CI+merge gate
+TR-POLY-09B2 exact-head CI + merge
         ↓
-TR-POLY-09B3 common VALIDATION aggregation harness
-        🔄 NEXT
+TR-POLY-09B3 deterministic VALIDATION aggregation
         ↓
-MusicXML-validity / TEDn admission packages as needed
+independent admission of missing metric surfaces
         ↓
 TR-POLY-02-complete comparable evidence
         ↓
 P09C evidence-driven TRAIN/VALIDATION refinement
         ↓
-P09D final candidate/evaluation freeze
+P09D candidate/evaluation recipe freeze
         ↓
-Stage 9 sealed TEST decision
+Stage 9 one-shot sealed TEST decision
         ↓
 Stage 10 separate ScoreMosaic shadow gate
 ```
 
-## Safety boundaries
+## Safety invariants
 
 - TEST remains sealed until Stage 9.
-- TRAIN alone may update model parameters.
-- VALIDATION evaluation must not mutate model state.
-- Invalid/abstain outputs are evidence and must not be dropped from benchmark denominators.
-- Unsupported metrics must not be guessed, approximated under the same metric ID, or filled with placeholder numbers.
-- External datasets still require rights/license/install-pin admission.
+- TRAIN alone may update parameters.
+- VALIDATION evaluation is read-only.
+- Invalid/abstain outputs must not be removed from denominators.
+- Unsupported metrics must not receive proxy or placeholder numbers under frozen metric IDs.
+- External data still requires rights/license/install-pin admission.
 - ScoreMosaic uploads and teacher corrections are not automatic training data.
-- Candidate artifacts and reports remain exact hash/provenance bound.
+- Candidate artifacts and metric reports remain hash/provenance bound.
 - Deterministic musical validators retain veto authority.
 
 ## Next gate
 
-Merge TR-POLY-09B2 only after exact-head CI is green. Then implement TR-POLY-09B3 common VALIDATION aggregation/reporting. Do not open TEST and do not claim a complete benchmark winner while `musicxml_validity` or `tedn` remain unsupported.
+Merge TR-POLY-09B2 only after exact-head CI is green. Then implement TR-POLY-09B3 common VALIDATION aggregation/reporting by voice stratum and robustness bucket. Do not open TEST or declare a complete benchmark winner while any frozen metric remains unsupported.
