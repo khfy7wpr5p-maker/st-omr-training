@@ -1,14 +1,15 @@
 # ST-OMR Training Lab Status
 
-Updated: 2026-09-14
+Updated: 2026-09-16
 
 This is the current stage-status source. `ARCHITECTURE.md` preserves historical detail; `ARCHITECTURE_CURRENT.md` and `ARCHITECTURE_POLYPHONIC_V2_CURRENT.md` describe the active lane.
 
 ## Current repository phase
 
-- latest merged package: PR #160 — TR-POLY-09B6 native multi-batch quality execution
-- latest verified pre-B7 `main`: `429e64d790d758c8f99ad143e0a2a04c878c04bc`
-- active package: TR-POLY-09B7 hash-bound quality VALIDATION execution
+- latest merged package: PR #161 — TR-POLY-09B7 hash-bound quality VALIDATION execution
+- latest verified `main`: `a57a14a764e97640e89b6cd4d805254b7f2c1b2f`
+- B7 exact PR head `2b9fcf9ac58dca7913dcb46e8117236f22ea2974`: CI run #701 success before merge
+- active package: TR-POLY-09B8A persisted Native V2 artifact reload / first-baseline preflight
 - frozen ≤2-step smoke trainer/checkpoint remain unchanged
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
@@ -33,9 +34,10 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 | TR-POLY-09B3 | VALIDATION aggregation by voice/robustness | ✅ Merged |
 | TR-POLY-09B4 | Multi-epoch TRAIN-only quality-training regime | ✅ Merged |
 | TR-POLY-09B5 | Separate verified quality-checkpoint artifact + B1 bridge | ✅ Merged |
-| TR-POLY-09B6 | Full native TRAIN/VALIDATION multi-batch quality execution | ✅ Merged / CI green |
-| TR-POLY-09B7 | Exact descriptor-bound quality VALIDATION B1→B2→B3 execution | 🔄 Active package |
-| First measured quality baseline | Real admitted B6 checkpoint + B7 descriptor manifest/run | 🔒 After B7 |
+| TR-POLY-09B6 | Full native TRAIN/VALIDATION multi-batch quality execution | ✅ Merged |
+| TR-POLY-09B7 | Exact descriptor-bound quality VALIDATION B1→B2→B3 execution | ✅ Merged / CI green |
+| TR-POLY-09B8A | Persisted Native V2 reload + baseline artifact preflight | 🔄 Active package |
+| First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | ⛔ Artifact-blocked |
 | Missing metric admission | Five frozen metrics remain unsupported | 🔒 Separate work |
 | P09C | Evidence-driven refinement | 🔒 After measured quality evidence |
 | P09D | Final candidate/evaluation freeze | 🔒 |
@@ -45,7 +47,9 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 ## Executable quality path
 
 ```text
-Native V2 TRAIN + VALIDATION build
+Admitted persisted Native V2 TRAIN + VALIDATION root
+        ↓
+B8A fail-closed reload / identity preflight
         ↓
 B6 deterministic full-population batching
         ↓
@@ -62,28 +66,36 @@ B2 per-sample metrics
 B3 overall + voice + robustness aggregation
 ```
 
-B6 removed the old single-batch execution limitation without changing the frozen smoke path. Every model batch remains bounded to at most eight samples and semantic target truncation remains forbidden.
+B7 is now merged. The remaining blocker is not an execution-code gap in B1–B7; it is the absence of a physically available, admitted real Native V2 baseline artifact root with an exact manifest/build identity and explicit B7 descriptor metadata.
 
-## B7 active contract
+Repository regression fixtures are test evidence only. They must not be reported as real model-quality evidence.
 
-B7 adds the missing execution bridge between an actual B5 quality checkpoint and the already-frozen B1/B2/B3 measurement stack.
+## B8A artifact gate
 
-The benchmark population is the complete native V2 VALIDATION split. There is no benchmark `max_samples` or random/prefix sample selection.
+TR-POLY-09A persists:
 
-Complexity and robustness labels are explicit `BenchmarkSampleDescriptor` metadata. B7 does not infer absent density values and does not default an unlabeled image to `clean`.
+```text
+manifest.json
+manifest.sha256
+build.json
+targets/<sha256>.json       # TRAIN/VALIDATION only
+images/<sha256>.png          # TRAIN/VALIDATION only
+```
 
-The split-manifest identity binds descriptor metadata to exact:
+B8A adds a separate reload/preflight boundary for an externally mounted persisted root. It reconstructs the `NativePolyV2DatasetBuild`, verifies exact canonical metadata, verifies TRAIN/VALIDATION artifact hashes and V2/PNG semantics, rejects extra artifact files, and keeps TEST artifact bytes absent/unread.
 
-- sample/family identity;
-- target and canonical representation SHA-256;
-- image SHA-256;
-- image dimensions;
-- target token count;
-- dataset manifest and build identity.
+A real baseline may start only after the preflight yields an exact:
 
-Changing metadata or bytes changes the benchmark identity.
+- dataset manifest SHA-256;
+- deterministic build ID;
+- TRAIN and VALIDATION population;
+- sealed TEST metadata population without TEST bytes;
+- accepted provenance/license record where external data is involved;
+- explicit B7 complexity/robustness descriptors for every VALIDATION sample.
 
-## Checkpoint/evaluation safety
+If these artifacts are unavailable, no checkpoint quality or accuracy number is claimed.
+
+## B7 checkpoint/evaluation safety
 
 B7 requires:
 
@@ -125,20 +137,22 @@ beam_relation_f1
 tie_relation_f1
 ```
 
-No unsupported metric receives a proxy number. A B7 run may provide genuine partial VALIDATION evidence while the complete common-comparison/promotion gate remains closed.
+No unsupported metric receives a proxy number. A first B7 run may provide genuine partial VALIDATION evidence while the complete common-comparison/promotion gate remains closed.
 
 ## Required order from here
 
-1. finish B7 tests/docs and exact-head CI;
-2. merge B7 only if green;
-3. freeze an admitted real/native V2 TRAIN/VALIDATION build and explicit descriptor manifest;
-4. execute B6 to create the first real quality checkpoint;
-5. execute B7 over the complete VALIDATION population;
-6. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
-7. admit the five missing metric implementations without proxies;
-8. freeze P09D candidate/evaluation identity;
-9. open sealed TEST once at Stage 9;
-10. only then consider Stage 10 ScoreMosaic shadow integration.
+1. finish B8A reload/preflight tests/docs and exact-head CI;
+2. merge B8A only if green;
+3. locate/provide one admitted real Native V2 persisted TRAIN/VALIDATION root and record its manifest/build identity plus provenance;
+4. freeze the exact B4/B6 experiment recipe and complete B7 descriptor manifest;
+5. execute B6 to create the first real quality checkpoint;
+6. independently verify the B5 checkpoint round trip;
+7. execute B7 over the complete admitted VALIDATION population;
+8. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
+9. admit the five missing metric implementations without proxies;
+10. freeze P09D candidate/evaluation identity;
+11. open sealed TEST once at Stage 9;
+12. only then consider Stage 10 ScoreMosaic shadow integration.
 
 ## Safety invariants
 
@@ -146,9 +160,12 @@ No unsupported metric receives a proxy number. A B7 run may provide genuine part
 - TRAIN alone changes model parameters.
 - VALIDATION is read-only.
 - Smoke contracts remain immutable.
+- Quality work uses separate versioned provenance.
 - No semantic truncation is allowed.
-- Invalid/abstain predictions stay visible.
+- Invalid/abstain predictions stay visible in denominators.
 - Unsupported metrics stay unsupported.
-- External data still requires rights/license/install-pin admission.
+- Benchmark identity and candidate identity must match exactly.
+- External data requires rights/license/install-pin admission.
 - Teacher corrections and ScoreMosaic uploads are not automatic training data.
 - No training or VALIDATION benchmark package grants production authority.
+- Every merge requires exact-head green CI.
