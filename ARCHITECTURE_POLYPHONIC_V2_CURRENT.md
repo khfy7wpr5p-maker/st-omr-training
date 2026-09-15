@@ -2,247 +2,225 @@
 
 Updated: 2026-09-14
 
-This document separates implemented capability from measured quality and preserves the dependency order toward a defensible Polyphonic V2 model.
+This document separates implemented capability, executable evidence and measured model quality. TEST remains sealed until Stage 9.
 
 ## 1. Current chain
 
-Protected `main` baseline for the active package:
-
-`c1d6f3b9e1419839def00e64a41625d258ef2b47`
-
 ```text
-TR-POLY-02 evaluation taxonomy / benchmark identity       ✅
+TR-POLY-02 evaluation taxonomy / benchmark identity       ✅ FROZEN
 TR-POLY-03 external dataset + license registry            ✅
 TR-POLY-04 deterministic external benchmark harness       ✅
-TR-POLY-05 Polyphonic Representation V2                   ✅
-TR-POLY-06 V2 parser/tokenizer/lossless roundtrip         ✅
-TR-POLY-07 research model registry                         ✅
+TR-POLY-05 Polyphonic Representation V2                   ✅ FROZEN
+TR-POLY-06 V2 parser/tokenizer/lossless roundtrip         ✅ FROZEN
+TR-POLY-07 research model registry                        ✅
 TR-POLY-08 tiny 2D Transformer                            ✅ RESEARCH
 TR-POLY-08A bounded trainer                               ✅ SMOKE ONLY (≤2 steps)
-TR-POLY-08B bounded research checkpoint                    ✅ SMOKE ONLY
-TR-POLY-08C exact Stage 6 V1→V2 execution                 ✅
-TR-POLY-09A native explicit V2 materialization            ✅
+TR-POLY-08B bounded research checkpoint                   ✅ SMOKE ONLY
+TR-POLY-08C exact Stage 6 V1→V2 execution                ✅ SINGLE-VOICE EVIDENCE
+TR-POLY-09A native explicit V2 materialization            ✅ MERGED
 TR-POLY-09B1 free-running greedy inference                ✅ MERGED
 TR-POLY-09B2 deterministic metric/adaptor layer           ✅ MERGED
 TR-POLY-09B3 deterministic VALIDATION aggregation         ✅ MERGED
-TR-POLY-09B4 deterministic quality-training regime        ✅ IMPLEMENTED / MERGE GATE
-quality-checkpoint artifact                               🔒 NEXT
-first native-V2 quality candidate                         🔒
-quality VALIDATION B1→B2→B3                              🔒
+TR-POLY-09B4 multi-epoch quality-training regime          ✅ MERGED
+TR-POLY-09B5 verified quality checkpoint + B1 bridge      ✅ MERGED
+TR-POLY-09B6 native multi-batch quality execution         ✅ MERGED
+TR-POLY-09B7 hash-bound quality VALIDATION execution      🔄 ACTIVE
+first measured quality baseline                           🔒
 P09C evidence-driven refinement                           🔒
 missing metric admission                                  🔒 5 surfaces
-P09D final candidate freeze                               🔒
+P09D final candidate/evaluation freeze                    🔒
 Stage 9 sealed TEST decision                              🔒
 Stage 10 ScoreMosaic shadow integration                   🔒
 ```
 
-## 2. Measurement architecture
+Latest merged package before B7: PR #160 / main `429e64d790d758c8f99ad143e0a2a04c878c04bc`.
 
-The model-quality measurement path is structurally available once a real quality checkpoint exists:
+## 2. Architecture layers
 
-```text
-native V2 VALIDATION image + canonical target
-        ↓
-exact verified quality checkpoint
-        ↓
-B1 free-running greedy prediction
-        ↓
-strict V2 parse OR explicit invalid/abstain
-        ↓
-B2 deterministic per-sample metrics
-        ↓
-B3 deterministic candidate aggregation
-        ├─ overall
-        ├─ 1 / 2 / 3 / 4+ voice
-        └─ robustness buckets
-```
+### Representation layer
 
-B1 removes teacher forcing, B2 measures each prediction, and B3 prevents failure cases from disappearing in aggregation.
+Polyphonic Representation V2 and its tokenizer preserve the explicit score surface needed for multi-voice OMR research: voices, staves, chords, exact rational timing, noteheads, ties, beams, tuplets, grace state and cross-staff notehead overrides.
 
-## 3. Why the earlier training path is not enough
+### Model layer
 
-TR-POLY-08A and TR-POLY-08B were intentionally designed to prove bounded deterministic training/checkpoint infrastructure. Both enforce a maximum of two optimizer steps.
+The tiny 2D Transformer keeps a 2D visual patch grid and autoregressive V2 decoder. It remains a research architecture with no production authority.
 
-That is sufficient to verify:
+### Smoke layer
 
-- gradient updates;
-- TRAIN-only mutation;
-- read-only VALIDATION;
-- finite-state guards;
-- checkpoint serialization/reload;
-- provenance and hash binding.
+TR-POLY-08A/B prove bounded trainability and checkpoint replay only. Their ≤2-step semantics remain immutable.
 
-It is not sufficient to estimate the achievable recognition quality of the 2D Transformer.
+### Quality-training layer
 
-The smoke path therefore remains frozen as historical infrastructure evidence and must never be silently widened or relabeled as a quality-training run.
-
-## 4. TR-POLY-09B4 quality-training regime
-
-B4 creates a separate multi-epoch control plane while reusing the already-hardened one-step optimization primitive.
+B4/B5/B6 form a separate path for genuine training candidates:
 
 ```text
-quality config + quality provenance
+native V2 TRAIN/VALIDATION
         ↓
-exact TRAIN tuple + exact VALIDATION tuple
+B6 deterministic complete selected population materialization
         ↓
-frozen seed model initialization
+ordered batches, each ≤8
         ↓
-Epoch 1
-  TRAIN batch 1 → update
-  TRAIN batch 2 → update
-  ...
-  full VALIDATION → read-only mean loss
+B4 multi-epoch TRAIN updates + read-only VALIDATION
         ↓
-Epoch 2 ... N
+minimum mean VALIDATION-loss selected epoch
         ↓
-fixed budget completes
-        ↓
-minimum mean VALIDATION loss
-        ↓
-earliest exact-loss tie
-        ↓
-reload selected epoch state
-        ↓
-selected-state SHA-256 verification
+B5 hash-verified research quality checkpoint
 ```
 
-### Frozen v1 policies
+### Quality-measurement layer
 
-- optimizer: AdamW via the existing TR-POLY-08A primitive;
-- loss: V2 PAD-aware cross-entropy;
-- scheduler: none;
-- batch order: exact caller-supplied tuple order;
-- shuffle/sampling: none;
-- validation interval: every epoch;
-- validation coverage: every supplied VALIDATION batch;
-- selection: minimum arithmetic-mean VALIDATION loss;
-- tie: earliest epoch;
-- stopping: fixed configured epoch budget;
-- TEST: prohibited;
-- production authority: prohibited.
+B7 connects a verified B5 artifact to the already-frozen B1/B2/B3 measurement stack:
 
-A future shuffled, scheduled or early-stopped regime must receive a new version and cannot reuse the v1 trainer fingerprint.
+```text
+explicit VALIDATION descriptors
+        +
+exact native sample/artifact identities
+        ↓
+hash-bound split manifest
+        ↓
+TR-POLY-02 BenchmarkIdentity
+        +
+verified B5 checkpoint
+        ↓
+B1 free-running predictions
+        ↓
+B2 sample reports
+        ↓
+B3 aggregate report
+```
 
-## 5. Quality recipe identity
+## 3. B4 quality-training contract
 
-The quality trainer has an independent fingerprint that binds:
+B4 is deliberately separate from the smoke trainer.
 
-- quality trainer version;
-- quality plan version;
-- exact quality config;
-- model profile;
-- tokenizer and representation versions;
-- pinned PyTorch runtime;
-- underlying one-step primitive profile.
+Frozen v1 policies:
 
-The run additionally fingerprints the **ordered batch plan**. The plan includes split, ordered sample IDs, dataset identity and tensor shapes for each supplied TRAIN/VALIDATION batch.
+- TRAIN-only gradient updates;
+- exact caller-supplied batch order;
+- no shuffle or hidden sampling;
+- no scheduler;
+- full read-only VALIDATION after every epoch;
+- fixed epoch budget;
+- arithmetic-mean VALIDATION loss;
+- minimum mean VALIDATION-loss selection;
+- earliest epoch wins exact ties;
+- selected state reloaded and hash-verified;
+- TEST prohibited;
+- production authority prohibited.
 
-Therefore changing batch order changes the training-plan SHA even when the underlying sample set is unchanged.
+Safety ceilings remain finite: max 128 epochs, max 100,000 optimizer steps and inherited per-batch tensor/token limits.
 
-## 6. Data separation
+## 4. B5 quality-checkpoint contract
 
-B4 accepts only existing `Poly2DTrainingBatch` values, so the earlier batch-level bounds remain active.
+B5 does not widen TR-POLY-08B. It defines a separate research artifact for a B4-selected state.
 
-Additional B4 guards require:
+It binds:
 
-- every TRAIN entry is actually TRAIN;
-- every VALIDATION entry is actually VALIDATION;
-- one exact dataset manifest across all batches and provenance;
-- no duplicate sample ID anywhere across the supplied TRAIN/VALIDATION plan;
-- the planned optimizer-step count fits the configured bound before training begins.
+- selected model state;
+- B4 result fingerprint and selected epoch;
+- exact model/trainer/provenance identity;
+- dataset manifest;
+- preprocessing fingerprint;
+- tokenizer/representation/runtime;
+- dedicated research registry record;
+- checkpoint/metadata/training-result/receipt hashes.
 
-TEST cannot be constructed through the accepted batch boundary and receives no escape hatch in B4.
+Reload verifies hashes before deserialization and uses `weights_only=True`. The B1 wrapper binds inference identity to the exact verified B5 artifact.
 
-## 7. B4 resource ceilings
+## 5. B6 native quality execution
 
-The v1 safety ceilings are deliberately larger than the smoke harness while still finite:
+B6 removes the old execution limitation where native V2 materialization could feed only one ≤8-sample smoke batch.
 
-- maximum epochs: 128;
-- maximum optimizer steps: 100,000;
-- maximum supplied batches per split: 100,000;
-- inherited per-batch image, batch-size, target-length, vocabulary and finite-value limits.
+B6:
 
-These values are ceilings, not a claim that the default recipe is optimal.
+- preserves the old smoke API unchanged;
+- selects TRAIN or VALIDATION samples in deterministic sample-id order;
+- supports the full selected population;
+- partitions it into contiguous batches of at most eight;
+- verifies target/image bytes and canonical V2 roundtrip;
+- forbids semantic target truncation;
+- keeps TRAIN/VALIDATION families disjoint;
+- executes B4;
+- persists/verifies B5;
+- never opens TEST;
+- grants no benchmark or production authority.
 
-The default v1 quality config uses eight epochs and an 8,192-step ceiling. Real experiment parameters remain fingerprinted and must be frozen before execution.
+A green B6 merge proves the execution path, not model quality.
 
-## 8. Epoch and run evidence
+## 6. B7 benchmark population identity
 
-Each epoch emits:
+B7 evaluates the **complete** native V2 VALIDATION population. Benchmark execution exposes no `max_samples` or random sampling option.
 
-- epoch number;
-- cumulative optimizer steps;
-- mean TRAIN loss;
-- mean read-only VALIDATION loss;
-- exact model-state SHA-256.
+Every explicit descriptor must map one-to-one to an exact VALIDATION sample and exact family ID.
 
-The run result binds:
+The B7 split-manifest hash binds:
 
-- initial model-state SHA;
-- selected model-state SHA;
-- selected epoch;
-- selected validation loss;
-- every epoch record;
-- exact training-plan SHA;
-- model profile;
-- quality-trainer profile;
-- underlying one-step primitive profile;
-- quality provenance;
-- dataset identity;
-- tokenizer fingerprint;
-- repository SHA;
-- pinned runtime;
-- explicit `test_split_accessed=false`;
-- explicit `production_authority=false`.
+- dataset manifest and native build ID;
+- sample/family IDs;
+- target SHA-256;
+- canonical representation SHA-256;
+- image SHA-256;
+- dimensions and target-token count;
+- caller-declared complexity profile;
+- caller-declared robustness bucket;
+- B7 descriptor/selection policy versions.
 
-The returned model is reloaded to the selected epoch state and its exact state SHA is checked against the result.
+This SHA becomes `BenchmarkIdentity.split_manifest_sha256`.
 
-## 9. Checkpoint dependency
+## 7. Why descriptor values are not guessed
 
-B4 deliberately stops before artifact persistence.
+TR-POLY-02 freezes fields such as voice count, density measures and robustness buckets, but it does not define one universal extraction algorithm for all density/robustness metadata.
 
-The old TR-POLY-08B checkpoint cannot be reused because its schema semantically means “bounded ≤2-step research checkpoint” and validates that bound on reload.
+B7 therefore treats them as explicit benchmark metadata rather than inventing values.
 
-The next package must provide a separate quality-checkpoint schema with:
+Consequences:
 
-- selected B4 state only;
-- exact B4 config and provenance;
-- B4 result fingerprint / selected epoch evidence;
-- non-overwriting artifact directory;
-- checkpoint/metadata/receipt hashes;
-- hash verification before deserialization;
-- `torch.load(..., weights_only=True)`;
-- strict model-state reload;
-- dedicated research registry binding;
-- `benchmark_evidence=false`;
-- `production_authority=false`;
-- `test_split_accessed=false`.
+- no absent robustness label becomes `clean` silently;
+- no density is estimated by an unversioned helper;
+- changing declared metadata changes benchmark identity;
+- future automatic descriptor derivation requires its own versioned deterministic admission contract.
 
-A verified quality-checkpoint loader then needs a B1 wrapper that creates a checkpoint-bound inference identity without weakening the existing smoke-checkpoint wrapper.
+## 8. B7 checkpoint and inference gate
 
-## 10. B1–B3 measurement rules remain unchanged
+Before sample inference B7 verifies:
 
-Invalid free-running predictions remain in the metric population. B3 continues to require one exact benchmark identity and one exact checkpoint/candidate identity.
+1. the complete B5 artifact through the existing loader;
+2. checkpoint dataset manifest == B7 native dataset manifest;
+3. checkpoint preprocessing identity == native V2 materialization fingerprint for the loaded model config;
+4. checkpoint model-profile fingerprint == loaded model config;
+5. one explicit `max_decode_steps` within the checkpoint target boundary.
 
-Required voice strata remain:
+The checkpoint is loaded once. Every sample then uses the frozen B1 greedy decoder without gold prefix or model mutation.
+
+The first inference establishes candidate/inference-profile identity. Any identity drift on a later sample aborts the execution.
+
+## 9. B2/B3 semantics remain unchanged
+
+B7 orchestrates; it does not redefine metrics.
+
+Invalid free-running predictions remain in the population. B2 records parse failure and available sequence/semantic relation values according to its frozen contract. B3 requires one benchmark identity, one checkpoint-bound candidate identity and unique sample IDs.
+
+Voice strata:
 
 - `1_voice`;
 - `2_voice`;
 - `3_voice`;
 - `4_plus_voice`.
 
-Observed robustness buckets remain separate:
+Robustness buckets:
 
-- clean;
-- scan;
-- phone;
-- blur;
-- perspective;
-- low contrast.
+- `clean`;
+- `scan`;
+- `phone`;
+- `blur`;
+- `perspective`;
+- `low_contrast`.
 
-## 11. Current metric coverage
+Missing strata remain visible rather than fabricated.
 
-Numeric:
+## 10. Current metric coverage
+
+Available numeric metrics:
 
 - `parse_success`;
 - `ter`;
@@ -256,7 +234,7 @@ Numeric:
 - `accidental_note_f1`;
 - `note_staff_f1`.
 
-Still unsupported:
+Still explicitly unsupported:
 
 - `musicxml_validity`;
 - `tedn`;
@@ -264,41 +242,63 @@ Still unsupported:
 - `beam_relation_f1`;
 - `tie_relation_f1`.
 
-Partial VALIDATION evidence may guide P09C, but complete winner/promotion claims remain closed while required metrics are unsupported.
+A B7 run can therefore be genuine VALIDATION evidence while full common-comparison/promotion readiness remains false.
 
-## 12. First quality experiment order
+## 11. Evidence hierarchy
+
+The architecture now distinguishes four evidence levels:
 
 ```text
-B4 exact-head green merge
-        ↓
-quality-checkpoint contract + reload
-        ↓
-freeze exact native-V2 TRAIN/VALIDATION manifest/build
-        ↓
-freeze exact B4 training recipe
-        ↓
-train on TRAIN only
-        ↓
-select/freeze best VALIDATION-loss checkpoint
-        ↓
-run checkpoint on VALIDATION via B1
-        ↓
-B2 per-sample metrics
-        ↓
-B3 voice/robustness aggregation
-        ↓
-P09C failure-driven refinement
+SMOKE EVIDENCE
+08A/08B: bounded plumbing/trainability
+
+QUALITY TRAINING EVIDENCE
+B4/B5/B6: real multi-epoch candidate creation and verified artifact
+
+QUALITY VALIDATION EVIDENCE
+B7 + B1/B2/B3: exact checkpoint on exact hash-bound VALIDATION population
+
+SEALED TEST EVIDENCE
+Stage 9 only: final one-shot decision
 ```
 
-The first quality run must be treated as a baseline, not as the final architecture.
+None of these automatically grants production authority.
+
+## 12. First real quality baseline
+
+After B7 is merged, the first meaningful model-quality run should freeze all of the following before execution:
+
+- admitted native/external TRAIN/VALIDATION dataset identity;
+- data-rights/license/install-pin evidence where external data is involved;
+- exact B4 quality-training recipe;
+- exact B6 batch/execution identity;
+- exact B5 checkpoint hashes;
+- explicit B7 descriptor manifest;
+- exact B7 decode bound and benchmark identity.
+
+Then:
+
+```text
+B6 TRAIN-only candidate creation
+        ↓
+freeze B5 checkpoint
+        ↓
+B7 full VALIDATION execution
+        ↓
+B2/B3 failure analysis
+        ↓
+P09C targeted change
+```
+
+The first run is a baseline, not a winner or production candidate.
 
 ## 13. P09C decision policy
 
-Use measured quality evidence rather than model-size intuition:
+Use measured evidence rather than model-size intuition:
 
 ```text
 high parse failure       → decoder/search diagnosis
-high TER, valid parses   → sequence modeling/search diagnosis
+high TER, valid parses   → sequence/search diagnosis
 weak pitch               → visual/pitch evidence diagnosis
 weak duration/onset      → rhythm/data diagnosis
 weak 2+/3+/4+ voice      → polyphonic separation/data diagnosis
@@ -306,22 +306,34 @@ weak note_staff_f1       → staff/cross-staff diagnosis
 strong clean, weak scan  → robustness/domain coverage diagnosis
 ```
 
-Only demonstrated failure families should justify model/data/search expansion.
+Only demonstrated failure families justify architecture/data/search expansion.
 
-## 14. Safety invariants
+## 14. Missing metric admission
+
+The five unsupported surfaces must be admitted separately and exactly. In particular:
+
+- TEDn must use an identified/versioned implementation, not a private proxy with the same metric ID;
+- MusicXML validity requires an admitted V2→MusicXML evaluation adapter;
+- stem/beam/tie relation metrics require relation identities that match the frozen metric semantics.
+
+Until then no complete winner/promotion claim is valid.
+
+## 15. Safety invariants
 
 - TEST remains sealed until Stage 9.
 - TRAIN is the only parameter-updating split.
-- VALIDATION is read-only and may select a candidate but never update it.
-- Smoke contracts remain immutable.
-- Quality training receives separate version/provenance identities.
-- Unsupported benchmark metrics never receive proxy numbers.
-- Invalid/abstain outputs remain in benchmark denominators.
+- VALIDATION is read-only.
+- Frozen smoke contracts remain immutable.
+- Semantic target truncation is forbidden.
+- Benchmark sample selection cannot silently shrink the population.
+- Descriptor metadata cannot silently default or drift.
+- Invalid/abstain outputs remain in denominators.
+- Unsupported metric IDs never receive proxy values.
 - Different benchmark/candidate identities cannot be mixed.
 - External data requires rights/license/install-pin admission.
 - Teacher corrections and ScoreMosaic uploads are not automatic training data.
-- No quality-training or benchmark artifact grants production authority.
+- No quality-training or VALIDATION benchmark artifact grants production authority.
 
 ## Immediate next action
 
-Finish TR-POLY-09B4 exact-head CI/merge. Then implement the separate quality-checkpoint artifact/reload contract and checkpoint-bound B1 inference bridge. Only after those gates are green should the first real native-V2 quality training/VALIDATION experiment run. TEST remains sealed.
+Finish B7 exact-head tests/CI and merge only if green. Then execute the first admitted B6→B5→B7 quality baseline, inspect actual VALIDATION failure strata, and choose P09C from evidence. TEST remains sealed throughout.
