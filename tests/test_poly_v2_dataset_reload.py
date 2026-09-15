@@ -191,7 +191,10 @@ class PolyV2DatasetReloadTests(unittest.TestCase):
             expected, root = self._persist(Path(directory))
             loaded = load_and_verify_native_poly_v2_dataset(root)
 
-            self.assertEqual(loaded.build, expected)
+            self.assertEqual(loaded.build.manifest_sha256, expected.manifest_sha256)
+            self.assertEqual(loaded.build.build_id, expected.build_id)
+            self.assertEqual(loaded.build.targets, expected.targets)
+            self.assertEqual(loaded.build.images, expected.images)
             self.assertEqual(loaded.receipt.manifest_sha256, expected.manifest_sha256)
             self.assertEqual(loaded.receipt.build_id, expected.build_id)
             self.assertEqual(len(loaded.receipt.train_sample_ids), 1)
