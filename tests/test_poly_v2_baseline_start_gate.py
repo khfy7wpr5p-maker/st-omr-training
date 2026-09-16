@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import unittest
 from unittest.mock import Mock, patch
@@ -226,12 +227,7 @@ class PolyV2BaselineStartGateTests(unittest.TestCase):
             recipe=recipe,
             repository_sha=REPOSITORY_SHA,
         )
-        tampered = NativePolyV2BaselineStartPermit(
-            **{
-                **permit.__dict__,
-                "b8i_admission_receipt_sha256": h("4"),
-            }
-        )
+        tampered = replace(permit, b8i_admission_receipt_sha256=h("4"))
         with patch(
             "st_omr_training.poly_v2_baseline_start_gate.execute_native_poly_v2_quality_training"
         ) as execute:
