@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
@@ -86,6 +87,25 @@ class PolyV2ExperimentRecipeTests(unittest.TestCase):
             self.assertFalse(first.test_artifact_bytes_accessed)
             self.assertFalse(first.production_authority)
             self.assertGreaterEqual(first.max_decode_steps, 1)
+
+    def test_frozen_receipt_rejects_independent_invalid_step_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            loaded = self._loaded(Path(directory))
+            recipe = freeze_native_poly_v2_experiment_recipe(
+                loaded=loaded,
+                repository_sha=_REPOSITORY_SHA,
+                descriptors=(_descriptor(loaded),),
+            )
+            with self.assertRaisesRegex(
+                PolyV2ExperimentRecipeError,
+                "epochs must be a positive plain integer",
+            ):
+                replace(recipe, epochs=0)
+            with self.assertRaisesRegex(
+                PolyV2ExperimentRecipeError,
+                "optimizer-step evidence differs",
+            ):
+                replace(recipe, required_optimizer_steps=recipe.required_optimizer_steps + 1)
 
     def test_descriptor_set_must_cover_exact_validation_population(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
