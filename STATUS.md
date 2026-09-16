@@ -6,16 +6,20 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 ## Current repository phase
 
-- latest merged package: PR #169 — TR-POLY-09B8N exact OSSQ source-PDF byte pinning
-- latest verified `main`: `c72a2696ccdc664de63253811068fbd3ad758f56`
-- B8N exact PR head `e4040c18eb4f03d4861618c1e704fd3340dd7aef`: CI run #724 success plus OSSQ B8N Source Byte Pin run #6 success before merge
+- active package: TR-POLY-09B8P exact OSSQ system-image ↔ systemwise-MusicXML materialization
 - B8N canonical source-byte receipt: `9f9b678e2365ec849cc19424b28d8dbdb435af3a5a9ef5b47cf7a460e72a801c`
-- active package: TR-POLY-09B8O exact OSSQ pairing-source preflight
-- B8O discovery receipt: `b77718f90f5865082a36f18da8701457baa5014d278e4ad33e49e727abbab65a`
-- B8O current readiness: 7 score records ready for materialization; `7397765` blocked on an uninterpreted upstream `a` alignment marker
-- frozen ≤2-step smoke trainer/checkpoint remain unchanged
+- B8O canonical pairing-preflight receipt: `b77718f90f5865082a36f18da8701457baa5014d278e4ad33e49e727abbab65a`
+- B8P canonical materialization receipt: `3f9f2df43b287dd95e03eaf1ffc4c5a3c9e25bdced8f09675918bc9b1f99e0cf`
+- B8P materialized population: 412 hash-bound candidate pairs across seven READY score records
+- READY scores: `7070781`, `7075297`, `7078259`, `7093885`, `7103818`, `7108150`, `8071278`
+- blocked score: `7397765` — upstream opaque `a` alignment marker remains uninterpreted and fail-closed
+- independent image ↔ MusicXML pair review: not yet completed
+- real Stage 8 TRAIN/VALIDATION corpus: not yet completed
+- real model training: not started
+- real validation metrics: UNKNOWN / NOT MEASURED
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
+- commercial-use / redistribution authority: not granted by B8P
 
 ## Current stage status
 
@@ -47,8 +51,9 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 | TR-POLY-09B8L | OSSQ per-score source inventory + independent rights/provenance review gate | Merged / CI green |
 | TR-POLY-09B8M | First 5 IMSLP sources / 8 OSSQ scores independently reviewed for research training | Merged / CI green |
 | TR-POLY-09B8N | Exact PDF source-byte SHA-256 pin + live revalidation | Merged / CI + live byte green |
-| TR-POLY-09B8O | Exact scanned-alignment + cleaned-MusicXML pairing-source preflight | Active package |
-| First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | Pair materialization/review/admission blocked |
+| TR-POLY-09B8O | Exact scanned-alignment + cleaned-MusicXML pairing-source preflight | Receipt pinned / predecessor complete |
+| TR-POLY-09B8P | Exact real system-image + systemwise-MusicXML materialization | 412 candidates / receipt pinned / final exact-head VERIFIED + CI pending |
+| First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | Pair review/admission still required |
 | Missing metric admission | Five frozen metrics remain unsupported | Separate work |
 | P09C | Evidence-driven refinement | After measured quality evidence |
 | P09D | Final candidate/evaluation freeze | Locked |
@@ -60,194 +65,138 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 ```text
 Independently reviewed OSSQ source identity / rights evidence
         ↓
-Exact source-PDF SHA-256 byte pin
+Exact source-PDF SHA-256 byte pin (B8N)
         ↓
 Exact pairing-source preflight (B8O)
         ↓
-Deterministic system-image + systemwise MusicXML materialization
+Deterministic system-image + systemwise MusicXML materialization (B8P)
         ↓
 Independent image/MusicXML pair review
         ↓
-Leakage-safe Stage 8 TRAIN + VALIDATION quarantine/intake
+Stage 8 real-data intake of VERIFIED pairs only
         ↓
-Admitted Stage 8 real TRAIN + VALIDATION metadata/byte receipts
+Leakage-safe TRAIN + VALIDATION family split
         ↓
 Persisted Native V2 TRAIN + VALIDATION root
         ↓
-B8A fail-closed reload / identity preflight
+B8A exact artifact reload/preflight
         ↓
 B8I exact real-data ↔ Native V2 lineage admission
-        ↓
-complete explicit B7 descriptor metadata
         ↓
 B8B exact experiment-recipe freeze
         ↓
 B8J exact baseline start permit
         ↓
-B8J authorized full-population B6 wrapper
-        ↓
-B6 deterministic full-population batching
-        ↓
-B4 multi-epoch TRAIN-only optimization
+B6 full-population TRAIN-only optimization
         ↓
 B5 verified selected-state checkpoint
         ↓
-B7 exact VALIDATION descriptor/artifact binding
+B7 full frozen VALIDATION execution
         ↓
-B1 free-running inference
+B1 inference → B2 per-sample metrics → B3 aggregation
         ↓
-B2 per-sample metrics
+P09C evidence-driven refinement
         ↓
-B3 overall + voice + robustness aggregation
+P09D frozen candidate/evaluation identity
+        ↓
+Stage 9 one-shot sealed TEST
 ```
 
-The remaining blocker is no longer an execution-code gap in B1–B8J. The first OSSQ source batch has independent rights evidence, exact source-PDF identities, and a reproducible B8O pairing-source preflight. Seven score records are currently ready to attempt deterministic materialization. Schubert `7397765` remains excluded because the exact camera-ready `sq7397765_scanned.csv` payload is `:\na`; the pinned preprocessor does not establish the meaning of the literal `a` marker, so B8O fails closed instead of inventing an interpretation. No image/MusicXML pair has yet been independently approved, and no admitted Native V2 real corpus exists yet.
+Repository regression fixtures and smoke artifacts are test evidence only. They must never be reported as real OMR model-quality evidence.
 
-Repository regression fixtures are test evidence only. They must not be reported as real model-quality evidence.
+## B8A / B8I / B8B / B8J baseline gates
 
-## B8A artifact gate
+B8A reloads and independently validates a persisted Native V2 root containing `manifest.json`, `manifest.sha256`, `build.json`, TRAIN/VALIDATION image records and target records while keeping TEST artifact bytes absent/unread.
 
-TR-POLY-09A persists:
+B8I reuses the frozen Stage 8 real-data safety path. Successful B8I lineage admission requires exact one-to-one real-data ↔ Native V2 bindings, byte identities, split/family equality, independent target-review evidence and no near-duplicate leakage veto. B8I grants quality-training eligibility only, not production or commercial authority.
 
-```text
-manifest.json
-manifest.sha256
-build.json
-targets/<sha256>.json       # TRAIN/VALIDATION only
-images/<sha256>.png          # TRAIN/VALIDATION only
-```
+B8B freezes the first real experiment recipe before quality evidence is observed. The frozen research recipe uses the existing model/trainer contracts, 8 epochs, AdamW, no scheduler, validation every epoch, minimum mean VALIDATION-loss checkpoint selection with earliest exact tie, bounded batch size and complete TRAIN/VALIDATION populations.
 
-B8A independently reconstructs and verifies the persisted build while keeping TEST artifact bytes absent/unread.
+B8J requires B8A, B8I and B8B to bind exactly the same real dataset identity and population before the first B6 quality-training run. The authorized wrapper disallows prefix/subsample execution for the first measured baseline. B8J does not open TEST.
 
-A real baseline may continue only after preflight yields an exact dataset manifest SHA-256, deterministic build ID, full TRAIN/VALIDATION population, sealed TEST metadata population without TEST bytes, and accepted provenance/license evidence where external data is involved.
-
-## B8I real-corpus admission gate
-
-B8I reuses the frozen Stage 8-0/8-1 real-data safety path rather than inventing a second rights/provenance system. A successful admission requires:
-
-- an admitted `RealDataManifest` with no TEST records;
-- exactly one Stage 8-1 byte receipt per admitted real sample;
-- exact one-to-one real-data ↔ Native V2 development bindings;
-- split, family, image SHA-256 and image-dimension equality;
-- one V2 conversion-profile SHA-256 per binding;
-- one independent V2 target-review evidence SHA-256 per binding;
-- no Stage 8 near-duplicate leakage veto;
-- exact B8A TRAIN/VALIDATION population coverage.
-
-A successful B8I receipt grants quality-training eligibility only. It does not grant production authority or commercial-use authority and does not open TEST.
-
-## B8B experiment gate
-
-B8B freezes the first real baseline before quality evidence is observed. The default recipe reuses the merged contracts:
-
-- `FROZEN_POLY_2D_CONFIG`;
-- `FROZEN_POLY_2D_QUALITY_CONFIG`;
-- 8 epochs;
-- AdamW, no scheduler;
-- max 8192 optimizer steps;
-- validation every epoch;
-- minimum mean VALIDATION-loss checkpoint selection, earliest exact tie;
-- B6 batch size ≤8;
-- full TRAIN and full VALIDATION populations only;
-- B7 decode bound at least the longest admitted VALIDATION target and within the model target boundary.
-
-The recipe hash-binds repository SHA, B8A receipt, dataset manifest/build identity, exact split populations/families, batch plan, model/trainer/materialization/B6 profiles, descriptor manifest, B7 split manifest, benchmark identity and decode bound.
-
-Freeze fails if the optimizer-step ceiling cannot cover every full TRAIN batch across every frozen epoch. This prevents silent partial training on a corpus that is larger than the accepted recipe can execute.
-
-## B8J baseline-start gate
-
-B8J requires B8A, B8I and B8B to bind the same exact real baseline before B6 can start through the first-baseline path. The permit binds:
-
-- repository SHA;
-- dataset manifest/build identity;
-- B8A preflight fingerprint;
-- B8I admission fingerprint;
-- B8B recipe fingerprint;
-- exact TRAIN/VALIDATION sample populations;
-- deterministic batch plan;
-- model/trainer/materialization/B6 execution profiles;
-- epoch and optimizer-step budget.
-
-The authorized B8J execution wrapper forces `max_train_samples=None` and `max_validation_samples=None`. Prefix/subsample execution therefore cannot be used for the first measured baseline. Runtime configs are revalidated before B6 and B6 evidence is revalidated after execution.
-
-B8J does not open TEST and grants neither production nor commercial-use authority.
-
-## B8K external-source boundary
+## B8K–B8M external-source and rights boundary
 
 B8K pins the reviewed OSSQ-OMR camera-ready source snapshot:
 
 `MALerLab/ossq-omr@7a17e45cddc0b7064fc3a179b62caeb57595e993`
 
-The source family is deliberately split into two registry components:
+B8L binds the camera-ready scanned-score inventory to exact upstream metadata and requires separate provenance evidence and separate independent rights evidence for each real-image score record. Upstream copyright labels are not independent rights approval.
 
-- annotation sources plus publisher-created synthetic/derived artifacts: CC0, `LICENSE_VERIFIED`, not install-pinned;
-- IMSLP-derived scanned-image track: `LICENSE_REVIEW_REQUIRED`, no training/evaluation/commercial permission asserted until per-score upstream rights are independently reviewed.
-
-B8K does not download or admit corpus bytes and does not change TEST, production, or commercial authority.
-
-## B8L per-score rights/provenance gate
-
-B8L binds the camera-ready OSSQ source inventory to the exact upstream metadata objects:
-
-- `data/scanned_score_types.tsv` Git blob `35ebe84f0c9f03a41231c92fa21183242bf12774`;
-- `data/scores_w_pub.yaml` Git blob `7a72b220f4faa897900f51bcb85e49b845cb1304`.
-
-The pinned scanned-score table has 122 score entries across 116 unique work paths. B8L recomputes the Git blob SHA from caller-supplied TSV bytes before parsing them.
-
-Every real-image score type (`0`, `1`, `1\``, `1\`\``, `3`, `4`) requires an exact score-ID/IMSLP-ID/source-type review record. Approved records require separate provenance evidence and separate independent rights evidence plus explicit training/commercial/redistribution permission booleans. The upstream OSSQ copyright label itself cannot serve as the independent rights evidence.
-
-Scores sharing one IMSLP source file may not carry contradictory rights/provenance decisions. Pending or rejected records remain blocked. B8L only identifies later Stage 8 candidates; it does not download source bytes, grant production authority, grant final commercial-use authority, or open TEST.
-
-## B8M first independent rights-evidence batch
-
-B8M independently reviewed five exact IMSLP sources covering eight OSSQ score records:
-
-- `#04047` → `7397765`;
-- `#04755` → `8071278`;
-- `#64136` → `7103818`;
-- `#64141` → `7070781`, `7075297`, `7078259`, `7093885`;
-- `#242305` → `7108150`.
-
-For these records only, B8M records `PUBLIC_DOMAIN`, independent rights review and research-training candidacy. It deliberately keeps commercial use and redistribution false. Every other scanned-track OSSQ record remains pending and blocked.
-
-B8M grants neither Stage 8 admission nor production/commercial authority and opens no TEST bytes.
+B8M independently reviewed the first five IMSLP source documents covering eight OSSQ score records. Those records are research-training candidates only; commercial use and redistribution remain false. Every other scanned-track OSSQ source remains pending and blocked.
 
 ## B8N exact source-byte pin
 
-B8N fetches only the five B8M-reviewed source-PDF URLs and validates actual source bytes before hashing. Non-PDF responses, population drift and sources over the 64 MiB source-document limit fail closed.
+B8N validates the live bytes of the five reviewed source PDFs and commits hash-only evidence.
 
 Canonical receipt:
 
 `9f9b678e2365ec849cc19424b28d8dbdb435af3a5a9ef5b47cf7a460e72a801c`
 
-The hash-only receipt is committed as `evidence/ossq_b8n_source_byte_pins.json`. On the final PR head, standard CI #724 and dedicated OSSQ B8N Source Byte Pin run #6 both succeeded; the latter re-fetched the five exact source URLs and proved the live bytes still matched the committed hashes and byte counts.
-
-Raw PDF bytes are neither committed nor uploaded as workflow artifacts. B8N grants no Stage 8 admission, TEST, production or commercial authority.
+Raw PDF bytes are neither committed nor uploaded as evidence. B8N grants no Stage 8 admission, TEST, production or commercial authority.
 
 ## B8O pairing-source preflight
 
-B8O binds the B8N source-document identities to exact camera-ready OSSQ alignment metadata and cleaned MusicXML annotation bytes for all eight score records. It pins:
+B8O binds B8N source-document identities to exact camera-ready OSSQ alignment metadata and cleaned MusicXML annotation bytes.
 
-- B8N receipt `9f9b678e2365ec849cc19424b28d8dbdb435af3a5a9ef5b47cf7a460e72a801c`;
-- OSSQ camera-ready commit `7a17e45cddc0b7064fc3a179b62caeb57595e993`;
-- preprocessor snapshot `bdea0d1829c9db84480ebd2e0385f6f5fe324274`;
-- exact `sq<id>_scanned.csv` Git blob identity and SHA-256 per score;
-- exact `sq<id>_cleaned.musicxml` Git blob identity and SHA-256 per score.
-
-Canonical preflight receipt:
+Canonical receipt:
 
 `b77718f90f5865082a36f18da8701457baa5014d278e4ad33e49e727abbab65a`
 
-Ready for later deterministic materialization: `7070781`, `7075297`, `7078259`, `7093885`, `7103818`, `7108150`, `8071278`.
+Ready for deterministic materialization: `7070781`, `7075297`, `7078259`, `7093885`, `7103818`, `7108150`, `8071278`.
 
-Blocked: `7397765`. Its exact alignment payload contains the literal `a` marker. The pinned preprocessor establishes the first line as a scanned-PDF page-range selector but does not establish the semantic meaning of `a`; B8O therefore records `blocked-uninterpreted-alignment-marker` rather than guessing. The literal `x` marker found in several K.464 files is retained in evidence and is never converted into a numeric value.
+Blocked: `7397765`. Its upstream alignment payload contains the literal `a` marker; the pinned preprocessor does not establish its semantic meaning, so it remains fail-closed rather than guessed.
 
-B8O does not materialize system-image bytes, does not independently approve image/MusicXML pairs, does not assign TRAIN/VALIDATION, does not grant Stage 8 admission, and does not open TEST or grant production/commercial authority.
+B8O does not independently approve image/MusicXML pairs or grant Stage 8 admission.
+
+## B8P exact system-pair materialization
+
+B8P consumes only the seven B8O READY score records and deterministically reproduces final systemwise scanned PNG ↔ systemwise MusicXML candidate pairs from exact upstream identities.
+
+Frozen source identities:
+
+- OSSQ commit: `7a17e45cddc0b7064fc3a179b62caeb57595e993`
+- preprocessor commit: `bdea0d1829c9db84480ebd2e0385f6f5fe324274`
+- B8N receipt: `9f9b678e2365ec849cc19424b28d8dbdb435af3a5a9ef5b47cf7a460e72a801c`
+- B8O receipt: `b77718f90f5865082a36f18da8701457baa5014d278e4ad33e49e727abbab65a`
+
+Canonical B8P receipt:
+
+`3f9f2df43b287dd95e03eaf1ffc4c5a3c9e25bdced8f09675918bc9b1f99e0cf`
+
+Committed evidence:
+
+`evidence/ossq_b8p_system_pair_materialization.json`
+
+Materialized candidate population:
+
+- `7070781`: 9
+- `7075297`: 28
+- `7078259`: 26
+- `7093885`: 26
+- `7103818`: 87
+- `7108150`: 117
+- `8071278`: 119
+- total: 412
+
+The receipt preserves source-document SHA-256, YOLO-info SHA-256, PNG SHA-256/byte count/dimensions, MusicXML SHA-256/byte count, segment identity and upstream exclusion evidence for every candidate pair.
+
+Raw source-PDF, PNG and MusicXML bytes are not persisted as repository evidence.
+
+B8P explicitly does **not** grant:
+
+- independent image ↔ MusicXML pairing approval;
+- Stage 8 admission;
+- TRAIN/VALIDATION assignment;
+- model-training authority;
+- TEST access;
+- production authority;
+- commercial-use authority.
+
+Therefore 412 is the number of real materialized **candidates**, not the number of approved training examples. Real OMR accuracy remains **UNKNOWN / NOT MEASURED**.
 
 ## Current metric surface
 
-Numeric B2/B3 metrics:
+Supported numeric B2/B3 metrics:
 
 ```text
 parse_success
@@ -263,7 +212,7 @@ accidental_note_f1
 note_staff_f1
 ```
 
-Explicitly unsupported:
+Explicitly unsupported until real implementations exist:
 
 ```text
 musicxml_validity
@@ -277,24 +226,23 @@ No unsupported metric receives a proxy number.
 
 ## Required order from here
 
-1. finish B8O exact-head standard CI plus live upstream receipt verification and merge only if both are green;
-2. deterministically materialize system images and corresponding systemwise MusicXML for the seven B8O-ready score records using exact B8N source bytes and pinned OSSQ/preprocessor/YOLO identities;
-3. hash every materialized image/MusicXML pair and independently review pair correctness;
-4. assign leakage-safe TRAIN/VALIDATION families and create Stage 8 quarantined records only from approved pairs;
-5. validate exact source/image/MusicXML bytes and emit Stage 8-1 receipts, then admit only reviewed development records;
-6. expand the OSSQ rights/byte-pinned batch before recipe freeze if the first batch is insufficient for voice/robustness coverage;
-7. materialize one Native V2 persisted root and verify it through B8A;
-8. emit the exact B8I lineage-admission receipt;
-9. complete explicit B7 descriptors and emit the real B8B recipe fingerprint;
-10. emit the exact B8J baseline start permit;
-11. execute the authorized B8J→B6 full-population path to create the first real quality checkpoint;
-12. independently verify the B5 checkpoint round trip;
-13. execute B7 over the complete admitted VALIDATION population;
-14. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
-15. admit the five missing metric implementations without proxies;
-16. freeze P09D candidate/evaluation identity;
-17. open sealed TEST once at Stage 9;
-18. only then consider Stage 10 ScoreMosaic shadow integration.
+1. finish B8P exact-head standard CI plus dedicated live `VERIFIED` receipt reproduction and merge PR #171 only if both are green;
+2. independently review every B8P image/MusicXML candidate and classify it `VERIFIED`, `REVIEW_REQUIRED` or `BLOCKED`;
+3. admit only `VERIFIED` pairs through Stage 8 real-data intake with exact byte/provenance/training-permission evidence;
+4. group admitted samples by musical work/source-document family and split whole families into exactly one of TRAIN or VALIDATION;
+5. audit duplicate/near-duplicate leakage across TRAIN/VALIDATION;
+6. materialize the admitted real TRAIN/VALIDATION corpus to Native V2;
+7. run B8A on the persisted real root;
+8. instantiate B8I real-corpus lineage admission;
+9. freeze B8B against the exact real manifest and populations;
+10. issue B8J only if B8A+B8I+B8B identities agree exactly;
+11. execute first real B6 training on full admitted TRAIN;
+12. select checkpoint only by the frozen VALIDATION-loss rule;
+13. execute B7 on the complete frozen VALIDATION population and report supported real metrics;
+14. expand the real corpus before judging broad model quality;
+15. freeze the final model/recipe/checkpoint before Stage 9;
+16. open sealed TEST once according to Stage 9 protocol;
+17. only then consider Stage 10 ScoreMosaic shadow integration.
 
 ## Safety invariants
 
@@ -302,20 +250,20 @@ No unsupported metric receives a proxy number.
 - TRAIN alone changes model parameters.
 - VALIDATION is read-only.
 - Smoke contracts remain immutable.
-- Quality work uses separate versioned provenance.
-- No semantic truncation is allowed.
-- Invalid/abstain predictions stay visible in denominators.
-- Unsupported metrics stay unsupported.
-- Benchmark identity and candidate identity must match exactly.
-- External data requires rights/license/install-pin admission.
-- Teacher corrections and ScoreMosaic uploads are not automatic training data.
-- B8I admission is not commercial-use authorization.
-- B8J permit authorizes the exact full first-baseline run only.
-- B8K scanned-source selection is not permission to use IMSLP-derived bytes.
-- B8L upstream copyright labels are not independent rights approval.
-- B8M grants research-training candidacy only to the explicitly reviewed first batch; no commercial/redistribution authority.
-- B8N source-byte pins are hash-only evidence, not Stage 8 sample admission.
-- B8O `READY` means ready to attempt deterministic materialization only; it is not pairing approval or Stage 8 admission.
-- B8O score `7397765` remains blocked until the `a` alignment marker semantics are independently resolved or a separate verified pairing path is supplied.
-- No training or VALIDATION benchmark package grants production authority.
+- Synthetic/regression fixtures are never reported as real OMR quality.
+- Invalid/abstain predictions remain in metric denominators.
+- Unsupported metrics remain unsupported.
+- No teacher correction, ScoreMosaic upload, public score or external corpus silently becomes training data.
+- Public availability does not equal training permission.
+- Research-training permission does not imply commercial or redistribution authority.
+- Same musical work/source-document family may not cross TRAIN/VALIDATION boundaries.
+- Checkpoint, manifest, receipt and artifact identities may not be mixed across commits or runs.
+- B8N source-byte pins are hash-only evidence, not Stage 8 admission.
+- B8O `READY` means ready to attempt deterministic materialization only.
+- B8O score `7397765` remains blocked until the `a` marker semantics are independently resolved or a separate verified pairing path is supplied.
+- B8P materialization is not independent pairing approval, Stage 8 admission, TRAIN/VALIDATION assignment or training authority.
+- B8P raw third-party PDF/PNG/MusicXML bytes are not persisted as evidence.
+- Real OMR accuracy remains UNKNOWN / NOT MEASURED until real B6 training and full frozen B7 VALIDATION complete.
+- No B8x receipt grants production authority unless explicitly designed to do so.
 - Every merge requires exact-head green CI.
+- A changed live receipt is investigated; it is never re-blessed merely to make CI green.
