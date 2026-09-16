@@ -1,0 +1,113 @@
+name: B8P Status Bootstrap
+
+on:
+  push:
+    branches:
+      - tr-poly-09b8p-ossq-system-pair-materialization
+    paths:
+      - '.github/workflows/b8p-status-bootstrap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-status:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: tr-poly-09b8p-ossq-system-pair-materialization
+          fetch-depth: 0
+
+      - name: Patch STATUS without rewriting unrelated history
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('STATUS.md')
+          text = path.read_text(encoding='utf-8')
+
+          old = '''- active package: TR-POLY-09B8O exact OSSQ pairing-source preflight
+- B8O discovery receipt: `b77718f90f5865082a36f18da8701457baa5014d278e4ad33e49e727abbab65a`
+- B8O current readiness: 7 score records ready for materialization; `7397765` blocked on an uninterpreted upstream `a` alignment marker
+'''
+          new = '''- B8O canonical pairing-preflight receipt: `b77718f90f5865082a36f18da8701457baa5014d278e4ad33e49e727abbab65a`
+- active package: TR-POLY-09B8P exact OSSQ system-image ↔ systemwise-MusicXML materialization
+- B8P canonical materialization receipt: `3f9f2df43b287dd95e03eaf1ffc4c5a3c9e25bdced8f09675918bc9b1f99e0cf`
+- B8P materialized population: 412 hash-bound candidate pairs across 7 READY scores; `7397765` remains blocked
+- B8P authority: materialization evidence only; independent pairing review / Stage 8 admission / TRAIN-VALIDATION assignment / training / production / commercial authority are not granted
+'''
+          if old not in text:
+              raise SystemExit('repository-phase anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '| TR-POLY-09B8O | Exact scanned-alignment + cleaned-MusicXML pairing-source preflight | Active package |\n'
+          new = '| TR-POLY-09B8O | Exact scanned-alignment + cleaned-MusicXML pairing-source preflight | Receipt pinned / predecessor complete |\n| TR-POLY-09B8P | Exact real system-image + systemwise-MusicXML materialization | 412 candidates / receipt pinned / exact-head verification pending |\n'
+          if old not in text:
+              raise SystemExit('stage-table anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''The remaining blocker is no longer an execution-code gap in B1–B8J. The first OSSQ source batch has independent rights evidence, exact source-PDF identities, and a reproducible B8O pairing-source preflight. Seven score records are currently ready to attempt deterministic materialization. Schubert `7397765` remains excluded because the exact camera-ready `sq7397765_scanned.csv` payload is `:\\na`; the pinned preprocessor does not establish the meaning of the literal `a` marker, so B8O fails closed instead of inventing an interpretation. No image/MusicXML pair has yet been independently approved, and no admitted Native V2 real corpus exists yet.
+'''
+          new = '''The remaining blocker is no longer deterministic pair materialization. B8P reproduced and hash-bound 412 real candidate system-image ↔ systemwise-MusicXML pairs across seven score records. These candidates are not yet independently pairing-approved and therefore are not yet admitted Stage 8 training examples. Schubert `7397765` remains excluded because the upstream `a` alignment marker semantics are not independently established. No admitted Native V2 real corpus exists yet, and real OMR accuracy remains UNKNOWN / NOT MEASURED.
+'''
+          if old not in text:
+              raise SystemExit('remaining-blocker anchor not found')
+          text = text.replace(old, new, 1)
+
+          marker = '## Current metric surface\n'
+          b8p = '''## B8P exact system-pair materialization
+
+B8P consumes only the seven B8O READY score records and deterministically reproduces final systemwise scanned PNG ↔ systemwise MusicXML candidate pairs from exact upstream identities.
+
+Canonical receipt:
+
+`3f9f2df43b287dd95e03eaf1ffc4c5a3c9e25bdced8f09675918bc9b1f99e0cf`
+
+Committed hash-only evidence:
+
+`evidence/ossq_b8p_system_pair_materialization.json`
+
+Materialized candidate population: 412 pairs total — `7070781`: 9, `7075297`: 28, `7078259`: 26, `7093885`: 26, `7103818`: 87, `7108150`: 117, `8071278`: 119. `7397765` remains blocked.
+
+Raw source-PDF, PNG and MusicXML bytes are not persisted as repository evidence. B8P does not independently approve pair semantics, does not grant Stage 8 admission, does not assign TRAIN/VALIDATION, does not open TEST and grants neither production nor commercial-use authority.
+
+The next admissible work is independent image ↔ MusicXML pair verification followed by Stage 8 intake of VERIFIED pairs only. Real model training has not started and real model accuracy remains UNKNOWN / NOT MEASURED.
+
+'''
+          if marker not in text:
+              raise SystemExit('metric-surface anchor not found')
+          text = text.replace(marker, b8p + marker, 1)
+
+          old = '''1. finish B8O exact-head standard CI plus live upstream receipt verification and merge only if both are green;
+2. deterministically materialize system images and corresponding systemwise MusicXML for the seven B8O-ready score records using exact B8N source bytes and pinned OSSQ/preprocessor/YOLO identities;
+3. hash every materialized image/MusicXML pair and independently review pair correctness;
+4. assign leakage-safe TRAIN/VALIDATION families and create Stage 8 quarantined records only from approved pairs;
+'''
+          new = '''1. finish B8P exact-head standard CI plus dedicated live VERIFIED receipt reproduction and merge only if both are green;
+2. independently review every B8P materialized image/MusicXML candidate and classify it VERIFIED, REVIEW_REQUIRED or BLOCKED;
+3. admit only VERIFIED pairs through Stage 8 real-data intake with exact byte/provenance/training-permission evidence;
+4. assign leakage-safe TRAIN/VALIDATION families and create Stage 8 quarantined records only from approved pairs;
+'''
+          if old not in text:
+              raise SystemExit('required-order anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '- B8O score `7397765` remains blocked until the `a` alignment marker semantics are independently resolved or a separate verified pairing path is supplied.\n- No training or VALIDATION benchmark package grants production authority.\n'
+          new = '- B8O score `7397765` remains blocked until the `a` alignment marker semantics are independently resolved or a separate verified pairing path is supplied.\n- B8P candidate materialization is not independent pairing approval, Stage 8 admission, TRAIN/VALIDATION assignment or training authority.\n- B8P raw third-party PDF/PNG/MusicXML bytes are not persisted as evidence; only hash/provenance evidence is committed.\n- Real OMR accuracy remains UNKNOWN / NOT MEASURED until real B6 training and full frozen B7 VALIDATION complete.\n- No training or VALIDATION benchmark package grants production authority.\n'
+          if old not in text:
+              raise SystemExit('safety anchor not found')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          git diff --check
+          git diff -- STATUS.md
+          git add STATUS.md
+          test "$(git diff --cached --name-only)" = "STATUS.md"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "TR-POLY-09B8P: update materialization status"
+          git push origin HEAD:tr-poly-09b8p-ossq-system-pair-materialization
