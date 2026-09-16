@@ -6,10 +6,10 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 ## Current repository phase
 
-- latest merged package: PR #162 — TR-POLY-09B8A persisted Native V2 artifact reload/preflight
-- latest verified `main`: `563802128750cec6645fb4604f1fa6761ee9e129`
-- B8A exact PR head `40ac06a7fb530df8e03150f0f603304316172345`: CI run #703 success before merge
-- active package: TR-POLY-09B8B first real experiment-recipe freeze
+- latest merged package: PR #163 — TR-POLY-09B8B first real experiment-recipe freeze
+- latest verified `main`: `5fb23696d60fc7c3ace7abfbf80991b39cf4e11f`
+- B8B exact PR head `e81019573de4094784c23cc520214babbf89c4e8`: CI run #707 success before merge
+- active package: TR-POLY-09B8I real-corpus lineage admission bridge
 - frozen ≤2-step smoke trainer/checkpoint remain unchanged
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
@@ -18,39 +18,44 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 | Stage / package | Description | Status |
 |---|---|---|
-| 0–6 | Deterministic symbolic → rendered → validated synthetic dataset | ✅ Closed / preserved |
-| 7-A/B/C | Baseline model/training evidence | ✅ Historical baseline |
-| 7-D | Specialist architecture/evidence | ✅ Historical evidence |
-| TR-POLY-02 | Evaluation taxonomy + benchmark identity | ✅ Frozen |
-| TR-POLY-03/04 | External-data registry + benchmark harness | ✅ Closed |
-| TR-POLY-05/06 | V2 representation + tokenizer/roundtrip | ✅ Frozen |
-| TR-POLY-07/08 | Registry + tiny 2D Transformer | ✅ Research implementation |
-| TR-POLY-08A | ≤2-step deterministic smoke trainer | ✅ Frozen / preserved |
-| TR-POLY-08B | ≤2-step exact research checkpoint | ✅ Frozen / preserved |
-| TR-POLY-08C | Stage 6 V1→V2 execution | ✅ Single-voice evidence only |
-| TR-POLY-09A | Native explicit V2 dataset/materialization | ✅ Merged |
-| TR-POLY-09B1 | Free-running greedy inference | ✅ Merged |
-| TR-POLY-09B2 | Deterministic V2 metric/adaptor layer | ✅ Merged |
-| TR-POLY-09B3 | VALIDATION aggregation by voice/robustness | ✅ Merged |
-| TR-POLY-09B4 | Multi-epoch TRAIN-only quality-training regime | ✅ Merged |
-| TR-POLY-09B5 | Separate verified quality-checkpoint artifact + B1 bridge | ✅ Merged |
-| TR-POLY-09B6 | Full native TRAIN/VALIDATION multi-batch quality execution | ✅ Merged |
-| TR-POLY-09B7 | Exact descriptor-bound quality VALIDATION B1→B2→B3 execution | ✅ Merged / CI green |
-| TR-POLY-09B8A | Persisted Native V2 reload + baseline artifact preflight | ✅ Merged / CI green |
-| TR-POLY-09B8B | Dataset-specific experiment recipe + descriptor/decode/step freeze | 🔄 Active package |
-| First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | ⛔ Artifact-blocked |
-| Missing metric admission | Five frozen metrics remain unsupported | 🔒 Separate work |
-| P09C | Evidence-driven refinement | 🔒 After measured quality evidence |
-| P09D | Final candidate/evaluation freeze | 🔒 |
-| Stage 9 | One-shot sealed TEST decision | 🔒 TEST sealed |
-| Stage 10 | ScoreMosaic shadow/integration | 🔒 Not started |
+| 0–6 | Deterministic symbolic → rendered → validated synthetic dataset | Closed / preserved |
+| 7-A/B/C | Baseline model/training evidence | Historical baseline |
+| 7-D | Specialist architecture/evidence | Historical evidence |
+| TR-POLY-02 | Evaluation taxonomy + benchmark identity | Frozen |
+| TR-POLY-03/04 | External-data registry + benchmark harness | Closed |
+| TR-POLY-05/06 | V2 representation + tokenizer/roundtrip | Frozen |
+| TR-POLY-07/08 | Registry + tiny 2D Transformer | Research implementation |
+| TR-POLY-08A | ≤2-step deterministic smoke trainer | Frozen / preserved |
+| TR-POLY-08B | ≤2-step exact research checkpoint | Frozen / preserved |
+| TR-POLY-08C | Stage 6 V1→V2 execution | Single-voice evidence only |
+| TR-POLY-09A | Native explicit V2 dataset/materialization | Merged |
+| TR-POLY-09B1 | Free-running greedy inference | Merged |
+| TR-POLY-09B2 | Deterministic V2 metric/adaptor layer | Merged |
+| TR-POLY-09B3 | VALIDATION aggregation by voice/robustness | Merged |
+| TR-POLY-09B4 | Multi-epoch TRAIN-only quality-training regime | Merged |
+| TR-POLY-09B5 | Separate verified quality-checkpoint artifact + B1 bridge | Merged |
+| TR-POLY-09B6 | Full native TRAIN/VALIDATION multi-batch quality execution | Merged |
+| TR-POLY-09B7 | Exact descriptor-bound quality VALIDATION B1→B2→B3 execution | Merged / CI green |
+| TR-POLY-09B8A | Persisted Native V2 reload + baseline artifact preflight | Merged / CI green |
+| TR-POLY-09B8B | Dataset-specific experiment recipe + descriptor/decode/step freeze | Merged / CI green |
+| TR-POLY-09B8I | Stage 8 admitted real data ↔ Native V2 lineage admission | Active package |
+| First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | Artifact-blocked |
+| Missing metric admission | Five frozen metrics remain unsupported | Separate work |
+| P09C | Evidence-driven refinement | After measured quality evidence |
+| P09D | Final candidate/evaluation freeze | Locked |
+| Stage 9 | One-shot sealed TEST decision | TEST sealed |
+| Stage 10 | ScoreMosaic shadow/integration | Not started |
 
 ## Executable quality path
 
 ```text
-Admitted persisted Native V2 TRAIN + VALIDATION root
+Admitted Stage 8 real TRAIN + VALIDATION metadata/byte receipts
+        ↓
+Persisted Native V2 TRAIN + VALIDATION root
         ↓
 B8A fail-closed reload / identity preflight
+        ↓
+B8I exact real-data ↔ Native V2 lineage admission
         ↓
 complete explicit B7 descriptor metadata
         ↓
@@ -71,7 +76,7 @@ B2 per-sample metrics
 B3 overall + voice + robustness aggregation
 ```
 
-The remaining blocker is not an execution-code gap in B1–B8B. It is the absence of a physically available, admitted real Native V2 baseline artifact root with exact manifest/build identity plus complete explicit VALIDATION descriptors.
+The remaining blocker is not an execution-code gap in B1–B8B. It is the absence of a physically available, admitted real corpus. The connected `ScoreMosaic_Teacher_Gold` Drive hierarchy currently contains empty organizational folders only: no admitted registry records, source corpus, teacher-verified corpus, benchmark output, or Native V2 persisted root is available.
 
 Repository regression fixtures are test evidence only. They must not be reported as real model-quality evidence.
 
@@ -90,6 +95,21 @@ images/<sha256>.png          # TRAIN/VALIDATION only
 B8A independently reconstructs and verifies the persisted build while keeping TEST artifact bytes absent/unread.
 
 A real baseline may continue only after preflight yields an exact dataset manifest SHA-256, deterministic build ID, full TRAIN/VALIDATION population, sealed TEST metadata population without TEST bytes, and accepted provenance/license evidence where external data is involved.
+
+## B8I real-corpus admission gate
+
+B8I reuses the frozen Stage 8-0/8-1 real-data safety path rather than inventing a second rights/provenance system. A successful admission requires:
+
+- an admitted `RealDataManifest` with no TEST records;
+- exactly one Stage 8-1 byte receipt per admitted real sample;
+- exact one-to-one real-data ↔ Native V2 development bindings;
+- split, family, image SHA-256 and image-dimension equality;
+- one V2 conversion-profile SHA-256 per binding;
+- one independent V2 target-review evidence SHA-256 per binding;
+- no Stage 8 near-duplicate leakage veto;
+- exact B8A TRAIN/VALIDATION population coverage.
+
+A successful B8I receipt grants quality-training eligibility only. It does not grant production authority or commercial-use authority and does not open TEST.
 
 ## B8B experiment gate
 
@@ -142,18 +162,19 @@ No unsupported metric receives a proxy number.
 
 ## Required order from here
 
-1. finish B8B recipe-contract tests/docs and exact-head CI;
-2. merge B8B only if green;
-3. locate/provide one admitted real Native V2 persisted TRAIN/VALIDATION root and verify it through B8A;
-4. complete explicit B7 descriptors and emit the real B8B recipe fingerprint;
-5. execute B6 to create the first real quality checkpoint;
-6. independently verify the B5 checkpoint round trip;
-7. execute B7 over the complete admitted VALIDATION population;
-8. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
-9. admit the five missing metric implementations without proxies;
-10. freeze P09D candidate/evaluation identity;
-11. open sealed TEST once at Stage 9;
-12. only then consider Stage 10 ScoreMosaic shadow integration.
+1. finish B8I code/tests/docs and exact-head CI; merge only if green;
+2. populate/provide one rights/provenance-admitted real TRAIN/VALIDATION corpus and Stage 8-1 byte receipts;
+3. materialize one Native V2 persisted root and verify it through B8A;
+4. emit the exact B8I lineage-admission receipt;
+5. complete explicit B7 descriptors and emit the real B8B recipe fingerprint;
+6. execute B6 to create the first real quality checkpoint;
+7. independently verify the B5 checkpoint round trip;
+8. execute B7 over the complete admitted VALIDATION population;
+9. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
+10. admit the five missing metric implementations without proxies;
+11. freeze P09D candidate/evaluation identity;
+12. open sealed TEST once at Stage 9;
+13. only then consider Stage 10 ScoreMosaic shadow integration.
 
 ## Safety invariants
 
@@ -168,5 +189,6 @@ No unsupported metric receives a proxy number.
 - Benchmark identity and candidate identity must match exactly.
 - External data requires rights/license/install-pin admission.
 - Teacher corrections and ScoreMosaic uploads are not automatic training data.
+- B8I admission is not commercial-use authorization.
 - No training or VALIDATION benchmark package grants production authority.
 - Every merge requires exact-head green CI.
