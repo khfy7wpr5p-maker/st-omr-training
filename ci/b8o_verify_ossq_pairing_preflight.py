@@ -7,6 +7,7 @@ from st_omr_training.poly_v2_ossq_pairing_preflight import (
     B8O_PAIRING_SOURCE_SPECS,
     OssqPairingSourcePayload,
     build_b8o_pairing_preflight,
+    parse_scanned_alignment,
     receipt_to_json,
 )
 from st_omr_training.poly_v2_ossq_source_byte_pin import receipt_from_json
@@ -41,6 +42,14 @@ def main() -> None:
     for spec in B8O_PAIRING_SOURCE_SPECS:
         alignment = fetch_bytes(spec.alignment_raw_url, max_bytes=MAX_ALIGNMENT_BYTES)
         musicxml = fetch_bytes(spec.cleaned_musicxml_raw_url, max_bytes=MAX_MUSICXML_BYTES)
+        print(f"B8O_INSPECT_SCORE={spec.score_id}")
+        try:
+            parse_scanned_alignment(alignment)
+        except Exception:
+            # Emit only the exact score identity and bounded textual alignment
+            # metadata for diagnosis. No PDF/image bytes are logged.
+            print("B8O_ALIGNMENT_DIAGNOSTIC=" + repr(alignment.decode("utf-8", errors="replace")))
+            raise
         payloads[spec.score_id] = OssqPairingSourcePayload(
             alignment_bytes=alignment,
             cleaned_musicxml_bytes=musicxml,
