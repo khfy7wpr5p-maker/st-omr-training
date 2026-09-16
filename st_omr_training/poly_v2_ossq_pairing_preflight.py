@@ -7,9 +7,10 @@ records in that source batch.
 
 This module deliberately stops before claiming that an image/MusicXML pair is
 verified. It identifies which score records have enough upstream alignment
-metadata to proceed to deterministic system-image materialization, and blocks
-records whose alignment metadata is empty or malformed. Raw PDF, alignment and
-MusicXML bytes are caller-supplied and are not persisted by this module.
+metadata to proceed to deterministic system-image materialization. Raw PDF,
+alignment and MusicXML bytes are caller-supplied and are not persisted here.
+Opaque alignment markers whose semantics are not established by the pinned
+preprocessor remain blocked rather than being guessed.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ class OssqPairingPreflightError(ValueError):
 class PairingMaterializationState(str, Enum):
     READY = "ready-for-materialization"
     BLOCKED_EMPTY_ALIGNMENT = "blocked-empty-alignment"
+    BLOCKED_UNINTERPRETED_ALIGNMENT_MARKER = "blocked-uninterpreted-alignment-marker"
 
 
 def _canonical_json_bytes(payload: object) -> bytes:
@@ -173,10 +175,15 @@ class ScannedAlignmentProfile:
     row_count: int
     value_count: int
     value_sum: int
+    marker_tokens: tuple[str, ...]
 
     @property
     def has_alignment_values(self) -> bool:
         return self.value_count > 0
+
+    @property
+    def has_uninterpreted_markers(self) -> bool:
+        return any(marker != "x" for marker in self.marker_tokens)
 
 
 def parse_scanned_alignment(data: bytes) -> ScannedAlignmentProfile:
@@ -208,6 +215,7 @@ def parse_scanned_alignment(data: bytes) -> ScannedAlignmentProfile:
     block_count = 0
     row_count = 0
     values: list[int] = []
+    markers: set[str] = set()
     in_block = False
     for raw_line in lines[1:]:
         line = raw_line.strip()
@@ -224,15 +232,16 @@ def parse_scanned_alignment(data: bytes) -> ScannedAlignmentProfile:
             if cell == "":
                 continue
             row_has_token = True
-            if cell == "x":
-                # Camera-ready OSSQ alignment files use the literal x token as
-                # an explicit placeholder. It is preserved by the alignment
-                # file SHA-256/Git identity but does not contribute a numeric
-                # alignment value.
+            if cell in {"x", "a"}:
+                # `x` is visibly used alongside numeric alignment values in the
+                # camera-ready OSSQ files. `a` is present in the Schubert D.810
+                # file, but its semantics are not established by the pinned
+                # preprocessor. Both remain byte-bound; `a` fails readiness.
+                markers.add(cell)
                 continue
             if not cell.isdigit() or int(cell) < 1:
                 raise OssqPairingPreflightError(
-                    "alignment cells must be positive integers or the exact x placeholder"
+                    "alignment cells must be positive integers or a pinned OSSQ marker"
                 )
             values.append(int(cell))
         if not row_has_token:
@@ -244,6 +253,7 @@ def parse_scanned_alignment(data: bytes) -> ScannedAlignmentProfile:
         row_count=row_count,
         value_count=len(values),
         value_sum=sum(values),
+        marker_tokens=tuple(sorted(markers)),
     )
 
 
@@ -300,11 +310,12 @@ def inspect_pairing_source(
     head = payload.cleaned_musicxml_bytes[:131072]
     if b"<score-partwise" not in head and b"<score-timewise" not in head:
         raise OssqPairingPreflightError(f"cleaned MusicXML envelope is missing for score {spec.score_id}")
-    state = (
-        PairingMaterializationState.READY
-        if profile.has_alignment_values
-        else PairingMaterializationState.BLOCKED_EMPTY_ALIGNMENT
-    )
+    if profile.has_uninterpreted_markers:
+        state = PairingMaterializationState.BLOCKED_UNINTERPRETED_ALIGNMENT_MARKER
+    elif profile.has_alignment_values:
+        state = PairingMaterializationState.READY
+    else:
+        state = PairingMaterializationState.BLOCKED_EMPTY_ALIGNMENT
     return OssqPairingSourceEvidence(
         score_id=spec.score_id,
         imslp_id=spec.imslp_id,
