@@ -37,5 +37,6 @@ jobs:
 
       - name: Fetch and hash exact B8M-reviewed source PDFs
         env:
+          PYTHONPATH: '.'
           PYTHONUNBUFFERED: '1'
         run: python ci/b8n_pin_ossq_sources.py
