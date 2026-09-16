@@ -67,6 +67,21 @@ class OssqPairingPreflightTests(unittest.TestCase):
         self.assertEqual(profile.page_end, 8)
         self.assertEqual(profile.value_count, 2)
 
+    def test_parser_accepts_exact_camera_ready_x_placeholder(self) -> None:
+        profile = parse_scanned_alignment(b"6:8\nx, x, 14, 14, 16\n7, x, x\n")
+        self.assertEqual(profile.page_start, 6)
+        self.assertEqual(profile.page_end, 8)
+        self.assertEqual(profile.row_count, 2)
+        self.assertEqual(profile.value_count, 4)
+        self.assertEqual(profile.value_sum, 51)
+        self.assertTrue(profile.has_alignment_values)
+
+    def test_parser_allows_x_only_row_without_inventing_numeric_alignment(self) -> None:
+        profile = parse_scanned_alignment(b":\nx, x\n")
+        self.assertEqual(profile.row_count, 1)
+        self.assertEqual(profile.value_count, 0)
+        self.assertFalse(profile.has_alignment_values)
+
     def test_parser_keeps_metadata_only_alignment_empty(self) -> None:
         profile = parse_scanned_alignment(b":\n")
         self.assertEqual(profile.value_count, 0)
@@ -77,11 +92,11 @@ class OssqPairingPreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(OssqPairingPreflightError, "reversed"):
             parse_scanned_alignment(b"8:3\n4, 4\n")
 
-    def test_parser_rejects_non_positive_or_non_integer_values(self) -> None:
-        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers"):
+    def test_parser_rejects_non_positive_or_unknown_tokens(self) -> None:
+        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers or the exact x"):
             parse_scanned_alignment(b":\n4, 0\n")
-        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers"):
-            parse_scanned_alignment(b":\n4, x\n")
+        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers or the exact x"):
+            parse_scanned_alignment(b":\n4, y\n")
 
     def test_inspection_marks_nonempty_alignment_ready(self) -> None:
         alignment = b":\n4, 5\n"
