@@ -59,6 +59,7 @@ class OssqPairingPreflightTests(unittest.TestCase):
         self.assertEqual(profile.row_count, 3)
         self.assertEqual(profile.value_count, 8)
         self.assertEqual(profile.value_sum, 57)
+        self.assertEqual(profile.marker_tokens, ())
         self.assertTrue(profile.has_alignment_values)
 
     def test_parser_accepts_bounded_page_range(self) -> None:
@@ -67,38 +68,48 @@ class OssqPairingPreflightTests(unittest.TestCase):
         self.assertEqual(profile.page_end, 8)
         self.assertEqual(profile.value_count, 2)
 
-    def test_parser_accepts_exact_camera_ready_x_placeholder(self) -> None:
+    def test_parser_accepts_camera_ready_x_placeholder(self) -> None:
         profile = parse_scanned_alignment(b"6:8\nx, x, 14, 14, 16\n7, x, x\n")
         self.assertEqual(profile.page_start, 6)
         self.assertEqual(profile.page_end, 8)
         self.assertEqual(profile.row_count, 2)
         self.assertEqual(profile.value_count, 4)
         self.assertEqual(profile.value_sum, 51)
+        self.assertEqual(profile.marker_tokens, ("x",))
+        self.assertFalse(profile.has_uninterpreted_markers)
         self.assertTrue(profile.has_alignment_values)
+
+    def test_parser_records_camera_ready_a_marker_without_interpreting_it(self) -> None:
+        profile = parse_scanned_alignment(b":\na\n")
+        self.assertEqual(profile.value_count, 0)
+        self.assertEqual(profile.marker_tokens, ("a",))
+        self.assertTrue(profile.has_uninterpreted_markers)
 
     def test_parser_allows_x_only_row_without_inventing_numeric_alignment(self) -> None:
         profile = parse_scanned_alignment(b":\nx, x\n")
         self.assertEqual(profile.row_count, 1)
         self.assertEqual(profile.value_count, 0)
+        self.assertEqual(profile.marker_tokens, ("x",))
         self.assertFalse(profile.has_alignment_values)
 
     def test_parser_keeps_metadata_only_alignment_empty(self) -> None:
         profile = parse_scanned_alignment(b":\n")
         self.assertEqual(profile.value_count, 0)
         self.assertEqual(profile.row_count, 0)
+        self.assertEqual(profile.marker_tokens, ())
         self.assertFalse(profile.has_alignment_values)
 
     def test_parser_rejects_reversed_page_range(self) -> None:
         with self.assertRaisesRegex(OssqPairingPreflightError, "reversed"):
             parse_scanned_alignment(b"8:3\n4, 4\n")
 
-    def test_parser_rejects_non_positive_or_unknown_tokens(self) -> None:
-        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers or the exact x"):
+    def test_parser_rejects_non_positive_or_unpinned_tokens(self) -> None:
+        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers or a pinned"):
             parse_scanned_alignment(b":\n4, 0\n")
-        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers or the exact x"):
+        with self.assertRaisesRegex(OssqPairingPreflightError, "positive integers or a pinned"):
             parse_scanned_alignment(b":\n4, y\n")
 
-    def test_inspection_marks_nonempty_alignment_ready(self) -> None:
+    def test_inspection_marks_numeric_alignment_ready(self) -> None:
         alignment = b":\n4, 5\n"
         musicxml = b'<?xml version="1.0"?><score-partwise version="4.0"></score-partwise>'
         evidence = inspect_pairing_source(
@@ -112,8 +123,8 @@ class OssqPairingPreflightTests(unittest.TestCase):
         self.assertEqual(evidence.state, PairingMaterializationState.READY)
         self.assertEqual(evidence.alignment_profile.value_count, 2)
 
-    def test_inspection_blocks_empty_alignment_without_granting_readiness(self) -> None:
-        alignment = b":\n"
+    def test_inspection_blocks_opaque_a_marker(self) -> None:
+        alignment = b":\na\n"
         musicxml = b'<score-partwise version="4.0"></score-partwise>'
         evidence = inspect_pairing_source(
             spec_for(alignment, musicxml),
@@ -125,8 +136,24 @@ class OssqPairingPreflightTests(unittest.TestCase):
         )
         self.assertEqual(
             evidence.state,
-            PairingMaterializationState.BLOCKED_EMPTY_ALIGNMENT,
+            PairingMaterializationState.BLOCKED_UNINTERPRETED_ALIGNMENT_MARKER,
         )
+
+    def test_inspection_blocks_empty_or_x_only_alignment(self) -> None:
+        musicxml = b'<score-partwise version="4.0"></score-partwise>'
+        for alignment in (b":\n", b":\nx, x\n"):
+            evidence = inspect_pairing_source(
+                spec_for(alignment, musicxml),
+                source_document_sha256=h("c"),
+                payload=OssqPairingSourcePayload(
+                    alignment_bytes=alignment,
+                    cleaned_musicxml_bytes=musicxml,
+                ),
+            )
+            self.assertEqual(
+                evidence.state,
+                PairingMaterializationState.BLOCKED_EMPTY_ALIGNMENT,
+            )
 
     def test_inspection_rejects_alignment_blob_identity_drift(self) -> None:
         alignment = b":\n4, 5\n"
@@ -135,7 +162,7 @@ class OssqPairingPreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(OssqPairingPreflightError, "alignment Git blob"):
             inspect_pairing_source(
                 spec,
-                source_document_sha256=h("c"),
+                source_document_sha256=h("d"),
                 payload=OssqPairingSourcePayload(
                     alignment_bytes=alignment + b"6\n",
                     cleaned_musicxml_bytes=musicxml,
@@ -149,7 +176,7 @@ class OssqPairingPreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(OssqPairingPreflightError, "MusicXML Git blob"):
             inspect_pairing_source(
                 spec,
-                source_document_sha256=h("d"),
+                source_document_sha256=h("e"),
                 payload=OssqPairingSourcePayload(
                     alignment_bytes=alignment,
                     cleaned_musicxml_bytes=musicxml + b" ",
@@ -163,7 +190,7 @@ class OssqPairingPreflightTests(unittest.TestCase):
         with self.assertRaisesRegex(OssqPairingPreflightError, "MusicXML envelope"):
             inspect_pairing_source(
                 spec,
-                source_document_sha256=h("e"),
+                source_document_sha256=h("f"),
                 payload=OssqPairingSourcePayload(
                     alignment_bytes=alignment,
                     cleaned_musicxml_bytes=not_xml,
