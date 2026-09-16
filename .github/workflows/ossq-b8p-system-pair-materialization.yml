@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ossq-b8p-system-pair-materialization-${{ github.ref }}
@@ -29,8 +29,11 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Checkout ST-OMR training
+      - name: Checkout ST-OMR training PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: tr-poly-09b8p-ossq-system-pair-materialization
+          fetch-depth: 0
 
       - name: Checkout exact OSSQ camera-ready source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -71,11 +74,67 @@ jobs:
         working-directory: _b8p/preprocessor
         run: uv sync --frozen
 
-      - name: Reproduce and hash exact B8P system pairs
+      - name: Reproduce, verify historical identity, and pin canonical receipt
         env:
           PYTHONPATH: '.'
           PYTHONUNBUFFERED: '1'
-        run: >-
-          python ci/b8p_materialize_ossq_system_pairs.py
-          --dataset-root _b8p/ossq
-          --preprocessor-root _b8p/preprocessor
+          EXPECTED_B8P_RECEIPT_SHA256: '3f9f2df43b287dd95e03eaf1ffc4c5a3c9e25bdced8f09675918bc9b1f99e0cf'
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/b8p-output.txt"
+          python ci/b8p_materialize_ossq_system_pairs.py \
+            --dataset-root _b8p/ossq \
+            --preprocessor-root _b8p/preprocessor | tee "$output"
+
+          actual_sha="$(sed -n 's/^B8P_RECEIPT_SHA256=//p' "$output" | tail -n 1)"
+          test "$actual_sha" = "$EXPECTED_B8P_RECEIPT_SHA256"
+
+          mode="$(sed -n 's/^B8P_MODE=//p' "$output" | tail -n 1)"
+          if test "$mode" = "DISCOVERY"; then
+            python - "$output" "$EXPECTED_B8P_RECEIPT_SHA256" <<'PY'
+          from __future__ import annotations
+          from hashlib import sha256
+          import json
+          from pathlib import Path
+          import sys
+
+          output_path = Path(sys.argv[1])
+          expected = sys.argv[2]
+          prefix = "B8P_RECEIPT_JSON="
+          canonical = None
+          for line in output_path.read_text(encoding="utf-8").splitlines():
+              if line.startswith(prefix):
+                  canonical = line[len(prefix):]
+          if canonical is None:
+              raise SystemExit("canonical B8P discovery receipt was not emitted")
+          payload = json.loads(canonical)
+          embedded = payload.pop("receipt_sha256", None)
+          canonical_payload = json.dumps(
+              payload,
+              sort_keys=True,
+              separators=(",", ":"),
+              ensure_ascii=True,
+              allow_nan=False,
+          ).encode("ascii")
+          recomputed = sha256(canonical_payload).hexdigest()
+          if embedded != expected or recomputed != expected:
+              raise SystemExit(
+                  f"B8P discovery identity differs from historical run #4: "
+                  f"embedded={embedded} recomputed={recomputed} expected={expected}"
+              )
+          target = Path("evidence/ossq_b8p_system_pair_materialization.json")
+          if target.exists():
+              raise SystemExit("refusing bootstrap because B8P receipt already exists")
+          target.write_text(canonical, encoding="ascii")
+          PY
+
+            git add evidence/ossq_b8p_system_pair_materialization.json
+            test "$(git diff --cached --name-only)" = "evidence/ossq_b8p_system_pair_materialization.json"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "TR-POLY-09B8P: pin canonical materialization receipt"
+            git push origin HEAD:tr-poly-09b8p-ossq-system-pair-materialization
+          else
+            test "$mode" = "VERIFIED"
+            test "$(sed -n 's/^B8P_LIVE_PAIRS_MATCH_COMMITTED_RECEIPT=//p' "$output" | tail -n 1)" = "true"
+          fi
