@@ -11,6 +11,8 @@ on:
       - 'st_omr_training/poly_v2_ossq_source_byte_pin.py'
       - 'st_omr_training/poly_v2_ossq_rights_evidence_batch1.py'
       - 'tests/test_poly_v2_ossq_source_byte_pin.py'
+      - 'TR_POLY_09B8N_OSSQ_SOURCE_BYTE_PIN.md'
+      - 'STATUS.md'
   workflow_dispatch:
 
 permissions:
