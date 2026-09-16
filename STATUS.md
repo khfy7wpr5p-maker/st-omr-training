@@ -6,10 +6,10 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 ## Current repository phase
 
-- latest merged package: PR #161 — TR-POLY-09B7 hash-bound quality VALIDATION execution
-- latest verified `main`: `a57a14a764e97640e89b6cd4d805254b7f2c1b2f`
-- B7 exact PR head `2b9fcf9ac58dca7913dcb46e8117236f22ea2974`: CI run #701 success before merge
-- active package: TR-POLY-09B8A persisted Native V2 artifact reload / first-baseline preflight
+- latest merged package: PR #162 — TR-POLY-09B8A persisted Native V2 artifact reload/preflight
+- latest verified `main`: `563802128750cec6645fb4604f1fa6761ee9e129`
+- B8A exact PR head `40ac06a7fb530df8e03150f0f603304316172345`: CI run #703 success before merge
+- active package: TR-POLY-09B8B first real experiment-recipe freeze
 - frozen ≤2-step smoke trainer/checkpoint remain unchanged
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
@@ -36,7 +36,8 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 | TR-POLY-09B5 | Separate verified quality-checkpoint artifact + B1 bridge | ✅ Merged |
 | TR-POLY-09B6 | Full native TRAIN/VALIDATION multi-batch quality execution | ✅ Merged |
 | TR-POLY-09B7 | Exact descriptor-bound quality VALIDATION B1→B2→B3 execution | ✅ Merged / CI green |
-| TR-POLY-09B8A | Persisted Native V2 reload + baseline artifact preflight | 🔄 Active package |
+| TR-POLY-09B8A | Persisted Native V2 reload + baseline artifact preflight | ✅ Merged / CI green |
+| TR-POLY-09B8B | Dataset-specific experiment recipe + descriptor/decode/step freeze | 🔄 Active package |
 | First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | ⛔ Artifact-blocked |
 | Missing metric admission | Five frozen metrics remain unsupported | 🔒 Separate work |
 | P09C | Evidence-driven refinement | 🔒 After measured quality evidence |
@@ -50,6 +51,10 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 Admitted persisted Native V2 TRAIN + VALIDATION root
         ↓
 B8A fail-closed reload / identity preflight
+        ↓
+complete explicit B7 descriptor metadata
+        ↓
+B8B exact experiment-recipe freeze
         ↓
 B6 deterministic full-population batching
         ↓
@@ -66,7 +71,7 @@ B2 per-sample metrics
 B3 overall + voice + robustness aggregation
 ```
 
-B7 is now merged. The remaining blocker is not an execution-code gap in B1–B7; it is the absence of a physically available, admitted real Native V2 baseline artifact root with an exact manifest/build identity and explicit B7 descriptor metadata.
+The remaining blocker is not an execution-code gap in B1–B8B. It is the absence of a physically available, admitted real Native V2 baseline artifact root with exact manifest/build identity plus complete explicit VALIDATION descriptors.
 
 Repository regression fixtures are test evidence only. They must not be reported as real model-quality evidence.
 
@@ -82,32 +87,28 @@ targets/<sha256>.json       # TRAIN/VALIDATION only
 images/<sha256>.png          # TRAIN/VALIDATION only
 ```
 
-B8A adds a separate reload/preflight boundary for an externally mounted persisted root. It reconstructs the `NativePolyV2DatasetBuild`, verifies exact canonical metadata, verifies TRAIN/VALIDATION artifact hashes and V2/PNG semantics, rejects extra artifact files, and keeps TEST artifact bytes absent/unread.
+B8A independently reconstructs and verifies the persisted build while keeping TEST artifact bytes absent/unread.
 
-A real baseline may start only after the preflight yields an exact:
+A real baseline may continue only after preflight yields an exact dataset manifest SHA-256, deterministic build ID, full TRAIN/VALIDATION population, sealed TEST metadata population without TEST bytes, and accepted provenance/license evidence where external data is involved.
 
-- dataset manifest SHA-256;
-- deterministic build ID;
-- TRAIN and VALIDATION population;
-- sealed TEST metadata population without TEST bytes;
-- accepted provenance/license record where external data is involved;
-- explicit B7 complexity/robustness descriptors for every VALIDATION sample.
+## B8B experiment gate
 
-If these artifacts are unavailable, no checkpoint quality or accuracy number is claimed.
+B8B freezes the first real baseline before quality evidence is observed. The default recipe reuses the merged contracts:
 
-## B7 checkpoint/evaluation safety
+- `FROZEN_POLY_2D_CONFIG`;
+- `FROZEN_POLY_2D_QUALITY_CONFIG`;
+- 8 epochs;
+- AdamW, no scheduler;
+- max 8192 optimizer steps;
+- validation every epoch;
+- minimum mean VALIDATION-loss checkpoint selection, earliest exact tie;
+- B6 batch size ≤8;
+- full TRAIN and full VALIDATION populations only;
+- B7 decode bound at least the longest admitted VALIDATION target and within the model target boundary.
 
-B7 requires:
+The recipe hash-binds repository SHA, B8A receipt, dataset manifest/build identity, exact split populations/families, batch plan, model/trainer/materialization/B6 profiles, descriptor manifest, B7 split manifest, benchmark identity and decode bound.
 
-- verified B5 checkpoint load before inference;
-- checkpoint dataset identity == benchmark dataset identity;
-- checkpoint preprocessing/materialization identity == current native V2 materialization;
-- exact loaded model profile;
-- one explicit bounded B1 decode limit for the whole run;
-- one checkpoint/candidate identity across all sample reports;
-- invalid/abstain predictions retained in B2/B3 denominators;
-- TEST never accessed;
-- production authority always false.
+Freeze fails if the optimizer-step ceiling cannot cover every full TRAIN batch across every frozen epoch. This prevents silent partial training on a corpus that is larger than the accepted recipe can execute.
 
 ## Current metric surface
 
@@ -137,14 +138,14 @@ beam_relation_f1
 tie_relation_f1
 ```
 
-No unsupported metric receives a proxy number. A first B7 run may provide genuine partial VALIDATION evidence while the complete common-comparison/promotion gate remains closed.
+No unsupported metric receives a proxy number.
 
 ## Required order from here
 
-1. finish B8A reload/preflight tests/docs and exact-head CI;
-2. merge B8A only if green;
-3. locate/provide one admitted real Native V2 persisted TRAIN/VALIDATION root and record its manifest/build identity plus provenance;
-4. freeze the exact B4/B6 experiment recipe and complete B7 descriptor manifest;
+1. finish B8B recipe-contract tests/docs and exact-head CI;
+2. merge B8B only if green;
+3. locate/provide one admitted real Native V2 persisted TRAIN/VALIDATION root and verify it through B8A;
+4. complete explicit B7 descriptors and emit the real B8B recipe fingerprint;
 5. execute B6 to create the first real quality checkpoint;
 6. independently verify the B5 checkpoint round trip;
 7. execute B7 over the complete admitted VALIDATION population;
