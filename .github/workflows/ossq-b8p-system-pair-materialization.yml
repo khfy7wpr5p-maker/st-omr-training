@@ -54,10 +54,14 @@ jobs:
         with:
           python-version: '3.10.12'
 
+      - name: Install pinned uv 0.8.17
+        run: python -m pip install --disable-pip-version-check --no-deps uv==0.8.17
+
       - name: Verify runner toolchain
         run: |
           python --version
           uv --version
+          test "$(uv --version)" = "uv 0.8.17"
           git -C _b8p/ossq rev-parse HEAD
           git -C _b8p/preprocessor rev-parse HEAD
           test "$(git -C _b8p/ossq rev-parse HEAD)" = "7a17e45cddc0b7064fc3a179b62caeb57595e993"
