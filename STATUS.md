@@ -6,10 +6,10 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 ## Current repository phase
 
-- latest merged package: PR #163 — TR-POLY-09B8B first real experiment-recipe freeze
-- latest verified `main`: `5fb23696d60fc7c3ace7abfbf80991b39cf4e11f`
-- B8B exact PR head `e81019573de4094784c23cc520214babbf89c4e8`: CI run #707 success before merge
-- active package: TR-POLY-09B8I real-corpus lineage admission bridge
+- latest merged package: PR #164 — TR-POLY-09B8I real-corpus lineage admission gate
+- latest verified `main`: `306b5a15f93d7a699d7085111964e9a9841d1ebf`
+- B8I exact PR head `98cbce0ff5859de8a4a1401aa60740a5144551c8`: CI run #709 success before merge
+- active package: TR-POLY-09B8J first real baseline start permit
 - frozen ≤2-step smoke trainer/checkpoint remain unchanged
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
@@ -38,7 +38,8 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 | TR-POLY-09B7 | Exact descriptor-bound quality VALIDATION B1→B2→B3 execution | Merged / CI green |
 | TR-POLY-09B8A | Persisted Native V2 reload + baseline artifact preflight | Merged / CI green |
 | TR-POLY-09B8B | Dataset-specific experiment recipe + descriptor/decode/step freeze | Merged / CI green |
-| TR-POLY-09B8I | Stage 8 admitted real data ↔ Native V2 lineage admission | Active package |
+| TR-POLY-09B8I | Stage 8 admitted real data ↔ Native V2 lineage admission | Merged / CI green |
+| TR-POLY-09B8J | Exact B8A+B8I+B8B start permit + authorized full-population B6 wrapper | Active package |
 | First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | Artifact-blocked |
 | Missing metric admission | Five frozen metrics remain unsupported | Separate work |
 | P09C | Evidence-driven refinement | After measured quality evidence |
@@ -61,6 +62,10 @@ complete explicit B7 descriptor metadata
         ↓
 B8B exact experiment-recipe freeze
         ↓
+B8J exact baseline start permit
+        ↓
+B8J authorized full-population B6 wrapper
+        ↓
 B6 deterministic full-population batching
         ↓
 B4 multi-epoch TRAIN-only optimization
@@ -76,7 +81,7 @@ B2 per-sample metrics
 B3 overall + voice + robustness aggregation
 ```
 
-The remaining blocker is not an execution-code gap in B1–B8B. It is the absence of a physically available, admitted real corpus. The connected `ScoreMosaic_Teacher_Gold` Drive hierarchy currently contains empty organizational folders only: no admitted registry records, source corpus, teacher-verified corpus, benchmark output, or Native V2 persisted root is available.
+The remaining blocker is not an execution-code gap in B1–B8J. It is the absence of a physically available, admitted real corpus. The connected `ScoreMosaic_Teacher_Gold` Drive hierarchy currently contains empty organizational folders only: no admitted registry records, source corpus, teacher-verified corpus, benchmark output, or Native V2 persisted root is available.
 
 Repository regression fixtures are test evidence only. They must not be reported as real model-quality evidence.
 
@@ -130,6 +135,24 @@ The recipe hash-binds repository SHA, B8A receipt, dataset manifest/build identi
 
 Freeze fails if the optimizer-step ceiling cannot cover every full TRAIN batch across every frozen epoch. This prevents silent partial training on a corpus that is larger than the accepted recipe can execute.
 
+## B8J baseline-start gate
+
+B8J requires B8A, B8I and B8B to bind the same exact real baseline before B6 can start through the first-baseline path. The permit binds:
+
+- repository SHA;
+- dataset manifest/build identity;
+- B8A preflight fingerprint;
+- B8I admission fingerprint;
+- B8B recipe fingerprint;
+- exact TRAIN/VALIDATION sample populations;
+- deterministic batch plan;
+- model/trainer/materialization/B6 execution profiles;
+- epoch and optimizer-step budget.
+
+The authorized B8J execution wrapper forces `max_train_samples=None` and `max_validation_samples=None`. Prefix/subsample execution therefore cannot be used for the first measured baseline. Runtime configs are revalidated before B6 and B6 evidence is revalidated after execution.
+
+B8J does not open TEST and grants neither production nor commercial-use authority.
+
 ## Current metric surface
 
 Numeric B2/B3 metrics:
@@ -162,19 +185,20 @@ No unsupported metric receives a proxy number.
 
 ## Required order from here
 
-1. finish B8I code/tests/docs and exact-head CI; merge only if green;
+1. finish B8J code/tests/docs and exact-head CI; merge only if green;
 2. populate/provide one rights/provenance-admitted real TRAIN/VALIDATION corpus and Stage 8-1 byte receipts;
 3. materialize one Native V2 persisted root and verify it through B8A;
 4. emit the exact B8I lineage-admission receipt;
 5. complete explicit B7 descriptors and emit the real B8B recipe fingerprint;
-6. execute B6 to create the first real quality checkpoint;
-7. independently verify the B5 checkpoint round trip;
-8. execute B7 over the complete admitted VALIDATION population;
-9. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
-10. admit the five missing metric implementations without proxies;
-11. freeze P09D candidate/evaluation identity;
-12. open sealed TEST once at Stage 9;
-13. only then consider Stage 10 ScoreMosaic shadow integration.
+6. emit the exact B8J baseline start permit;
+7. execute the authorized B8J→B6 full-population path to create the first real quality checkpoint;
+8. independently verify the B5 checkpoint round trip;
+9. execute B7 over the complete admitted VALIDATION population;
+10. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
+11. admit the five missing metric implementations without proxies;
+12. freeze P09D candidate/evaluation identity;
+13. open sealed TEST once at Stage 9;
+14. only then consider Stage 10 ScoreMosaic shadow integration.
 
 ## Safety invariants
 
@@ -190,5 +214,6 @@ No unsupported metric receives a proxy number.
 - External data requires rights/license/install-pin admission.
 - Teacher corrections and ScoreMosaic uploads are not automatic training data.
 - B8I admission is not commercial-use authorization.
+- B8J permit authorizes the exact full first-baseline run only.
 - No training or VALIDATION benchmark package grants production authority.
 - Every merge requires exact-head green CI.
