@@ -6,10 +6,10 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 ## Current repository phase
 
-- latest merged package: PR #164 — TR-POLY-09B8I real-corpus lineage admission gate
-- latest verified `main`: `306b5a15f93d7a699d7085111964e9a9841d1ebf`
-- B8I exact PR head `98cbce0ff5859de8a4a1401aa60740a5144551c8`: CI run #709 success before merge
-- active package: TR-POLY-09B8J first real baseline start permit
+- latest merged package: PR #165 — TR-POLY-09B8J first real baseline start permit
+- latest verified `main`: `37647922b098cbe3c46e13e1207eda5f23d8da82`
+- B8J exact PR head `288ed731b74767d0ad4aa21ae79a6e506e1a4223`: CI run #711 success before merge
+- active package: TR-POLY-09B8K OSSQ-OMR external source selection/admission boundary
 - frozen ≤2-step smoke trainer/checkpoint remain unchanged
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
@@ -39,8 +39,9 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 | TR-POLY-09B8A | Persisted Native V2 reload + baseline artifact preflight | Merged / CI green |
 | TR-POLY-09B8B | Dataset-specific experiment recipe + descriptor/decode/step freeze | Merged / CI green |
 | TR-POLY-09B8I | Stage 8 admitted real data ↔ Native V2 lineage admission | Merged / CI green |
-| TR-POLY-09B8J | Exact B8A+B8I+B8B start permit + authorized full-population B6 wrapper | Active package |
-| First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | Artifact-blocked |
+| TR-POLY-09B8J | Exact B8A+B8I+B8B start permit + authorized full-population B6 wrapper | Merged / CI green |
+| TR-POLY-09B8K | OSSQ-OMR source selection + scanned-rights boundary | Active package |
+| First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | Corpus-rights/artifact blocked |
 | Missing metric admission | Five frozen metrics remain unsupported | Separate work |
 | P09C | Evidence-driven refinement | After measured quality evidence |
 | P09D | Final candidate/evaluation freeze | Locked |
@@ -81,7 +82,7 @@ B2 per-sample metrics
 B3 overall + voice + robustness aggregation
 ```
 
-The remaining blocker is not an execution-code gap in B1–B8J. It is the absence of a physically available, admitted real corpus. The connected `ScoreMosaic_Teacher_Gold` Drive hierarchy currently contains empty organizational folders only: no admitted registry records, source corpus, teacher-verified corpus, benchmark output, or Native V2 persisted root is available.
+The remaining blocker is not an execution-code gap in B1–B8J. B8K has identified OSSQ-OMR as the primary external source family, but no external corpus is yet admitted or install-pinned. The connected `ScoreMosaic_Teacher_Gold` Drive hierarchy remains empty. OSSQ-OMR scanned-image bytes remain blocked until their per-score IMSLP source/provenance and rights evidence pass the existing Stage 8 admission rules.
 
 Repository regression fixtures are test evidence only. They must not be reported as real model-quality evidence.
 
@@ -153,6 +154,19 @@ The authorized B8J execution wrapper forces `max_train_samples=None` and `max_va
 
 B8J does not open TEST and grants neither production nor commercial-use authority.
 
+## B8K external-source boundary
+
+B8K pins the reviewed OSSQ-OMR camera-ready source snapshot:
+
+`MALerLab/ossq-omr@7a17e45cddc0b7064fc3a179b62caeb57595e993`
+
+The source family is deliberately split into two registry components:
+
+- annotation sources plus publisher-created synthetic/derived artifacts: CC0, `LICENSE_VERIFIED`, not install-pinned;
+- IMSLP-derived scanned-image track: `LICENSE_REVIEW_REQUIRED`, no training/evaluation/commercial permission asserted until per-score upstream rights are independently reviewed.
+
+B8K does not download or admit corpus bytes and does not change TEST, production, or commercial authority.
+
 ## Current metric surface
 
 Numeric B2/B3 metrics:
@@ -185,20 +199,22 @@ No unsupported metric receives a proxy number.
 
 ## Required order from here
 
-1. finish B8J code/tests/docs and exact-head CI; merge only if green;
-2. populate/provide one rights/provenance-admitted real TRAIN/VALIDATION corpus and Stage 8-1 byte receipts;
-3. materialize one Native V2 persisted root and verify it through B8A;
-4. emit the exact B8I lineage-admission receipt;
-5. complete explicit B7 descriptors and emit the real B8B recipe fingerprint;
-6. emit the exact B8J baseline start permit;
-7. execute the authorized B8J→B6 full-population path to create the first real quality checkpoint;
-8. independently verify the B5 checkpoint round trip;
-9. execute B7 over the complete admitted VALIDATION population;
-10. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
-11. admit the five missing metric implementations without proxies;
-12. freeze P09D candidate/evaluation identity;
-13. open sealed TEST once at Stage 9;
-14. only then consider Stage 10 ScoreMosaic shadow integration.
+1. finish B8K source-selection code/tests/docs and exact-head CI; merge only if green;
+2. perform a deterministic metadata-first rights/provenance audit over the OSSQ-OMR scanned source inventory;
+3. acquire only approved scanned artifacts and pin exact SHA-256 identities;
+4. create Stage 8-1 byte receipts and admitted TRAIN/VALIDATION metadata;
+5. materialize one Native V2 persisted root and verify it through B8A;
+6. emit the exact B8I lineage-admission receipt;
+7. complete explicit B7 descriptors and emit the real B8B recipe fingerprint;
+8. emit the exact B8J baseline start permit;
+9. execute the authorized B8J→B6 full-population path to create the first real quality checkpoint;
+10. independently verify the B5 checkpoint round trip;
+11. execute B7 over the complete admitted VALIDATION population;
+12. inspect B2/B3 failures by voice/robustness and choose P09C from evidence;
+13. admit the five missing metric implementations without proxies;
+14. freeze P09D candidate/evaluation identity;
+15. open sealed TEST once at Stage 9;
+16. only then consider Stage 10 ScoreMosaic shadow integration.
 
 ## Safety invariants
 
@@ -215,5 +231,6 @@ No unsupported metric receives a proxy number.
 - Teacher corrections and ScoreMosaic uploads are not automatic training data.
 - B8I admission is not commercial-use authorization.
 - B8J permit authorizes the exact full first-baseline run only.
+- B8K scanned-source selection is not permission to use IMSLP-derived bytes.
 - No training or VALIDATION benchmark package grants production authority.
 - Every merge requires exact-head green CI.
