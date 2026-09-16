@@ -6,10 +6,10 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 
 ## Current repository phase
 
-- latest merged package: PR #165 — TR-POLY-09B8J first real baseline start permit
-- latest verified `main`: `37647922b098cbe3c46e13e1207eda5f23d8da82`
-- B8J exact PR head `288ed731b74767d0ad4aa21ae79a6e506e1a4223`: CI run #711 success before merge
-- active package: TR-POLY-09B8K OSSQ-OMR external source selection/admission boundary
+- latest merged package: PR #166 — TR-POLY-09B8K OSSQ-OMR external source selection/admission boundary
+- latest verified `main`: `f2155de42cc849db3a6cef87c09f883dd7161714`
+- B8K exact PR head `00ee5d5912b6ba18ed18dc1abc7792cf782c7646`: CI run #713 success before merge
+- active package: TR-POLY-09B8L OSSQ per-score rights/provenance audit
 - frozen ≤2-step smoke trainer/checkpoint remain unchanged
 - TEST: sealed
 - ScoreMosaic / production authority: not granted
@@ -40,7 +40,8 @@ This is the current stage-status source. `ARCHITECTURE.md` preserves historical 
 | TR-POLY-09B8B | Dataset-specific experiment recipe + descriptor/decode/step freeze | Merged / CI green |
 | TR-POLY-09B8I | Stage 8 admitted real data ↔ Native V2 lineage admission | Merged / CI green |
 | TR-POLY-09B8J | Exact B8A+B8I+B8B start permit + authorized full-population B6 wrapper | Merged / CI green |
-| TR-POLY-09B8K | OSSQ-OMR source selection + scanned-rights boundary | Active package |
+| TR-POLY-09B8K | OSSQ-OMR source selection + scanned-rights boundary | Merged / CI green |
+| TR-POLY-09B8L | OSSQ per-score source inventory + independent rights/provenance review gate | Active package |
 | First measured quality baseline | Real admitted B6 checkpoint + B7 full VALIDATION run | Corpus-rights/artifact blocked |
 | Missing metric admission | Five frozen metrics remain unsupported | Separate work |
 | P09C | Evidence-driven refinement | After measured quality evidence |
@@ -82,7 +83,7 @@ B2 per-sample metrics
 B3 overall + voice + robustness aggregation
 ```
 
-The remaining blocker is not an execution-code gap in B1–B8J. B8K has identified OSSQ-OMR as the primary external source family, but no external corpus is yet admitted or install-pinned. The connected `ScoreMosaic_Teacher_Gold` Drive hierarchy remains empty. OSSQ-OMR scanned-image bytes remain blocked until their per-score IMSLP source/provenance and rights evidence pass the existing Stage 8 admission rules.
+The remaining blocker is not an execution-code gap in B1–B8J. B8K has selected OSSQ-OMR as the primary external source family and B8L is freezing the per-score rights/provenance gate. No external score PDF/image artifact is yet admitted or install-pinned. The connected `ScoreMosaic_Teacher_Gold` Drive hierarchy remains empty. OSSQ-OMR scanned-image bytes remain blocked until each source entry has independent rights/provenance evidence and later exact artifact-byte identity.
 
 Repository regression fixtures are test evidence only. They must not be reported as real model-quality evidence.
 
@@ -167,6 +168,19 @@ The source family is deliberately split into two registry components:
 
 B8K does not download or admit corpus bytes and does not change TEST, production, or commercial authority.
 
+## B8L per-score rights/provenance gate
+
+B8L binds the camera-ready OSSQ source inventory to the exact upstream metadata objects:
+
+- `data/scanned_score_types.tsv` Git blob `35ebe84f0c9f03a41231c92fa21183242bf12774`;
+- `data/scores_w_pub.yaml` Git blob `7a72b220f4faa897900f51bcb85e49b845cb1304`.
+
+The pinned scanned-score table has 122 score entries across 116 unique work paths. B8L recomputes the Git blob SHA from caller-supplied TSV bytes before parsing them.
+
+Every real-image score type (`0`, `1`, `1\``, `1\`\``, `3`, `4`) requires an exact score-ID/IMSLP-ID/source-type review record. Approved records require separate provenance evidence and separate independent rights evidence plus explicit training/commercial/redistribution permission booleans. The upstream OSSQ copyright label itself cannot serve as the independent rights evidence.
+
+Scores sharing one IMSLP source file may not carry contradictory rights/provenance decisions. Pending or rejected records remain blocked. B8L only identifies later Stage 8 candidates; it does not download source bytes, grant production authority, grant final commercial-use authority, or open TEST.
+
 ## Current metric surface
 
 Numeric B2/B3 metrics:
@@ -199,8 +213,8 @@ No unsupported metric receives a proxy number.
 
 ## Required order from here
 
-1. finish B8K source-selection code/tests/docs and exact-head CI; merge only if green;
-2. perform a deterministic metadata-first rights/provenance audit over the OSSQ-OMR scanned source inventory;
+1. finish B8L per-score audit code/tests/docs and exact-head CI; merge only if green;
+2. populate independent per-score rights/provenance evidence for the pinned OSSQ scanned candidate inventory;
 3. acquire only approved scanned artifacts and pin exact SHA-256 identities;
 4. create Stage 8-1 byte receipts and admitted TRAIN/VALIDATION metadata;
 5. materialize one Native V2 persisted root and verify it through B8A;
@@ -232,5 +246,7 @@ No unsupported metric receives a proxy number.
 - B8I admission is not commercial-use authorization.
 - B8J permit authorizes the exact full first-baseline run only.
 - B8K scanned-source selection is not permission to use IMSLP-derived bytes.
+- B8L upstream copyright labels are not independent rights approval.
+- No B8L score reaches byte admission without independent rights/provenance evidence.
 - No training or VALIDATION benchmark package grants production authority.
 - Every merge requires exact-head green CI.
