@@ -14,7 +14,6 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from hashlib import sha256
 import json
-import math
 import re
 from typing import Final, Iterable
 
@@ -77,6 +76,10 @@ def _jsonable(value: object) -> object:
     if isinstance(value, list):
         return [_jsonable(item) for item in value]
     return value
+
+
+def _plain_positive_int(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
 def _require_sha256(name: str, value: object) -> str:
@@ -158,24 +161,39 @@ class NativePolyV2ExperimentRecipe:
             _require_sha256(name, getattr(self, name))
         if not self.train_sample_ids or not self.validation_sample_ids:
             raise PolyV2ExperimentRecipeError("B8B requires full TRAIN and VALIDATION populations")
+        if len(self.train_family_ids) != len(self.train_sample_ids) or len(self.validation_family_ids) != len(self.validation_sample_ids):
+            raise PolyV2ExperimentRecipeError("B8B family/sample cardinality mismatch")
         if set(self.train_sample_ids) & set(self.validation_sample_ids):
             raise PolyV2ExperimentRecipeError("B8B sample leakage detected")
         if set(self.train_family_ids) & set(self.validation_family_ids):
             raise PolyV2ExperimentRecipeError("B8B family leakage detected")
-        if sum(self.train_batch_sizes) != len(self.train_sample_ids):
-            raise PolyV2ExperimentRecipeError("B8B TRAIN batch plan does not cover the population")
-        if sum(self.validation_batch_sizes) != len(self.validation_sample_ids):
-            raise PolyV2ExperimentRecipeError("B8B VALIDATION batch plan does not cover the population")
-        if not 1 <= self.batch_size <= MAX_POLY_2D_TRAINING_BATCH:
+        if not _plain_positive_int(self.batch_size) or self.batch_size > MAX_POLY_2D_TRAINING_BATCH:
             raise PolyV2ExperimentRecipeError("B8B batch_size exceeds the B6 boundary")
+        for name in ("epochs", "max_optimizer_steps", "required_optimizer_steps", "max_decode_steps"):
+            if not _plain_positive_int(getattr(self, name)):
+                raise PolyV2ExperimentRecipeError(f"B8B {name} must be a positive plain integer")
+        if self.train_batch_sizes != _batch_sizes(len(self.train_sample_ids), self.batch_size):
+            raise PolyV2ExperimentRecipeError("B8B TRAIN batch plan differs from deterministic full-population batching")
+        if self.validation_batch_sizes != _batch_sizes(len(self.validation_sample_ids), self.batch_size):
+            raise PolyV2ExperimentRecipeError("B8B VALIDATION batch plan differs from deterministic full-population batching")
+        if any(not _plain_positive_int(size) or size > self.batch_size for size in self.train_batch_sizes + self.validation_batch_sizes):
+            raise PolyV2ExperimentRecipeError("B8B batch plan contains an invalid batch size")
+        if self.required_optimizer_steps != len(self.train_batch_sizes) * self.epochs:
+            raise PolyV2ExperimentRecipeError("B8B optimizer-step evidence differs from the frozen TRAIN plan")
         if self.required_optimizer_steps > self.max_optimizer_steps:
             raise PolyV2ExperimentRecipeError("B8B optimizer-step ceiling cannot cover the frozen full TRAIN plan")
-        if self.max_decode_steps < 1:
-            raise PolyV2ExperimentRecipeError("B8B max_decode_steps must be positive")
-        if not self.benchmark_id or not self.benchmark_version:
+        if not isinstance(self.benchmark_id, str) or not self.benchmark_id or not isinstance(self.benchmark_version, str) or not self.benchmark_version:
             raise PolyV2ExperimentRecipeError("B8B benchmark identity text must be non-empty")
         if self.recipe_version != POLY_V2_EXPERIMENT_RECIPE_VERSION:
             raise PolyV2ExperimentRecipeError("B8B recipe version mismatch")
+        for name in (
+            "full_train_population",
+            "full_validation_population",
+            "test_artifact_bytes_accessed",
+            "production_authority",
+        ):
+            if not isinstance(getattr(self, name), bool):
+                raise PolyV2ExperimentRecipeError(f"B8B {name} must be boolean")
         if not self.full_train_population or not self.full_validation_population:
             raise PolyV2ExperimentRecipeError("first baseline may not use prefix/subsample selection")
         if self.test_artifact_bytes_accessed or self.production_authority:
