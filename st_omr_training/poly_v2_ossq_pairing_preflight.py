@@ -219,16 +219,24 @@ def parse_scanned_alignment(data: bytes) -> ScannedAlignmentProfile:
             in_block = True
         row_count += 1
         cells = [cell.strip() for cell in line.split(",")]
-        row_values: list[int] = []
+        row_has_token = False
         for cell in cells:
             if cell == "":
                 continue
+            row_has_token = True
+            if cell == "x":
+                # Camera-ready OSSQ alignment files use the literal x token as
+                # an explicit placeholder. It is preserved by the alignment
+                # file SHA-256/Git identity but does not contribute a numeric
+                # alignment value.
+                continue
             if not cell.isdigit() or int(cell) < 1:
-                raise OssqPairingPreflightError("alignment values must be positive integers")
-            row_values.append(int(cell))
-        if not row_values:
-            raise OssqPairingPreflightError("alignment row contains no positive integer values")
-        values.extend(row_values)
+                raise OssqPairingPreflightError(
+                    "alignment cells must be positive integers or the exact x placeholder"
+                )
+            values.append(int(cell))
+        if not row_has_token:
+            raise OssqPairingPreflightError("alignment row contains no alignment tokens")
     return ScannedAlignmentProfile(
         page_start=page_start,
         page_end=page_end,
