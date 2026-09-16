@@ -1,9 +1,13 @@
 """TR-POLY-09B8P real OSSQ system-image/MusicXML materialization evidence.
 
-B8P consumes only the seven B8O READY score records.  It validates a
-reproduced OSSQ/preprocessor output tree and emits a hash-only receipt for each
-systemwise PNG <-> MusicXML pair.  It does not independently approve pairing,
-admit Stage 8 data, assign TRAIN/VALIDATION, open TEST, or authorize training.
+B8P consumes only the seven B8O READY score records. It validates a reproduced
+OSSQ/preprocessor output tree and emits a hash-only receipt for each final
+systemwise PNG <-> MusicXML pair. Upstream YOLO `system.ignores` and
+`system.exceptions` are preserved as explicit exclusions; they are never
+silently intersected away.
+
+B8P does not independently approve pairing, admit Stage 8 data, assign
+TRAIN/VALIDATION, open TEST, or authorize training.
 """
 from __future__ import annotations
 
@@ -31,6 +35,7 @@ B8P_BLOCKED_SCORE_IDS: Final[tuple[str, ...]] = ("7397765",)
 _SEGMENT_RE = re.compile(r"^sq(?P<score>[0-9]+):(?P<page>[0-9]{4}):(?P<system>[0-9]{4})$")
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_YOLO_INFO_VERSION = "0.1.0"
 
 
 class OssqSystemPairMaterializationError(ValueError):
@@ -38,7 +43,13 @@ class OssqSystemPairMaterializationError(ValueError):
 
 
 def _canonical_bytes(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False).encode("ascii")
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+        allow_nan=False,
+    ).encode("ascii")
 
 
 def _require_sha256(name: str, value: str) -> str:
@@ -62,6 +73,72 @@ def _validate_musicxml(data: bytes) -> None:
     head = data[:131072]
     if b"<score-partwise" not in head and b"<score-timewise" not in head:
         raise OssqSystemPairMaterializationError("system MusicXML envelope is missing")
+
+
+def _parse_system_exclusions(yolo_bytes: bytes, *, score_id: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Parse the bounded camera-ready YOLOInfo surface without a YAML dependency.
+
+    Only the exact scalar/list shape used by YOLOInfo v0.1.0 is accepted for
+    `system.ignores` and `system.exceptions`. Unknown top-level content is
+    tolerated because the receipt separately hash-binds the complete YAML.
+    """
+    try:
+        text = yolo_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise OssqSystemPairMaterializationError("yolo_info must be UTF-8") from exc
+
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    version = None
+    data_id = None
+    image_type = None
+    system_start = None
+    for index, raw in enumerate(lines):
+        if raw.startswith("version:"):
+            version = raw.split(":", 1)[1].strip()
+        elif raw.startswith("data_id:"):
+            data_id = raw.split(":", 1)[1].strip()
+        elif raw.startswith("image_type:"):
+            image_type = raw.split(":", 1)[1].strip()
+        elif raw == "system:":
+            system_start = index + 1
+
+    if version != _YOLO_INFO_VERSION:
+        raise OssqSystemPairMaterializationError("unsupported yolo_info version")
+    if data_id != f"sq{score_id}":
+        raise OssqSystemPairMaterializationError("yolo_info data_id differs from score")
+    if image_type != "scanned":
+        raise OssqSystemPairMaterializationError("yolo_info image_type must be scanned")
+    if system_start is None:
+        raise OssqSystemPairMaterializationError("yolo_info system section is missing")
+
+    sections: dict[str, list[str]] = {"ignores": [], "exceptions": []}
+    active: str | None = None
+    for raw in lines[system_start:]:
+        if raw and not raw.startswith(" "):
+            break
+        if raw.startswith("  ") and not raw.startswith("    "):
+            stripped = raw.strip()
+            if stripped in ("ignores:", "exceptions:"):
+                active = stripped[:-1]
+            else:
+                active = None
+            continue
+        if raw.startswith("    - "):
+            if active not in sections:
+                raise OssqSystemPairMaterializationError("unexpected yolo_info system list")
+            segment_id = raw[6:].strip()
+            match = _SEGMENT_RE.fullmatch(segment_id)
+            if match is None or match.group("score") != score_id:
+                raise OssqSystemPairMaterializationError("invalid yolo_info system exclusion segment")
+            sections[active].append(segment_id)
+        elif raw.strip() and active is not None:
+            raise OssqSystemPairMaterializationError("malformed yolo_info system exclusion list")
+
+    ignores = tuple(sorted(set(sections["ignores"])))
+    exceptions = tuple(sorted(set(sections["exceptions"])))
+    if set(ignores) & set(exceptions):
+        raise OssqSystemPairMaterializationError("system ignore/exception sets overlap")
+    return ignores, exceptions
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,6 +168,32 @@ class OssqSystemPairEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class OssqSystemExclusionEvidence:
+    score_id: str
+    yolo_info_sha256: str
+    declared_ignore_ids: tuple[str, ...]
+    declared_exception_ids: tuple[str, ...]
+    applied_ignore_ids: tuple[str, ...]
+    applied_exception_ids: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require_sha256("yolo_info_sha256", self.yolo_info_sha256)
+        for segment_id in (
+            *self.declared_ignore_ids,
+            *self.declared_exception_ids,
+            *self.applied_ignore_ids,
+            *self.applied_exception_ids,
+        ):
+            match = _SEGMENT_RE.fullmatch(segment_id)
+            if match is None or match.group("score") != self.score_id:
+                raise OssqSystemPairMaterializationError("exclusion segment does not bind score")
+        if not set(self.applied_ignore_ids).issubset(set(self.declared_ignore_ids)):
+            raise OssqSystemPairMaterializationError("applied ignores must be declared upstream")
+        if not set(self.applied_exception_ids).issubset(set(self.declared_exception_ids)):
+            raise OssqSystemPairMaterializationError("applied exceptions must be declared upstream")
+
+
+@dataclass(frozen=True, slots=True)
 class OssqSystemPairMaterializationReceipt:
     version: str
     source_commit_sha: str
@@ -100,6 +203,7 @@ class OssqSystemPairMaterializationReceipt:
     ready_score_ids: tuple[str, ...]
     blocked_score_ids: tuple[str, ...]
     pairs: tuple[OssqSystemPairEvidence, ...]
+    exclusions: tuple[OssqSystemExclusionEvidence, ...]
     pair_count_by_score: tuple[tuple[str, int], ...]
     raw_pdf_bytes_persisted: bool
     raw_pair_bytes_persisted_as_evidence: bool
@@ -121,6 +225,7 @@ class OssqSystemPairMaterializationReceipt:
             "ready_score_ids": list(self.ready_score_ids),
             "blocked_score_ids": list(self.blocked_score_ids),
             "pairs": [asdict(item) for item in self.pairs],
+            "exclusions": [asdict(item) for item in self.exclusions],
             "pair_count_by_score": [list(item) for item in self.pair_count_by_score],
             "raw_pdf_bytes_persisted": self.raw_pdf_bytes_persisted,
             "raw_pair_bytes_persisted_as_evidence": self.raw_pair_bytes_persisted_as_evidence,
@@ -154,6 +259,7 @@ def build_b8p_materialization_receipt(
 
     specs = _source_spec_by_id()
     pairs: list[OssqSystemPairEvidence] = []
+    exclusions: list[OssqSystemExclusionEvidence] = []
     counts: list[tuple[str, int]] = []
     seen_segments: set[str] = set()
 
@@ -163,20 +269,48 @@ def build_b8p_materialization_receipt(
         yolo_info = score_dir / "images" / "scanned" / f"sq{score_id}_yolo_infos.yaml"
         if not yolo_info.is_file():
             raise OssqSystemPairMaterializationError(f"missing yolo_info for score {score_id}")
-        yolo_info_sha = sha256(yolo_info.read_bytes()).hexdigest()
+        yolo_bytes = yolo_info.read_bytes()
+        yolo_info_sha = sha256(yolo_bytes).hexdigest()
+        declared_ignores, declared_exceptions = _parse_system_exclusions(yolo_bytes, score_id=score_id)
+
         image_dir = score_dir / "images" / "scanned" / "systemwise"
         musicxml_dir = score_dir / "musicxml" / "scanned" / "systemwise"
         image_paths = sorted(image_dir.glob(f"sq{score_id}:*.png"))
         xml_paths = sorted(musicxml_dir.glob(f"sq{score_id}:*.musicxml"))
         image_stems = {path.stem for path in image_paths}
         xml_stems = {path.stem for path in xml_paths}
-        if not image_stems or image_stems != xml_stems:
+        if not image_stems or not xml_stems:
+            raise OssqSystemPairMaterializationError(f"zero final materialized pair population for score {score_id}")
+
+        ignore_set = set(declared_ignores)
+        exception_set = set(declared_exceptions)
+        declared_exclusion_set = ignore_set | exception_set
+        applied_ignores = tuple(sorted(image_stems & ignore_set))
+        applied_exceptions = tuple(sorted(image_stems & exception_set))
+        expected_pair_stems = image_stems - declared_exclusion_set
+
+        if xml_stems != expected_pair_stems:
+            unexpected_unpaired_images = sorted((image_stems - xml_stems) - declared_exclusion_set)
+            xml_without_image = sorted(xml_stems - image_stems)
+            excluded_xml = sorted(xml_stems & declared_exclusion_set)
             raise OssqSystemPairMaterializationError(
-                f"system image/MusicXML segment population mismatch for score {score_id}"
+                f"system image/MusicXML population differs from pinned upstream exclusions for score {score_id}; "
+                f"unexpected_unpaired_images={unexpected_unpaired_images}; "
+                f"xml_without_image={xml_without_image}; excluded_xml={excluded_xml}"
             )
+
+        exclusions.append(OssqSystemExclusionEvidence(
+            score_id=score_id,
+            yolo_info_sha256=yolo_info_sha,
+            declared_ignore_ids=declared_ignores,
+            declared_exception_ids=declared_exceptions,
+            applied_ignore_ids=applied_ignores,
+            applied_exception_ids=applied_exceptions,
+        ))
+
         score_count = 0
         source_sha = _require_sha256("source_document_sha256", b8n_source_sha256_by_score[score_id])
-        for stem in sorted(image_stems):
+        for stem in sorted(xml_stems):
             match = _SEGMENT_RE.fullmatch(stem)
             if match is None or match.group("score") != score_id:
                 raise OssqSystemPairMaterializationError(f"invalid system segment id: {stem}")
@@ -214,6 +348,7 @@ def build_b8p_materialization_receipt(
         ready_score_ids=B8P_READY_SCORE_IDS,
         blocked_score_ids=B8P_BLOCKED_SCORE_IDS,
         pairs=tuple(pairs),
+        exclusions=tuple(exclusions),
         pair_count_by_score=tuple(counts),
         raw_pdf_bytes_persisted=False,
         raw_pair_bytes_persisted_as_evidence=False,
@@ -227,12 +362,25 @@ def build_b8p_materialization_receipt(
     )
     fingerprint = sha256(_canonical_bytes(provisional.payload_without_fingerprint())).hexdigest()
     return OssqSystemPairMaterializationReceipt(
-        **{**provisional.payload_without_fingerprint(),
-           "ready_score_ids": provisional.ready_score_ids,
-           "blocked_score_ids": provisional.blocked_score_ids,
-           "pairs": provisional.pairs,
-           "pair_count_by_score": provisional.pair_count_by_score,
-           "receipt_sha256": fingerprint}
+        version=provisional.version,
+        source_commit_sha=provisional.source_commit_sha,
+        preprocessor_commit_sha=provisional.preprocessor_commit_sha,
+        b8n_source_receipt_sha256=provisional.b8n_source_receipt_sha256,
+        b8o_pairing_preflight_receipt_sha256=provisional.b8o_pairing_preflight_receipt_sha256,
+        ready_score_ids=provisional.ready_score_ids,
+        blocked_score_ids=provisional.blocked_score_ids,
+        pairs=provisional.pairs,
+        exclusions=provisional.exclusions,
+        pair_count_by_score=provisional.pair_count_by_score,
+        raw_pdf_bytes_persisted=provisional.raw_pdf_bytes_persisted,
+        raw_pair_bytes_persisted_as_evidence=provisional.raw_pair_bytes_persisted_as_evidence,
+        independent_pairing_review_authority=provisional.independent_pairing_review_authority,
+        stage8_admission_authority=provisional.stage8_admission_authority,
+        train_validation_assignment_authority=provisional.train_validation_assignment_authority,
+        test_artifact_bytes_accessed=provisional.test_artifact_bytes_accessed,
+        production_authority=provisional.production_authority,
+        commercial_use_authority=provisional.commercial_use_authority,
+        receipt_sha256=fingerprint,
     )
 
 
