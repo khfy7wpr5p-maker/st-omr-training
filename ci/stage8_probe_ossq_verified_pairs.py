@@ -117,7 +117,7 @@ def _probe_candidate(candidate, dataset_root: Path) -> dict[str, object]:
     try:
         semantic = semantic_fingerprint_from_musicxml(xml_bytes)
     except RealDataIntakeError as exc:
-        diagnostic = semantic_gate_diagnostic_from_error(exc)
+        diagnostic = semantic_gate_diagnostic_from_error(exc, musicxml_bytes=xml_bytes)
         return {
             **base,
             "semantic_fingerprint": None,
