@@ -1,0 +1,45 @@
+name: OSSQ B8Q B8R Review Bridge
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/ossq-b8q-b8r-review-bridge.yml'
+      - 'ci/b8q_bridge_ossq_cross_render_reviews.py'
+      - 'evidence/ossq_b8p_system_pair_materialization.json'
+      - 'evidence/ossq_b8r_cross_render_audit.json'
+      - 'evidence/ossq_b8q_pair_review_admission.json'
+      - 'st_omr_training/poly_v2_ossq_b8r_review_bridge.py'
+      - 'st_omr_training/poly_v2_ossq_pair_review_admission.py'
+      - 'tests/test_poly_v2_ossq_b8r_review_bridge.py'
+      - 'tests/test_poly_v2_ossq_pair_review_admission.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ossq-b8q-b8r-review-bridge-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bridge:
+    name: Convert frozen B8R evidence into exact B8Q pair reviews
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout ST-OMR training
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.13'
+
+      - name: Build or verify hash-only B8Q review receipt
+        env:
+          PYTHONPATH: '.'
+          PYTHONUNBUFFERED: '1'
+        run: python ci/b8q_bridge_ossq_cross_render_reviews.py
