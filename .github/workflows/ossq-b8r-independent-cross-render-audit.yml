@@ -1,0 +1,90 @@
+name: OSSQ B8R Independent Cross Render Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/ossq-b8r-independent-cross-render-audit.yml'
+      - 'ci/b8r_audit_ossq_cross_render_pairs.py'
+      - 'ci/b8p_materialize_ossq_system_pairs.py'
+      - 'evidence/ossq_b8n_source_byte_pins.json'
+      - 'evidence/ossq_b8p_system_pair_materialization.json'
+      - 'evidence/ossq_b8r_cross_render_audit.json'
+      - 'st_omr_training/poly_v2_ossq_cross_render_audit.py'
+      - 'st_omr_training/poly_v2_ossq_system_pair_materialization.py'
+      - 'st_omr_training/poly_v2_ossq_pairing_preflight.py'
+      - 'tests/test_poly_v2_ossq_cross_render_audit.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ossq-b8r-independent-cross-render-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: Independently cross-render and audit exact OSSQ system pairs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout ST-OMR training
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Checkout exact OSSQ camera-ready source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: MALerLab/ossq-omr
+          ref: 7a17e45cddc0b7064fc3a179b62caeb57595e993
+          path: _b8r/ossq
+          persist-credentials: false
+
+      - name: Checkout exact OSSQ preprocessor
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: MALerLab/omr-data-preprocessor
+          ref: bdea0d1829c9db84480ebd2e0385f6f5fe324274
+          path: _b8r/preprocessor
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.10.12'
+
+      - name: Install pinned audit and preprocessor runtimes
+        run: |
+          python -m pip install --disable-pip-version-check --no-deps uv==0.8.17
+          python -m pip install --disable-pip-version-check verovio==6.2.1 CairoSVG==2.8.2 Pillow==12.3.0
+
+      - name: Verify pinned runtime identities
+        run: |
+          test "$(uv --version)" = "uv 0.8.17"
+          test "$(git -C _b8r/ossq rev-parse HEAD)" = "7a17e45cddc0b7064fc3a179b62caeb57595e993"
+          test "$(git -C _b8r/preprocessor rev-parse HEAD)" = "bdea0d1829c9db84480ebd2e0385f6f5fe324274"
+          python - <<'PY'
+          from importlib import metadata
+          expected = {"verovio": "6.2.1", "CairoSVG": "2.8.2", "Pillow": "12.3.0"}
+          for package, version in expected.items():
+              actual = metadata.version(package)
+              if actual != version:
+                  raise SystemExit(f"{package}: expected {version}, got {actual}")
+              print(f"{package}=={actual}")
+          PY
+
+      - name: Install exact preprocessor lock
+        working-directory: _b8r/preprocessor
+        run: uv sync --frozen
+
+      - name: Reproduce B8P pairs and run independent B8R audit
+        env:
+          PYTHONPATH: '.'
+          PYTHONUNBUFFERED: '1'
+        run: >-
+          python ci/b8r_audit_ossq_cross_render_pairs.py
+          --dataset-root _b8r/ossq
+          --preprocessor-root _b8r/preprocessor
