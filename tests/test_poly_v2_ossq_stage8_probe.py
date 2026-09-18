@@ -49,6 +49,32 @@ class OssqStage8VerifiedProbeTests(unittest.TestCase):
         self.assertEqual(diagnostic.issue_path, "$.parts")
         self.assertEqual(diagnostic.source, "validation")
 
+    def test_semantic_gate_diagnostic_refines_generic_xsd_failure_from_musicxml_bytes(self) -> None:
+        validation = ValidationResult(
+            (
+                ValidationIssue(
+                    code="musicxml.xsd_invalid",
+                    path="$",
+                    message="document is not valid MusicXML 4.0 XSD",
+                ),
+            )
+        )
+        try:
+            try:
+                raise SupportedV1RoundTripError("Stage 2-C validation failed", validation)
+            except SupportedV1RoundTripError as cause:
+                raise RealDataIntakeError("generic Stage 8 semantic rejection") from cause
+        except RealDataIntakeError as error:
+            diagnostic = semantic_gate_diagnostic_from_error(
+                error,
+                musicxml_bytes=b'<?xml version="1.0"?><other/>',
+            )
+
+        self.assertNotEqual(diagnostic.issue_code, "musicxml.xsd_invalid")
+        self.assertTrue(diagnostic.issue_code.startswith("musicxml.xsd."))
+        self.assertEqual(diagnostic.issue_path, "/other")
+        self.assertEqual(diagnostic.source, "xsd-error-log")
+
     def test_exact_b8q_verified_population_yields_14_probe_candidates(self) -> None:
         candidates = build_stage8_probe_candidates(
             b8p_payload=payload(B8P),
