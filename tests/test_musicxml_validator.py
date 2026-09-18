@@ -11,6 +11,7 @@ from st_omr_training.generator import GeneratorConfig, generate_score
 from st_omr_training.musicxml_validator import (
     MAX_MUSICXML_BYTES,
     MUSICXML_SCHEMA_SHA256,
+    diagnose_musicxml_xsd_failure,
     validate_musicxml,
     validate_musicxml_semantics,
     validate_musicxml_xsd,
@@ -290,6 +291,20 @@ class SchemaIntegrityTests(unittest.TestCase):
                 invalid = b'<?xml version="1.0"?><other/>'
                 self.assertTrue(validate_musicxml_xsd(valid, schema_dir=root).is_valid)
                 self.assertIn("musicxml.xsd_invalid", codes(validate_musicxml_xsd(invalid, schema_dir=root)))
+
+    def test_xsd_failure_diagnostic_exposes_type_path_and_message_hash_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            assets = self.make_schema_dir(root)
+            with patch.dict(MUSICXML_SCHEMA_SHA256, self.hashes(assets), clear=True):
+                diagnostic = diagnose_musicxml_xsd_failure(b'<?xml version="1.0"?><other/>', schema_dir=root)
+
+        self.assertIsNotNone(diagnostic)
+        assert diagnostic is not None
+        self.assertTrue(diagnostic.issue_code.startswith("musicxml.xsd."))
+        self.assertEqual(diagnostic.issue_path, "/other")
+        self.assertEqual(len(diagnostic.message_sha256), 64)
+        self.assertNotIn("message", diagnostic.__dataclass_fields__)
 
     def test_xsd_adapter_refuses_unknown_external_import(self):
         schema = b'''<?xml version="1.0"?>
