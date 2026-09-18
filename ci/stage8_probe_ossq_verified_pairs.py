@@ -20,6 +20,7 @@ from st_omr_training.poly_v2_ossq_pairing_preflight import B8O_PAIRING_SOURCE_SP
 from st_omr_training.poly_v2_ossq_stage8_probe import (
     B8S_STAGE8_PROBE_VERSION,
     build_stage8_probe_candidates,
+    semantic_gate_diagnostic_from_error,
 )
 from st_omr_training.poly_v2_ossq_system_pair_materialization import (
     B8P_EXPECTED_B8N_RECEIPT_SHA256,
@@ -115,10 +116,14 @@ def _probe_candidate(candidate, dataset_root: Path) -> dict[str, object]:
 
     try:
         semantic = semantic_fingerprint_from_musicxml(xml_bytes)
-    except RealDataIntakeError:
+    except RealDataIntakeError as exc:
+        diagnostic = semantic_gate_diagnostic_from_error(exc)
         return {
             **base,
             "semantic_fingerprint": None,
+            "semantic_issue_code": diagnostic.issue_code,
+            "semantic_issue_path": diagnostic.issue_path,
+            "semantic_issue_source": diagnostic.source,
             "stage8_probe_decision": "rejected",
             "reason_code": "stage8-semantic-token-gate-rejected",
             "byte_receipt_sha256": None,
@@ -164,6 +169,9 @@ def _probe_candidate(candidate, dataset_root: Path) -> dict[str, object]:
         return {
             **base,
             "semantic_fingerprint": semantic,
+            "semantic_issue_code": None,
+            "semantic_issue_path": None,
+            "semantic_issue_source": None,
             "stage8_probe_decision": "rejected",
             "reason_code": "stage8-quarantine-intake-rejected",
             "byte_receipt_sha256": None,
@@ -172,6 +180,9 @@ def _probe_candidate(candidate, dataset_root: Path) -> dict[str, object]:
     return {
         **base,
         "semantic_fingerprint": semantic,
+        "semantic_issue_code": None,
+        "semantic_issue_path": None,
+        "semantic_issue_source": None,
         "stage8_probe_decision": "probe-passed",
         "reason_code": "stage8-quarantine-intake-probe-passed",
         "byte_receipt_sha256": receipt.receipt_sha256,
@@ -235,6 +246,12 @@ def main() -> int:
             if item["stage8_probe_decision"] == "probe-passed"
         }
     )
+    semantic_issue_counts: dict[str, int] = {}
+    for item in observations:
+        issue_code = item.get("semantic_issue_code")
+        if isinstance(issue_code, str):
+            semantic_issue_counts[issue_code] = semantic_issue_counts.get(issue_code, 0) + 1
+
 
     payload = {
         "version": B8S_STAGE8_PROBE_VERSION,
@@ -251,6 +268,7 @@ def main() -> int:
             ["intake-rejected", intake_rejected],
         ],
         "passing_family_count": passed_families,
+        "semantic_issue_counts": sorted(semantic_issue_counts.items()),
         "rights_scope": "research-training-candidate-only",
         "raw_source_bytes_persisted_as_evidence": False,
         "raw_pair_bytes_persisted_as_evidence": False,
@@ -283,6 +301,7 @@ def main() -> int:
         f"probe-passed:{passed},semantic-rejected:{semantic_rejected},intake-rejected:{intake_rejected}"
     )
     print(f"B8S_PASSING_FAMILY_COUNT={passed_families}")
+    print("B8S_SEMANTIC_ISSUE_COUNTS=" + json.dumps(sorted(semantic_issue_counts.items()), separators=(",", ":")))
     print("B8S_RIGHTS_SCOPE=research-training-candidate-only")
     print("B8S_STAGE8_ADMISSION_AUTHORITY=false")
     print("B8S_TRAIN_VALIDATION_ASSIGNMENT_AUTHORITY=false")
