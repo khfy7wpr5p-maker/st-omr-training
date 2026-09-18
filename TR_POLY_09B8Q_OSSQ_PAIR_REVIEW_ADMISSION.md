@@ -40,6 +40,42 @@ At package creation, the only justified classification is:
 
 This is deliberate fail-closed behavior, not a failure of materialization.
 
+## Frozen B8R bridge result
+
+The independently reproduced B8R receipt is frozen at:
+
+- B8R receipt SHA-256: `4b880a6348897189e9851d74258ba8a07cb210bb7695d159319adad633e237c1`
+- policy fingerprint: `9d6a6d25843bdd9bbcfd1a9b6dccec59471646d0b59361e034e2e959323b8397`
+- reviewer identity SHA-256: `35fd9e0abb378cd6bbd131a31468b248d13a9353b700193bc13ac0fcea6cdaac`
+- B8R decisions: 14 `verified-candidate`, 398 `review-required`
+- score cross-conflicts: 0 for all seven READY scores
+
+The deterministic B8R -> B8Q bridge validates the exact B8P identities, frozen B8R receipt,
+policy fingerprint, reviewer identity, complete 412-observation population and zero
+cross-conflict requirement. It never promotes a B8R `review-required` observation.
+
+The canonical B8Q review receipt is committed at:
+
+`evidence/ossq_b8q_pair_review_admission.json`
+
+Receipt SHA-256:
+
+`c9345c106217c52ecdb4cbc325e5ef4e1b5d23dfbfc44190ee6124dd655b86fa`
+
+Current B8Q result:
+
+- VERIFIED: **14**, all via `independent-cross-render-v1`
+- REVIEW_REQUIRED: **398**, all remain `unreviewed-v1`
+- BLOCKED: **0** among the 412 B8P candidates
+- upstream score `7397765`: still excluded and outside the 412-candidate population
+- independent pairing-review authority: **true**
+- Stage 8 admission authority: **false**
+- TRAIN/VALIDATION assignment authority: **false**
+- TEST access: **false**
+- production authority: **false**
+- commercial-use authority: **false**
+
+
 ## Independent review methods
 
 The contract currently reserves two explicit independent methods:
@@ -66,12 +102,12 @@ The existing Stage 8-0/8-1 contracts remain authoritative for rights evidence, f
 
 ## Next executable work
 
-1. produce independent review evidence for B8P pairs without using B8P reproducibility itself as the verifier;
-2. classify each pair as `VERIFIED`, `REVIEW_REQUIRED`, or `BLOCKED`;
-3. send only exact `VERIFIED` pair identities to Stage 8 quarantine construction;
-4. bind B8M rights evidence and exact source-document identity;
-5. assign complete work/source families to TRAIN or VALIDATION without leakage;
-6. run Stage 8-1 byte/semantic/perceptual validation on those quarantined records;
-7. admit only records that pass every frozen Stage 8 gate.
+1. send only the 14 exact B8Q `VERIFIED` pair identities to Stage 8 quarantine construction;
+2. keep all 398 `REVIEW_REQUIRED` pairs outside Stage 8 admission;
+3. bind existing committed rights/provenance evidence and exact source-document identity;
+4. assign complete work/source families to TRAIN or VALIDATION only when leakage-safe;
+5. run Stage 8 byte/provenance/semantic/perceptual validation on quarantined records;
+6. admit only records that pass every frozen Stage 8 gate;
+7. keep TEST sealed until the explicit Stage 9 gate.
 
-Until independent pair review exists, real model training remains `NOT STARTED` and real model accuracy remains `NOT MEASURED`.
+Real model training remains `NOT STARTED` and real model accuracy remains `NOT MEASURED` until Stage 8 admission, leakage-safe splitting, corpus sufficiency and the remaining real-corpus gates are proven.
