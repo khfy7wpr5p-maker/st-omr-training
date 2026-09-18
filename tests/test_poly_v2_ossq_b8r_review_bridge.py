@@ -97,11 +97,23 @@ class B8RToB8QReviewBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(OssqB8RReviewBridgeError, "exact B8P pair identity"):
             build_b8q_from_b8r(b8p_payload=b8p_payload(), b8r_payload=payload)
 
-    def test_b8p_pair_identity_drift_is_rejected(self) -> None:
+    def test_b8p_image_identity_drift_is_rejected(self) -> None:
         payload = b8p_payload()
         payload["pairs"][0]["image_sha256"] = "5" * 64
-        with self.assertRaises(Exception):
+        with self.assertRaisesRegex(OssqB8RReviewBridgeError, "B8P input rejected"):
             build_b8q_from_b8r(b8p_payload=payload, b8r_payload=b8r_payload())
+
+    def test_b8p_musicxml_identity_drift_is_rejected(self) -> None:
+        payload = b8p_payload()
+        payload["pairs"][0]["musicxml_sha256"] = "6" * 64
+        with self.assertRaisesRegex(OssqB8RReviewBridgeError, "B8P input rejected"):
+            build_b8q_from_b8r(b8p_payload=payload, b8r_payload=b8r_payload())
+
+    def test_b8r_non_identity_payload_drift_fails_canonical_fingerprint(self) -> None:
+        payload = b8r_payload()
+        payload["observations"][0]["primary_similarity_ppm"] += 1
+        with self.assertRaisesRegex(OssqB8RReviewBridgeError, "canonical receipt fingerprint"):
+            build_b8q_from_b8r(b8p_payload=b8p_payload(), b8r_payload=payload)
 
     def test_review_required_b8r_observation_never_becomes_verified(self) -> None:
         source = b8r_payload()
