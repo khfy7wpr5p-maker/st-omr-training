@@ -9,7 +9,11 @@ from st_omr_training.poly_v2_ossq_stage8_probe import (
     B8S_EXPECTED_B8Q_RECEIPT_SHA256,
     OssqStage8ProbeError,
     build_stage8_probe_candidates,
+    semantic_gate_diagnostic_from_error,
 )
+from st_omr_training.musicxml_roundtrip import SupportedV1RoundTripError
+from st_omr_training.real_data_intake import RealDataIntakeError
+from st_omr_training.validator import ValidationIssue, ValidationResult
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +27,28 @@ def payload(path: Path) -> dict[str, object]:
 
 
 class OssqStage8VerifiedProbeTests(unittest.TestCase):
+    def test_semantic_gate_diagnostic_recovers_wrapped_validation_issue_code_and_path(self) -> None:
+        validation = ValidationResult(
+            (
+                ValidationIssue(
+                    code="musicxml.part_count",
+                    path="$.parts",
+                    message="V1 requires exactly one score part",
+                ),
+            )
+        )
+        try:
+            try:
+                raise SupportedV1RoundTripError("Stage 2-C validation failed", validation)
+            except SupportedV1RoundTripError as cause:
+                raise RealDataIntakeError("generic Stage 8 semantic rejection") from cause
+        except RealDataIntakeError as error:
+            diagnostic = semantic_gate_diagnostic_from_error(error)
+
+        self.assertEqual(diagnostic.issue_code, "musicxml.part_count")
+        self.assertEqual(diagnostic.issue_path, "$.parts")
+        self.assertEqual(diagnostic.source, "validation")
+
     def test_exact_b8q_verified_population_yields_14_probe_candidates(self) -> None:
         candidates = build_stage8_probe_candidates(
             b8p_payload=payload(B8P),
