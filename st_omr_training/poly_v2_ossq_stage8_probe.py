@@ -16,6 +16,7 @@ from st_omr_training.poly_v2_ossq_b8r_review_bridge import (
     build_b8q_from_b8r,
 )
 from st_omr_training.poly_v2_ossq_pair_review_admission import review_receipt_to_json
+from st_omr_training.musicxml_validator import diagnose_musicxml_xsd_failure
 from st_omr_training.poly_v2_ossq_rights_evidence_batch1 import B8M_BATCH1_EVIDENCE
 from st_omr_training.real_data_contract import RightsBasis
 from st_omr_training.validator import ValidationResult
@@ -49,7 +50,11 @@ class SemanticGateDiagnostic:
     source: str
 
 
-def semantic_gate_diagnostic_from_error(error: BaseException) -> SemanticGateDiagnostic:
+def semantic_gate_diagnostic_from_error(
+    error: BaseException,
+    *,
+    musicxml_bytes: bytes | None = None,
+) -> SemanticGateDiagnostic:
     """Recover the first structured validation issue without exposing source bytes."""
 
     current: BaseException | None = error
@@ -63,6 +68,14 @@ def semantic_gate_diagnostic_from_error(error: BaseException) -> SemanticGateDia
             code = getattr(first, "code", None)
             path = getattr(first, "path", None)
             if isinstance(code, str) and code and isinstance(path, str) and path:
+                if code == "musicxml.xsd_invalid" and musicxml_bytes is not None:
+                    xsd = diagnose_musicxml_xsd_failure(musicxml_bytes)
+                    if xsd is not None:
+                        return SemanticGateDiagnostic(
+                            issue_code=xsd.issue_code,
+                            issue_path=xsd.issue_path,
+                            source="xsd-error-log",
+                        )
                 return SemanticGateDiagnostic(
                     issue_code=code,
                     issue_path=path,
