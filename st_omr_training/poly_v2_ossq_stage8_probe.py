@@ -42,6 +42,41 @@ class OssqStage8ProbeError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
+class SemanticGateDiagnostic:
+    issue_code: str
+    issue_path: str
+    source: str
+
+
+def semantic_gate_diagnostic_from_error(error: BaseException) -> SemanticGateDiagnostic:
+    """Recover the first structured validation issue without exposing source bytes."""
+
+    current: BaseException | None = error
+    seen: set[int] = set()
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        validation = getattr(current, "validation", None)
+        issues = getattr(validation, "issues", ())
+        if isinstance(issues, tuple) and issues:
+            first = issues[0]
+            code = getattr(first, "code", None)
+            path = getattr(first, "path", None)
+            if isinstance(code, str) and code and isinstance(path, str) and path:
+                return SemanticGateDiagnostic(
+                    issue_code=code,
+                    issue_path=path,
+                    source="validation",
+                )
+        current = current.__cause__ or current.__context__
+
+    return SemanticGateDiagnostic(
+        issue_code="semantic-gate-unclassified",
+        issue_path="$",
+        source="exception-chain",
+    )
+
+
+@dataclass(frozen=True, slots=True)
 class OssqStage8ProbeCandidate:
     score_id: str
     segment_id: str
