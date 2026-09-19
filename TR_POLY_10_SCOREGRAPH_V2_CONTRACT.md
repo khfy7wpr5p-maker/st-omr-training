@@ -2,7 +2,7 @@
 
 Status: initial contract
 
-Integration base: `main` after PR #175.
+Integration base: `main` (PR #175 already merged).
 
 ## Purpose
 
