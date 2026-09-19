@@ -2,6 +2,8 @@
 
 Status: initial contract
 
+Integration base: `main` after PR #175.
+
 ## Purpose
 
 ScoreGraph V2 provides the parser-facing graph envelope required for real polyphonic MusicXML without replacing the already-frozen Polyphonic Representation V2 (PolyScore) or changing the V1 tokenizer/model surface.
