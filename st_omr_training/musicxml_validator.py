@@ -11,6 +11,7 @@ silently normalizes unsupported MusicXML into the V1 subset.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from fractions import Fraction
 from hashlib import sha256
 from pathlib import Path
@@ -42,6 +43,13 @@ _DURATION_BY_TYPE: Final[dict[str, Fraction]] = {
     "whole": Fraction(1, 1), "half": Fraction(1, 2), "quarter": Fraction(1, 4), "eighth": Fraction(1, 8)
 }
 _ALLOWED_ACCIDENTALS: Final[frozenset[str]] = frozenset({"sharp", "flat", "natural"})
+
+@dataclass(frozen=True, slots=True)
+class XsdFailureDiagnostic:
+    issue_code: str
+    issue_path: str
+    message_sha256: str
+
 
 class _SchemaAssetError(RuntimeError):
     pass
@@ -138,6 +146,44 @@ def validate_musicxml_xsd(data: object, *, schema_dir: Path | None = None) -> Va
     if not schema.validate(document):
         return ValidationResult((_issue("musicxml.xsd_invalid", "$", "document is not valid MusicXML 4.0 XSD"),))
     return ValidationResult()
+
+def diagnose_musicxml_xsd_failure(
+    data: object,
+    *,
+    schema_dir: Path | None = None,
+) -> XsdFailureDiagnostic | None:
+    """Return hash-only detail for the first XSD validation failure."""
+
+    payload, issues = _preflight_bytes(data)
+    if issues:
+        return None
+    assert payload is not None
+    directory = schema_dir or SCHEMA_DIR
+    try:
+        etree, schema = _compile_schema(directory)
+        document = etree.fromstring(payload, parser=_secure_parser(etree))
+    except Exception:
+        return None
+    if schema.validate(document):
+        return None
+
+    first = next(iter(schema.error_log), None)
+    if first is None:
+        return None
+    type_name = getattr(first, "type_name", None)
+    suffix = (
+        type_name.lower()
+        if isinstance(type_name, str) and type_name
+        else "validation"
+    )
+    path = getattr(first, "path", None)
+    message = getattr(first, "message", "")
+    return XsdFailureDiagnostic(
+        issue_code=f"musicxml.xsd.{suffix}",
+        issue_path=path if isinstance(path, str) and path else "$",
+        message_sha256=sha256(str(message).encode("utf-8")).hexdigest(),
+    )
+
 
 def _parse_semantic_tree(data: bytes):
     try:
